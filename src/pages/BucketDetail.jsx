@@ -1,0 +1,1282 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Database, Activity, Clock, Cpu, Download, Plus, X, Trash2, LayoutGrid, GripVertical, ChevronRight, Settings, Move, Maximize2, Minimize2, LineChart as LineChartIcon, BarChart2 as BarChartIcon, PieChart as PieChartIcon, Activity as AreaChartIcon, Radar as RadarChartIcon, Hash, Gauge as GaugeIcon, Radio, ToggleRight, MapPin, CircleDashed } from 'lucide-react';
+import { bucketsApi, mqttApi } from '../services/api';
+import { StatusBadge } from '../components/UI/Badge';
+import {
+  LineChart, Line,
+  BarChart, Bar,
+  AreaChart, Area,
+  PieChart, Pie, Cell,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ScatterChart, Scatter,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Fix leaflet icon issue
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import Swal from 'sweetalert2';
+
+// ─── Chart color palette ───────────────────────────────────────────────────
+const COLORS = ['#22d3ee', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#fb923c', '#a78bfa'];
+const getColor = (i) => COLORS[i % COLORS.length];
+
+const CHART_TYPES = [
+  { value: 'line',   label: 'Line Chart',    icon: LineChartIcon, category: 'chart' },
+  { value: 'area',   label: 'Area Chart',    icon: AreaChartIcon, category: 'chart' },
+  { value: 'bar',    label: 'Bar Chart',     icon: BarChartIcon, category: 'chart' },
+  { value: 'pie',    label: 'Pie Chart',     icon: PieChartIcon, category: 'chart' },
+  { value: 'donut',  label: 'Donut Chart',   icon: CircleDashed, category: 'chart' },
+  { value: 'radar',  label: 'Radar Chart',   icon: RadarChartIcon, category: 'chart' },
+  { value: 'stat',   label: 'Value / Stat',  icon: Hash, category: 'widget' },
+  { value: 'gauge',  label: 'Gauge / Meter', icon: GaugeIcon, category: 'widget' },
+  { value: 'status', label: 'Indicator',     icon: Radio, category: 'widget' },
+  { value: 'switch', label: 'Switch / Toggle',icon: ToggleRight, category: 'widget' },
+  { value: 'map',    label: 'Map / GPS',     icon: MapPin, category: 'widget' },
+];
+
+const SIZE_OPTIONS = [
+  { value: '1', label: 'Small (1 col)',  cols: 1 },
+  { value: '2', label: 'Medium (2 cols)', cols: 2 },
+  { value: '3', label: 'Large (3 cols)',  cols: 3 },
+];
+
+// ─── Single Widget Renderer ─────────────────────────────────────────────────
+function WidgetChart({ widget, chartData, color }) {
+  const h = widget.h === 'tall' ? 320 : 220;
+
+  if (!chartData || chartData.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-slate-500">
+        <Database size={24} className="mb-2 opacity-40" />
+        <p className="text-sm">No data yet</p>
+      </div>
+    );
+  }
+
+  const latestVal = chartData[chartData.length - 1]?.[widget.field] ?? '-';
+
+  if (widget.type === 'stat') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-2">
+        <span className="text-5xl font-black flex items-baseline gap-2" style={{ color }}>
+          {latestVal}
+          {widget.unit && <span className="text-2xl text-slate-400 font-medium">{widget.unit}</span>}
+        </span>
+        <span className="text-slate-400 text-sm font-medium uppercase tracking-wide">{widget.field}</span>
+        <span className="text-xs text-slate-500">Latest value</span>
+      </div>
+    );
+  }
+
+  if (widget.type === 'gauge') {
+    // Simple recharts gauge (half pie)
+    const val = parseFloat(latestVal) || 0;
+    const min = parseFloat(widget.config?.min) || 0;
+    const max = parseFloat(widget.config?.max) || 100;
+    
+    // Normalize value between min and max
+    let normalized = val;
+    if (normalized < min) normalized = min;
+    if (normalized > max) normalized = max;
+    
+    // Calculate percentage for half-circle
+    const percent = (normalized - min) / (max - min);
+    
+    const pieData = [
+      { name: 'Value', value: percent, fill: color },
+      { name: 'Remaining', value: 1 - percent, fill: '#334155' }
+    ];
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full relative" style={{ height: h }}>
+        <ResponsiveContainer width="100%" height="80%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="100%"
+              startAngle={180}
+              endAngle={0}
+              innerRadius="70%"
+              outerRadius="100%"
+              dataKey="value"
+              isAnimationActive={false}
+              stroke="none"
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute bottom-4 flex flex-col items-center">
+          <span className="text-3xl font-black text-slate-100">{val}</span>
+          <span className="text-xs text-slate-500">{widget.unit || widget.field}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === 'status') {
+    const valStr = String(latestVal).toLowerCase();
+    const isOk = valStr === '1' || valStr === 'true' || valStr === 'on' || valStr === 'normal' || valStr === 'online';
+    const isBad = valStr === '0' || valStr === 'false' || valStr === 'off' || valStr === 'bahaya' || valStr === 'offline';
+    
+    let stateColor = '#64748b'; // default gray
+    let icon = '⚪';
+    let label = latestVal;
+
+    if (isOk) {
+      stateColor = widget.config?.color || '#10b981'; // custom or emerald
+      icon = '🟢';
+      label = widget.config?.onLabel || 'Normal / Online';
+    } else if (isBad) {
+      stateColor = '#ef4444'; // rose
+      icon = '🔴';
+      label = widget.config?.offLabel || 'Bahaya / Offline';
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: `${stateColor}20` }}>
+          <div className="w-12 h-12 rounded-full animate-pulse" style={{ backgroundColor: stateColor }} />
+        </div>
+        <span className="text-xl font-bold text-slate-200">{label}</span>
+        <span className="text-sm text-slate-500 uppercase">{widget.field}</span>
+      </div>
+    );
+  }
+
+  if (widget.type === 'switch') {
+    const isOn = String(latestVal).toLowerCase() === '1' || String(latestVal).toLowerCase() === 'on' || String(latestVal) === 'true';
+    const switchColor = widget.config?.color || '#06b6d4'; // default cyan
+    
+    // Publish MQTT message when switch is toggled
+    const handleToggle = async (e) => {
+      e.stopPropagation();
+      const newState = isOn ? 0 : 1; // Send 0 for off, 1 for on
+      const topic = widget.config?.topic || `iot/device/${widget.field}/set`;
+      
+      try {
+        await mqttApi.publish(topic, JSON.stringify({ [widget.field]: newState }));
+        
+        Swal.fire({
+          toast: true, position: 'top-end', icon: 'success',
+          title: `Command sent: ${newState ? 'ON' : 'OFF'}`,
+          showConfirmButton: false, timer: 1500, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399'
+        });
+      } catch (err) {
+        Swal.fire({
+          toast: true, position: 'top-end', icon: 'error',
+          title: 'Failed to send command',
+          showConfirmButton: false, timer: 2000, background: '#1e293b', color: '#e2e8f0'
+        });
+      }
+    };
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <button 
+          className="relative inline-flex h-12 w-24 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
+          style={{ backgroundColor: isOn ? switchColor : '#334155' }}
+          onClick={handleToggle}
+        >
+          <span className={`inline-block h-10 w-10 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-13' : 'translate-x-1'}`} />
+        </button>
+        <div className="text-center">
+          <span className="text-lg font-bold text-slate-200">{isOn ? 'ON' : 'OFF'}</span>
+          <p className="text-xs text-slate-500 mt-1 uppercase">{widget.field}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (widget.type === 'map') {
+    // Assuming field contains "lat,lng" e.g. "-6.2,106.8"
+    let lat = -6.2;
+    let lng = 106.8;
+    
+    if (typeof latestVal === 'string' && latestVal.includes(',')) {
+      const parts = latestVal.split(',');
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        lat = parseFloat(parts[0]);
+        lng = parseFloat(parts[1]);
+      }
+    }
+
+    return (
+      <div className="w-full h-full rounded-xl overflow-hidden z-0" style={{ height: h }}>
+        <MapContainer center={[lat, lng]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false} dragging={false} scrollWheelZoom={false}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap'
+          />
+          <Marker position={[lat, lng]}>
+            <Popup>{widget.field}: {lat}, {lng}</Popup>
+          </Marker>
+        </MapContainer>
+      </div>
+    );
+  }
+
+  // For pie / donut — use only last 6 points
+  if (widget.type === 'pie' || widget.type === 'donut') {
+    const slice = chartData.slice(-6);
+    const pieData = slice.map((d, i) => ({
+      name: d.timestamp,
+      value: parseFloat(d[widget.field]) || 0,
+      fill: COLORS[i % COLORS.length],
+    }));
+    const innerRadius = widget.type === 'donut' ? '55%' : 0;
+    return (
+      <div style={{ height: h }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius="80%"
+              innerRadius={innerRadius}
+              isAnimationActive={false}
+            >
+              {pieData.map((entry, i) => (
+                <Cell key={i} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }}
+              itemStyle={{ color: '#e2e8f0' }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  if (widget.type === 'radar') {
+    const slice = chartData.slice(-8);
+    return (
+      <div style={{ height: h }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart data={slice}>
+            <PolarGrid stroke="#334155" />
+            <PolarAngleAxis dataKey="timestamp" stroke="#64748b" fontSize={11} />
+            <PolarRadiusAxis stroke="#334155" fontSize={9} />
+            <Radar dataKey={widget.field} stroke={color} fill={color} fillOpacity={0.25} isAnimationActive={false} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }}
+              itemStyle={{ color: '#e2e8f0' }}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  if (widget.type === 'bar') {
+    return (
+      <div style={{ height: h }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+            <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
+            <YAxis stroke="#64748b" fontSize={10} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
+            <Bar dataKey={widget.field} fill={color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  if (widget.type === 'area') {
+    return (
+      <div style={{ height: h }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+            <defs>
+              <linearGradient id={`grad-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={color} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+            <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
+            <YAxis stroke="#64748b" fontSize={10} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
+            <Area type="monotone" dataKey={widget.field} stroke={color} strokeWidth={2.5} fill={`url(#grad-${widget.id})`} dot={false} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  // Default: Line
+  return (
+    <div style={{ height: h }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+          <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
+          <YAxis stroke="#64748b" fontSize={10} />
+          <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
+          <Line type="monotone" dataKey={widget.field} stroke={color} strokeWidth={2.5} dot={{ r: 2.5, fill: '#1e293b' }} activeDot={{ r: 5, strokeWidth: 0 }} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Sortable Widget Card ───────────────────────────────────────────────────
+function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, editMode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: widget.id });
+  const color = widget.config?.color || getColor(index);
+
+  // Local state for instant visual resizing
+  const [localW, setLocalW] = useState(widget.w || '1');
+  const [localH, setLocalH] = useState(widget.h || 'normal');
+  const [resizing, setResizing] = useState(false);
+  const [ghostSize, setGhostSize] = useState(null);
+  const startDragRef = useRef(null);
+
+  // Sync local state when widget prop changes (e.g. from modal)
+  useEffect(() => {
+    setLocalW(widget.w || '1');
+    setLocalH(widget.h || 'normal');
+  }, [widget.w, widget.h]);
+
+  const handlePointerDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
+    setResizing(true);
+    
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    startDragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startW: parseInt(localW),
+      startH: localH,
+      baseWidth: rect.width,
+      baseHeight: rect.height,
+    };
+    
+    setGhostSize({ w: rect.width, h: rect.height });
+
+    const handlePointerMove = (moveEvent) => {
+      if (!startDragRef.current) return;
+      
+      const dx = moveEvent.clientX - startDragRef.current.x;
+      const dy = moveEvent.clientY - startDragRef.current.y;
+      
+      // Update pixel-perfect ghost box size
+      setGhostSize({
+        w: Math.max(150, startDragRef.current.baseWidth + dx),
+        h: Math.max(150, startDragRef.current.baseHeight + dy),
+      });
+    };
+
+    const handlePointerUp = (upEvent) => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      
+      if (!startDragRef.current) return;
+      
+      const dx = upEvent.clientX - startDragRef.current.x;
+      const dy = upEvent.clientY - startDragRef.current.y;
+      
+      // Calculate final snapped values based on total drag distance
+      let newW = startDragRef.current.startW;
+      if (dx > 120) newW = Math.min(3, startDragRef.current.startW + 1);
+      if (dx > 350) newW = Math.min(3, startDragRef.current.startW + 2);
+      if (dx < -120) newW = Math.max(1, startDragRef.current.startW - 1);
+      if (dx < -350) newW = Math.max(1, startDragRef.current.startW - 2);
+
+      let newH = startDragRef.current.startH;
+      if (dy > 80) newH = 'tall';
+      if (dy < -80) newH = 'normal';
+
+      const finalW = newW.toString();
+      const finalH = newH;
+      
+      setLocalW(finalW);
+      setLocalH(finalH);
+      setGhostSize(null);
+      setResizing(false);
+      
+      if (finalW !== widget.w || finalH !== widget.h) {
+        if (onResize) {
+          onResize(widget.id, { w: finalW, h: finalH });
+        }
+      }
+      startDragRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition ? `${transition}, min-height 0.3s ease` : 'min-height 0.3s ease',
+    opacity: isDragging ? 0.5 : 1,
+    gridColumn: localW === '3' ? 'span 3' : localW === '2' ? 'span 2' : 'span 1',
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={`glass-card p-5 relative group flex flex-col gap-3 transition-[grid-column] duration-300 ease-in-out ${localH === 'tall' ? 'min-h-[400px]' : ''}`}
+    >
+      {/* Ghost Resize Box */}
+      {ghostSize && (
+        <div 
+          className="absolute top-0 left-0 rounded-2xl border-2 border-dashed border-cyan-400 bg-cyan-500/10 z-50 pointer-events-none backdrop-blur-[2px] transition-none"
+          style={{ width: `${ghostSize.w}px`, height: `${ghostSize.h}px` }}
+        />
+      )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          {editMode && (
+            <button
+              {...listeners}
+              {...attributes}
+              className="text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing flex-shrink-0 p-1 -ml-1 rounded hover:bg-slate-700/50 transition-colors"
+              title="Drag to reorder"
+            >
+              <GripVertical size={16} />
+            </button>
+          )}
+          <h4 className="font-semibold text-slate-200 truncate">{widget.title}</h4>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {editMode && (
+            <>
+              <button
+                onClick={() => onEdit(widget)}
+                className="text-slate-500 hover:text-cyan-400 p-1 rounded hover:bg-slate-700/50 transition-colors"
+                title="Edit widget"
+              >
+                <Settings size={14} />
+              </button>
+              <button
+                onClick={() => onDelete(widget.id)}
+                className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-slate-700/50 transition-colors"
+                title="Delete widget"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="flex-1 min-h-[180px]">
+        <WidgetChart widget={widget} chartData={chartData} color={color} />
+      </div>
+
+      {/* Footer badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 font-mono">
+          {CHART_TYPES.find(c => c.value === widget.type)?.label || widget.type}
+        </span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-500 font-mono">
+          field: {widget.field}
+        </span>
+      </div>
+
+      {/* Drag Resize Handle */}
+      {editMode && (
+        <div
+          onPointerDown={handlePointerDown}
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-slate-500 hover:text-cyan-400 transition-colors z-10"
+          title="Drag to resize"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0L0 12H12V0Z" fill="currentColor" opacity="0.5"/>
+            <path d="M12 6L6 12H12V6Z" fill="currentColor"/>
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+export default function BucketDetail() {
+  const { id } = useParams();
+  const [bucket, setBucket] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [widgets, setWidgets] = useState([]);
+  const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  // Modal states
+  const [showWidgetModal, setShowWidgetModal] = useState(false);
+  const [editingWidget, setEditingWidget] = useState(null); // for editing existing
+  const [submitting, setSubmitting] = useState(false);
+  const [formType, setFormType] = useState('line');
+  const [formColor, setFormColor] = useState('');
+  const [modalStep, setModalStep] = useState(1);
+  const lastUpdateRef = useRef(0);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // ── Fetch ──
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(() => fetchData(false), 3000);
+    return () => clearInterval(interval);
+  }, [id]);
+
+  const fetchData = async (showLoading = true) => {
+    const fetchStartTime = Date.now();
+    try {
+      if (showLoading) setLoading(true);
+      const [bucketRes, recordsRes] = await Promise.all([
+        bucketsApi.get(id),
+        bucketsApi.records(id),
+      ]);
+      setBucket(prev => JSON.stringify(prev) === JSON.stringify(bucketRes.data) ? prev : bucketRes.data);
+      setRecords(prev => JSON.stringify(prev) === JSON.stringify(recordsRes.data) ? prev : recordsRes.data);
+      
+      setWidgets(prev => {
+        // Prevent stale fetch from overwriting local state if an update happened recently
+        if (fetchStartTime < lastUpdateRef.current) return prev;
+        
+        const next = bucketRes.data.widgets || [];
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load bucket data.');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  // ── Format data for charts ──
+  const formatChartData = (recs) => {
+    if (!bucket?.fields) return [];
+    return recs.map(r => {
+      const point = { timestamp: r.timestamp };
+      bucket.fields.forEach(f => {
+        point[f] = r[f] !== undefined ? parseFloat(r[f]) : null;
+      });
+      return point;
+    }).reverse();
+  };
+
+  const chartData = formatChartData(records);
+
+  // ── Save widgets to API ──
+  const saveWidgets = useCallback(async (newWidgets) => {
+    try {
+      await bucketsApi.updateWidgets(id, newWidgets);
+      lastUpdateRef.current = Date.now();
+    } catch (err) {
+      console.error("Save widgets failed:", err);
+      Swal.fire({ text: 'Failed to save widget layout', icon: 'error', background: '#1e293b', color: '#e2e8f0' });
+      throw err; // Re-throw so caller knows it failed
+    }
+  }, [id]);
+
+  // ── Drag end ──
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setWidgets(prev => {
+        const oldIndex = prev.findIndex(w => w.id === active.id);
+        const newIndex = prev.findIndex(w => w.id === over.id);
+        const reordered = arrayMove(prev, oldIndex, newIndex);
+        saveWidgets(reordered);
+        return reordered;
+      });
+    }
+  };
+
+  // ── Add / Edit Widget Submit ──
+  const handleWidgetSubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+
+    setSubmitting(true);
+    try {
+      const widgetPayload = {
+        type: data.type,
+        field: data.field,
+        title: data.title || `${data.field} ${data.type}`,
+        w: data.w || '1',
+        h: data.h || 'normal',
+        unit: data.unit || null,
+        config: {
+          min: data.min || 0,
+          max: data.max || 100,
+          onLabel: data.onLabel || 'Online',
+          offLabel: data.offLabel || 'Offline',
+          topic: data.topic || null,
+          color: data.color || null,
+        }
+      };
+
+      if (editingWidget) {
+        // Edit existing
+        const updated = widgets.map(w => w.id === editingWidget.id ? { ...w, ...widgetPayload } : w);
+        setWidgets(updated);
+        await saveWidgets(updated);
+        setEditingWidget(null);
+        setShowWidgetModal(false);
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Widget updated!', showConfirmButton: false, timer: 2000, timerProgressBar: true, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399' });
+      } else {
+        // Add new
+        const newWidget = { id: Date.now().toString(), ...widgetPayload };
+        const newWidgets = [...widgets, newWidget];
+        setWidgets(newWidgets);
+        await saveWidgets(newWidgets);
+        setShowWidgetModal(false);
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Widget added!', showConfirmButton: false, timer: 2000, timerProgressBar: true, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399' });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Delete Widget ──
+  const handleDeleteWidget = async (widgetId) => {
+    const result = await Swal.fire({
+      title: 'Remove widget?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Remove',
+      confirmButtonColor: '#ef4444',
+      background: '#1e293b',
+      color: '#e2e8f0',
+    });
+    if (!result.isConfirmed) return;
+    const newWidgets = widgets.filter(w => w.id !== widgetId);
+    setWidgets(newWidgets);
+    try {
+      await saveWidgets(newWidgets);
+      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Widget removed!', showConfirmButton: false, timer: 2000, timerProgressBar: true, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399' });
+    } catch {
+      setWidgets(widgets); // Revert on failure
+    }
+  };
+
+  // ── Resize Widget ──
+  const handleResizeWidget = async (widgetId, updates) => {
+    const updated = widgets.map(w => w.id === widgetId ? { ...w, ...updates } : w);
+    setWidgets(updated);
+    try {
+      await saveWidgets(updated);
+    } catch {
+      setWidgets(widgets); // Revert on failure
+    }
+  };
+
+  // ── Open edit modal ──
+  const handleEditWidget = (widget) => {
+    setEditingWidget(widget);
+    setFormType(widget.type);
+    setFormColor(widget.config?.color || '');
+    setModalStep(1);
+    setShowWidgetModal(true);
+  };
+  
+  // ── Open add modal ──
+  const handleAddWidget = () => {
+    setEditingWidget(null);
+    setFormType('line');
+    setFormColor('');
+    setModalStep(1);
+    setShowWidgetModal(true);
+  };
+
+  // ── Loading / Error ──
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="h-10 w-32 bg-slate-800 rounded animate-pulse" />
+        <div className="h-40 glass-card animate-pulse" />
+        <div className="h-96 glass-card animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error || !bucket) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center glass-card">
+        <Database size={48} className="text-rose-400 mb-4" />
+        <h3 className="text-xl font-bold text-slate-200 mb-2">Error Loading Bucket</h3>
+        <p className="text-slate-400 mb-6">{error || 'Bucket not found'}</p>
+        <Link to="/app/buckets" className="btn-primary">Back to Buckets</Link>
+      </div>
+    );
+  }
+
+  // ── Render ──
+  return (
+    <div className="space-y-6 animate-fade-in">
+
+      {/* ─── Header ─── */}
+      <div className="flex items-center gap-4 mb-2">
+        <Link to="/app/buckets" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+          <ArrowLeft size={18} />
+        </Link>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-slate-100">{bucket.name}</h2>
+            <StatusBadge status={bucket.enabled ? 'online' : 'offline'} label={bucket.enabled ? 'Active' : 'Disabled'} />
+          </div>
+          <p className="text-slate-400 text-sm mt-1">{bucket.description || 'Customizable IoT Dashboard'}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {widgets.length > 0 && (
+            <button
+              onClick={() => setEditMode(e => !e)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                editMode
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {editMode ? <><Move size={15} /> Done Editing</> : <><Settings size={15} /> Edit Layout</>}
+            </button>
+          )}
+          <button onClick={handleAddWidget} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> Add Widget
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Stats row ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="glass-card p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400"><Cpu size={16} /></div>
+          <div><p className="text-xs text-slate-400">Device</p><p className="font-semibold text-slate-200 text-sm">{bucket.device?.name || bucket.device || 'Unknown'}</p></div>
+        </div>
+        <div className="glass-card p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-400"><Database size={16} /></div>
+          <div><p className="text-xs text-slate-400">Records</p><p className="font-semibold text-slate-200 text-sm">{bucket.records_count?.toLocaleString() || records.length}</p></div>
+        </div>
+        <div className="glass-card p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400"><Clock size={16} /></div>
+          <div><p className="text-xs text-slate-400">Last Write</p><p className="font-semibold text-slate-200 text-sm truncate w-24">{bucket.last_write ? new Date(bucket.last_write).toLocaleTimeString() : 'Never'}</p></div>
+        </div>
+        <div className="glass-card p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400"><Activity size={16} /></div>
+          <div><p className="text-xs text-slate-400">Fields</p><p className="font-semibold text-slate-200 text-sm">{bucket.fields?.length || 0}</p></div>
+        </div>
+      </div>
+
+      {/* ─── Tabs Navigation ─── */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-700/50 mb-6">
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
+          { id: 'records', label: 'Raw Records', icon: Database },
+          { id: 'connection', label: 'Connection', icon: Cpu },
+        ].map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors border-b-2 -mb-[1px] ${
+                activeTab === tab.id 
+                  ? 'border-cyan-400 text-cyan-400 bg-cyan-950/20' 
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ─── Tab Content: Dashboard ─── */}
+      {activeTab === 'dashboard' && (
+        <div className="animate-fade-in">
+          {/* Edit Mode Banner */}
+          {editMode && (
+            <div className="flex items-center gap-3 px-4 py-3 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm">
+              <Move size={16} className="flex-shrink-0" />
+              <span><strong>Edit Mode:</strong> Drag widgets to reorder · Click <Settings size={12} className="inline" /> to change type, size or field · Click <Trash2 size={12} className="inline" /> to remove</span>
+            </div>
+          )}
+
+          {/* Widget Grid */}
+          {widgets.length > 0 ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
+                <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  {widgets.map((widget, i) => (
+                    <SortableWidget key={widget.id} widget={widget} index={i} chartData={chartData} onDelete={handleDeleteWidget} onEdit={handleEditWidget} onResize={handleResizeWidget} editMode={editMode} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="glass-card p-12 text-center flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-4">
+                <LayoutGrid size={24} className="text-slate-500" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-200 mb-2">Your Dashboard is Empty</h3>
+              <p className="text-slate-400 mb-6 max-w-sm">Add charts, graphs, or stat cards mapped to your IoT data fields.</p>
+              <button onClick={handleAddWidget} className="btn-primary flex items-center gap-2">
+                <Plus size={16} /> Add First Widget
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Tab Content: Connection Info ─── */}
+      {activeTab === 'connection' && (
+        <div className="glass-card p-6 animate-fade-in">
+          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2 mb-4">
+            <Cpu size={18} className="text-violet-400" /> Connection Instructions
+          </h3>
+          {bucket.mqtt_topic ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">MQTT Topic</p>
+                <p className="text-cyan-400 font-mono text-sm">{bucket.mqtt_topic}</p>
+              </div>
+              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                <p className="text-xs text-slate-500 mb-1">Payload Format (JSON)</p>
+                <pre className="text-emerald-400 font-mono text-sm mt-2 p-3 bg-slate-950 rounded-md overflow-x-auto">{`{\n  ${bucket.fields?.map(f => `"${f}": 123.4`).join(',\n  ') || '"value": 123.4'}\n}`}</pre>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+              <p className="text-xs text-slate-500 mb-1">REST API Endpoint</p>
+              <p className="text-cyan-400 font-mono text-sm">POST http://your-server/api/v1/buckets/{bucket.id}/records</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Tab Content: Raw Records ─── */}
+      {activeTab === 'records' && (
+        <div className="glass-card p-6 animate-fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+              <Database size={18} className="text-violet-400" /> Raw Records
+            </h4>
+            <button className="text-sm flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors">
+              <Download size={16} /> Export CSV
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-slate-700/50">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-slate-400 bg-slate-800/80 uppercase">
+                <tr>
+                  <th className="px-4 py-4 font-medium">Timestamp</th>
+                  {bucket.fields?.map(field => (
+                    <th key={field} className="px-4 py-4 font-medium capitalize">{field}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.length > 0 ? records.map((record, i) => (
+                  <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{record.timestamp || record.recorded_at || 'Unknown'}</td>
+                    {bucket.fields?.map(field => (
+                      <td key={field} className="px-4 py-3 text-cyan-400 font-mono">
+                        {record[field] !== undefined ? record[field] : '-'}
+                      </td>
+                    ))}
+                  </tr>
+                )) : (
+                  <tr><td colSpan={100} className="px-4 py-12 text-center text-slate-500">No records found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Add/Edit Widget Modal ─── */}
+      {showWidgetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="glass-card w-full max-w-lg my-auto animate-scale-in">
+            <div className="p-6 border-b border-slate-700/50 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-slate-100">{editingWidget ? 'Edit Widget' : 'Add Dashboard Widget'}</h3>
+                <p className="text-slate-400 text-sm mt-1">Configure visualization for your IoT data</p>
+              </div>
+              <button onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form 
+              onSubmit={handleWidgetSubmit} 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.tagName === 'INPUT' && modalStep < 3) {
+                  e.preventDefault();
+                  setModalStep(s => s + 1);
+                }
+              }}
+              className="p-6"
+            >
+              {/* Stepper Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/50">
+                {[
+                  { step: 1, label: 'Widget Type' },
+                  { step: 2, label: 'Appearance' },
+                  { step: 3, label: 'Data & Config' }
+                ].map(s => (
+                  <div key={s.step} className={`flex items-center gap-2 ${modalStep === s.step ? 'text-cyan-400' : (modalStep > s.step ? 'text-emerald-400' : 'text-slate-500')}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep === s.step ? 'bg-cyan-500/20 ring-1 ring-cyan-500/50' : (modalStep > s.step ? 'bg-emerald-500/20' : 'bg-slate-800')}`}>
+                      {s.step}
+                    </div>
+                    <span className="text-xs font-medium uppercase tracking-wider hidden sm:block">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* STEP 1: Widget Type */}
+              <div className={modalStep === 1 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
+                <div>
+                  <div className="space-y-4">
+                    {/* Charts Group */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Data Charts</h4>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        {CHART_TYPES.filter(c => c.category === 'chart').map(ct => {
+                          const Icon = ct.icon;
+                          return (
+                            <label key={ct.value} className="relative cursor-pointer group">
+                              <input
+                                type="radio"
+                                name="type"
+                                value={ct.value}
+                                defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
+                                onChange={(e) => setFormType(e.target.value)}
+                                className="sr-only peer"
+                              />
+                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-cyan-400/80 peer-checked:bg-cyan-500/10 peer-checked:text-cyan-400 peer-checked:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
+                                <Icon size={26} strokeWidth={1.5} className="mb-2" />
+                                <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Components Group */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Components & Controls</h4>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                        {CHART_TYPES.filter(c => c.category === 'widget').map(ct => {
+                          const Icon = ct.icon;
+                          return (
+                            <label key={ct.value} className="relative cursor-pointer group">
+                              <input
+                                type="radio"
+                                name="type"
+                                value={ct.value}
+                                defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
+                                onChange={(e) => setFormType(e.target.value)}
+                                className="sr-only peer"
+                              />
+                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-fuchsia-400/80 peer-checked:bg-fuchsia-500/10 peer-checked:text-fuchsia-400 peer-checked:shadow-[0_0_15px_rgba(232,121,249,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
+                                <Icon size={26} strokeWidth={1.5} className="mb-2" />
+                                <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* STEP 2: Appearance */}
+              <div className={modalStep === 2 ? 'block space-y-6 min-h-[300px]' : 'hidden'}>
+                {/* Color Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Color (Optional)</label>
+                  
+                  {/* Hidden input to ensure FormData captures the color */}
+                  <input type="hidden" name="color" value={formColor} />
+
+                  <div className="flex flex-col gap-4">
+                    {/* Predefined Swatches */}
+                    <div className="flex gap-3 flex-wrap items-center">
+                      {[
+                        { label: 'Auto (Default)', value: '' },
+                        { label: 'Cyan', value: '#22d3ee' },
+                        { label: 'Emerald', value: '#34d399' },
+                        { label: 'Rose', value: '#f43f5e' },
+                        { label: 'Violet', value: '#a78bfa' },
+                        { label: 'Amber', value: '#fbbf24' },
+                      ].map(c => (
+                        <button
+                          type="button"
+                          key={c.label}
+                          title={c.label}
+                          onClick={() => setFormColor(c.value)}
+                          className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center shadow-lg ${
+                            formColor === c.value 
+                              ? 'border-white ring-2 ring-cyan-500/50' 
+                              : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: c.value || '#334155' }}
+                        >
+                          {c.value === '' && <span className="text-[10px] text-slate-400 font-medium">Auto</span>}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom Color Picker & Text Input */}
+                    <div className="flex gap-3 items-center">
+                      <div 
+                        className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-600 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500"
+                        title="Custom Color Picker"
+                      >
+                        <input
+                          type="color"
+                          value={formColor || '#22d3ee'}
+                          onChange={(e) => setFormColor(e.target.value)}
+                          className="absolute -top-2 -left-2 w-14 h-14 cursor-pointer"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={formColor}
+                        onChange={(e) => setFormColor(e.target.value)}
+                        placeholder="Auto (#hexcode)"
+                        className="input-field max-w-[150px]"
+                      />
+                      {formColor && (
+                        <button 
+                          type="button" 
+                          onClick={() => setFormColor('')} 
+                          className="text-xs text-slate-400 hover:text-rose-400"
+                        >
+                          Clear (Auto)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Width */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Width</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SIZE_OPTIONS.map(sz => (
+                      <label key={sz.value} className="relative cursor-pointer">
+                        <input
+                          type="radio"
+                          name="w"
+                          value={sz.value}
+                          defaultChecked={editingWidget ? editingWidget.w === sz.value : sz.value === '1'}
+                          className="sr-only peer"
+                        />
+                        <div className="flex flex-col items-center gap-1 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-violet-400/70 peer-checked:bg-violet-500/10 peer-checked:text-violet-300 hover:border-slate-500 transition-all text-center">
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: sz.cols }).map((_, i) => (
+                              <div key={i} className="w-4 h-4 rounded-sm bg-current opacity-70" />
+                            ))}
+                            {Array.from({ length: 3 - sz.cols }).map((_, i) => (
+                              <div key={i} className="w-4 h-4 rounded-sm bg-slate-600 opacity-30" />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-medium">{sz.label}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Height */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Height</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[{ value: 'normal', label: 'Normal', icon: <Minimize2 size={16} /> }, { value: 'tall', label: 'Tall', icon: <Maximize2 size={16} /> }].map(h => (
+                      <label key={h.value} className="relative cursor-pointer">
+                        <input
+                          type="radio"
+                          name="h"
+                          value={h.value}
+                          defaultChecked={editingWidget ? editingWidget.h === h.value : h.value === 'normal'}
+                          className="sr-only peer"
+                        />
+                        <div className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-emerald-400/70 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 hover:border-slate-500 transition-all">
+                          {h.icon}
+                          <span className="text-sm font-medium">{h.label}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* STEP 3: Data & Config */}
+              <div className={modalStep === 3 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
+                  <input
+                    name="title"
+                    type="text"
+                    defaultValue={editingWidget?.title || ''}
+                    placeholder="e.g. Temperature Over Time"
+                    className="input-field w-full"
+                  />
+                </div>
+
+                {/* Data Field */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Data Field</label>
+                  <select
+                    name="field"
+                    defaultValue={editingWidget?.field || bucket.fields?.[0] || ''}
+                    className="input-field w-full appearance-none"
+                    required
+                  >
+                    {bucket.fields?.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                  {(!bucket.fields || bucket.fields.length === 0) && (
+                    <p className="text-rose-400 text-xs mt-2">This bucket has no fields defined.</p>
+                  )}
+                </div>
+
+                {/* Dynamic Settings */}
+                {(formType === 'stat' || formType === 'gauge') && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Unit</label>
+                    <input
+                      name="unit"
+                      type="text"
+                      defaultValue={editingWidget?.unit || ''}
+                      placeholder="e.g. °C, %, ppm"
+                      className="input-field w-full"
+                    />
+                  </div>
+                )}
+                
+                {formType === 'gauge' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Min Value</label>
+                      <input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Max Value</label>
+                      <input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" />
+                    </div>
+                  </div>
+                )}
+
+                {formType === 'status' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">On Label (1, true, normal)</label>
+                      <input name="onLabel" type="text" defaultValue={editingWidget?.config?.onLabel || 'Online'} className="input-field w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Off Label (0, false, bahaya)</label>
+                      <input name="offLabel" type="text" defaultValue={editingWidget?.config?.offLabel || 'Offline'} className="input-field w-full" />
+                    </div>
+                  </div>
+                )}
+                
+                {formType === 'switch' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic (for sending command)</label>
+                    <input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} placeholder="e.g. home/livingroom/light/set" className="input-field w-full" />
+                  </div>
+                )}
+              </div>
+
+              {/* Navigation Footer */}
+              <div className="pt-6 mt-6 flex justify-between gap-3 border-t border-slate-700/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (modalStep > 1) {
+                      setModalStep(s => s - 1);
+                    } else {
+                      setShowWidgetModal(false);
+                      setEditingWidget(null);
+                    }
+                  }}
+                  className="btn-secondary px-6"
+                  disabled={submitting}
+                >
+                  {modalStep > 1 ? 'Back' : 'Cancel'}
+                </button>
+                
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalStep(s => s + 1)}
+                    className={`btn-primary px-6 ${modalStep < 3 ? 'block' : 'hidden'}`}
+                  >
+                    Next Step
+                  </button>
+
+                  <button
+                    type="submit"
+                    className={`btn-primary px-6 flex items-center gap-2 min-w-[130px] justify-center ${modalStep === 3 ? 'block' : 'hidden'}`}
+                    disabled={!bucket.fields || bucket.fields.length === 0 || submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      editingWidget ? 'Save Changes' : 'Add Widget'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

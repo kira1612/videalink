@@ -1,0 +1,1 @@
+const axios = require('axios'); axios.post('http://127.0.0.1:8001/api/v1/auth/login', {email: 'admin@iot-platform.io', password: 'password123'}).then(res => console.log('SUCCESS')).catch(err => console.log('ERROR:', err.response.data));
