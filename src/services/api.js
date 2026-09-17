@@ -82,6 +82,7 @@ export const endpointsApi = {
 export const userApi = {
   list: () => api.get('/users'),
   create: (data) => api.post('/users', data),
+  updateById: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
   update: (data) => api.put('/user', data),
   updatePassword: (data) => api.put('/user/password', data),

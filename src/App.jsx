@@ -25,6 +25,7 @@ const ProtectedRoute = ({ children }) => {
     const handleLogout = () => {
       localStorage.removeItem('iot_token');
       localStorage.removeItem('iot_user');
+      window.dispatchEvent(new Event('user-updated'));
       navigate('/login', { replace: true });
     };
 
@@ -41,13 +42,22 @@ const ProtectedRoute = ({ children }) => {
     });
 
     // Sync user profile from API (so timezone & other fields are always fresh)
-    import('./services/api').then(({ authApi }) => {
-      authApi.me().then(res => {
-        const existing = JSON.parse(localStorage.getItem('iot_user') || '{}');
-        localStorage.setItem('iot_user', JSON.stringify({ ...existing, ...res.data }));
-        window.dispatchEvent(new Event('user-updated'));
-      }).catch(() => {});
-    });
+    const syncUserProfile = () => {
+      import('./services/api').then(({ authApi }) => {
+        authApi.me().then(res => {
+          const existing = JSON.parse(localStorage.getItem('iot_user') || '{}');
+          const newData = { ...existing, ...res.data };
+          // Only update if there is a change to prevent infinite loops / unnecessary re-renders
+          if (JSON.stringify(existing) !== JSON.stringify(newData)) {
+            localStorage.setItem('iot_user', JSON.stringify(newData));
+            window.dispatchEvent(new Event('user-updated'));
+          }
+        }).catch(() => {});
+      });
+    };
+
+    syncUserProfile();
+    window.addEventListener('focus', syncUserProfile);
 
     // Start timer initially
     resetTimer();
@@ -57,6 +67,7 @@ const ProtectedRoute = ({ children }) => {
       events.forEach(event => {
         document.removeEventListener(event, resetTimer);
       });
+      window.removeEventListener('focus', syncUserProfile);
     };
   }, [token, navigate]);
 
@@ -68,6 +79,38 @@ const ProtectedRoute = ({ children }) => {
 };
 
 export default function App() {
+  useEffect(() => {
+    const applyTheme = () => {
+      const userStr = localStorage.getItem('iot_user');
+      let savedTheme = localStorage.getItem('iot_theme');
+      let savedMode = localStorage.getItem('iot_mode');
+
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          if (user.theme) savedTheme = user.theme;
+          if (user.mode) savedMode = user.mode;
+        } catch (e) {}
+      }
+
+      if (savedTheme && savedTheme !== 'cyan') {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      
+      if (savedMode && savedMode === 'light') {
+        document.documentElement.setAttribute('data-mode', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-mode');
+      }
+    };
+
+    applyTheme();
+    window.addEventListener('user-updated', applyTheme);
+    return () => window.removeEventListener('user-updated', applyTheme);
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

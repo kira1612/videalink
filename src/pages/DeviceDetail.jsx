@@ -115,9 +115,9 @@ export default function DeviceDetail() {
       {/* Top Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-4 flex flex-col items-center justify-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors" />
-          <CloudUpload size={20} className="absolute right-3 bottom-3 text-cyan-500/20" />
-          <p className="text-3xl font-light text-cyan-400">1.2 MB</p>
+          <div className="absolute inset-0 bg-primary-500/5 group-hover:bg-primary-500/10 transition-colors" />
+          <CloudUpload size={20} className="absolute right-3 bottom-3 text-primary-500/20" />
+          <p className="text-3xl font-light text-primary-400">1.2 MB</p>
           <p className="text-xs text-slate-400 uppercase tracking-wider mt-1">Transmitted Data</p>
         </div>
         <div className="glass-card p-4 flex flex-col items-center justify-center relative overflow-hidden group">
@@ -155,7 +155,7 @@ export default function DeviceDetail() {
       {/* Live Transmission Chart */}
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2"><Activity size={18} className="text-cyan-400" /> Live Transmission</h3>
+          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2"><Activity size={18} className="text-primary-400" /> Live Transmission</h3>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
             <span className="text-xs text-slate-400">Live</span>
@@ -172,7 +172,7 @@ export default function DeviceDetail() {
       {/* Device Location Map Placeholder */}
       <div className="glass-card p-0 overflow-hidden relative group">
         <div className="p-4 bg-slate-900/80 backdrop-blur-md absolute top-0 w-full z-10 flex items-center gap-2 border-b border-slate-700/50">
-          <MapPin size={16} className="text-cyan-400" />
+          <MapPin size={16} className="text-primary-400" />
           <h3 className="text-sm font-semibold text-slate-200">Device Location</h3>
         </div>
         <div className="h-64 w-full bg-slate-800 flex items-center justify-center relative overflow-hidden">
@@ -180,7 +180,7 @@ export default function DeviceDetail() {
           <div className="absolute inset-0 bg-grid opacity-20"></div>
           
           <div className="relative z-10 flex flex-col items-center mt-10">
-            <div className="w-4 h-4 bg-cyan-500 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.8)] animate-pulse"></div>
+            <div className="w-4 h-4 bg-primary-500 rounded-full shadow-[0_0_15px_rgb(var(--primary-500)/0.8)] animate-pulse"></div>
             <div className="mt-2 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700/50 text-xs text-slate-300">
               {device.location || 'Unknown Location'}
             </div>
@@ -264,7 +264,7 @@ export default function DeviceDetail() {
               </div>
               <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50 md:col-span-2">
                 <p className="text-xs text-slate-500 mb-1">Publish Topic</p>
-                <p className="text-cyan-400 font-mono text-sm break-all">{device.broker_config?.topic || `iot-platform/devices/${device.id}/telemetry`}</p>
+                <p className="text-primary-400 font-mono text-sm break-all">{device.broker_config?.topic || `iot-platform/devices/${device.id}/telemetry`}</p>
               </div>
               <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50 md:col-span-2">
                 <p className="text-xs text-slate-500 mb-1">Payload Format (JSON)</p>
@@ -282,7 +282,7 @@ export default function DeviceDetail() {
             <p className="text-slate-400 text-sm">Send a POST request to the REST API endpoint below to push data from your device.</p>
             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
               <p className="text-xs text-slate-500 mb-1">Endpoint URL</p>
-              <p className="text-cyan-400 font-mono text-sm break-all">http://your-server/api/v1/buckets/[BUCKET_ID]/records</p>
+              <p className="text-primary-400 font-mono text-sm break-all">http://your-server/api/v1/buckets/[BUCKET_ID]/records</p>
             </div>
             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
               <p className="text-xs text-slate-500 mb-1">cURL Example</p>
@@ -354,7 +354,7 @@ export default function DeviceDetail() {
                 
                 {/* Device Configuration */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
+                  <h4 className="text-sm font-semibold text-primary-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
                     <Cpu size={16} /> Device Configuration
                   </h4>
                   
@@ -391,7 +391,7 @@ export default function DeviceDetail() {
 
                   {editProtocol === 'mqtt' && (
                     <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 space-y-4">
-                      <h5 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">MQTT Broker Settings</h5>
+                      <h5 className="text-xs font-semibold text-primary-400 uppercase tracking-wider mb-2">MQTT Broker Settings</h5>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                         <label className="text-sm font-medium text-slate-400">Broker Host</label>
@@ -437,7 +437,7 @@ export default function DeviceDetail() {
 
                 {/* Device Information */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
+                  <h4 className="text-sm font-semibold text-primary-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> Device Information
                   </h4>
                   
@@ -458,14 +458,14 @@ export default function DeviceDetail() {
 
                 {/* Advanced Options */}
                 <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
+                  <h4 className="text-sm font-semibold text-primary-400 uppercase tracking-wider flex items-center gap-2 border-b border-slate-700/50 pb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> Advanced Options
                   </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-sm font-medium text-slate-300 flex items-center gap-2">Asset Type <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></label>
                     <div className="md:col-span-2 flex items-center gap-3">
-                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-slate-900" />
+                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-primary-500 focus:ring-primary-500/50 focus:ring-offset-slate-900" />
                       <select name="assetType" className="input-field w-full opacity-50 cursor-not-allowed" disabled>
                         <option>Select Type...</option>
                       </select>
@@ -475,7 +475,7 @@ export default function DeviceDetail() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-sm font-medium text-slate-300 flex items-center gap-2">Asset Group <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></label>
                     <div className="md:col-span-2 flex items-center gap-3">
-                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-slate-900" />
+                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-primary-500 focus:ring-primary-500/50 focus:ring-offset-slate-900" />
                       <select name="assetGroup" className="input-field w-full opacity-50 cursor-not-allowed" disabled>
                         <option>Select Group...</option>
                       </select>
@@ -485,7 +485,7 @@ export default function DeviceDetail() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-sm font-medium text-slate-300 flex items-center gap-2">Product <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></label>
                     <div className="md:col-span-2 flex items-center gap-3">
-                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-slate-900" />
+                      <input type="checkbox" className="w-5 h-5 rounded bg-slate-800 border-slate-700 text-primary-500 focus:ring-primary-500/50 focus:ring-offset-slate-900" />
                       <select name="product" className="input-field w-full opacity-50 cursor-not-allowed" disabled>
                         <option>Select Product...</option>
                       </select>
@@ -497,7 +497,7 @@ export default function DeviceDetail() {
                     <div className="md:col-span-2 flex items-center gap-3">
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" name="enabled" className="sr-only peer" defaultChecked={device.status !== 'offline'} />
-                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
                       </label>
                     </div>
                   </div>

@@ -27,6 +27,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // User profile and management
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{user}', [UserController::class, 'updateById']);
     Route::delete('/users/{user}', [UserController::class, 'destroy']);
     Route::put('/user', [UserController::class, 'update']);
     Route::put('/user/password', [UserController::class, 'updatePassword']);

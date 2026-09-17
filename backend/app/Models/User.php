@@ -25,6 +25,9 @@ class User extends Authenticatable
         'password',
         'role',
         'timezone',
+        'theme',
+        'mode',
+        'avatar',
     ];
 
     /**

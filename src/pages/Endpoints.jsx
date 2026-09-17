@@ -113,7 +113,7 @@ export default function Endpoints() {
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                       {endpoint.type}
                     </span>
-                    <span className="text-xs text-slate-500">Source: <span className="text-cyan-400">{endpoint.device}</span></span>
+                    <span className="text-xs text-slate-500">Source: <span className="text-primary-400">{endpoint.device}</span></span>
                   </div>
                   <div className="text-xs font-mono text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
                     {endpoint.type === 'EMAIL' && `To: ${endpoint.config?.email}`}

@@ -31,7 +31,7 @@ export function TypeBadge({ type }) {
 export function EndpointTypeBadge({ type }) {
   const colors = {
     EMAIL: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-    HTTP: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
+    HTTP: 'bg-primary-500/15 text-primary-400 border-primary-500/20',
     SLACK: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
     TELEGRAM: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
     MQTT: 'bg-orange-500/15 text-orange-400 border-orange-500/20',

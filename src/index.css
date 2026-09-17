@@ -5,6 +5,100 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Surface (Slate default - Dark mode) */
+    --surface-50: 248 250 252;
+    --surface-100: 241 245 249;
+    --surface-200: 226 232 240;
+    --surface-300: 203 213 225;
+    --surface-400: 148 163 184;
+    --surface-500: 100 116 139;
+    --surface-600: 71 85 105;
+    --surface-700: 51 65 85;
+    --surface-800: 30 41 59;
+    --surface-900: 15 23 42;
+    --surface-950: 2 6 23;
+
+    /* Cyan (Default) */
+    --primary-50: 236 254 255;
+    --primary-100: 207 250 254;
+    --primary-200: 165 243 252;
+    --primary-300: 103 232 249;
+    --primary-400: 34 211 238;
+    --primary-500: 6 182 212;
+    --primary-600: 8 145 178;
+    --primary-700: 14 116 144;
+    --primary-800: 21 94 117;
+    --primary-900: 22 78 99;
+  }
+  
+  [data-theme="emerald"] {
+    --primary-50: 236 253 245;
+    --primary-100: 209 250 229;
+    --primary-200: 167 243 208;
+    --primary-300: 110 231 183;
+    --primary-400: 52 211 153;
+    --primary-500: 16 185 129;
+    --primary-600: 5 150 105;
+    --primary-700: 4 120 87;
+    --primary-800: 6 95 70;
+    --primary-900: 6 78 59;
+  }
+  
+  [data-theme="violet"] {
+    --primary-50: 245 243 255;
+    --primary-100: 237 233 254;
+    --primary-200: 221 214 254;
+    --primary-300: 196 181 253;
+    --primary-400: 167 139 250;
+    --primary-500: 139 92 246;
+    --primary-600: 124 58 237;
+    --primary-700: 109 40 217;
+    --primary-800: 91 33 182;
+    --primary-900: 76 29 149;
+  }
+  
+  [data-theme="rose"] {
+    --primary-50: 255 241 242;
+    --primary-100: 255 228 230;
+    --primary-200: 254 205 211;
+    --primary-300: 253 164 175;
+    --primary-400: 251 113 133;
+    --primary-500: 244 63 94;
+    --primary-600: 225 29 72;
+    --primary-700: 190 18 60;
+    --primary-800: 159 18 57;
+    --primary-900: 136 19 55;
+  }
+  
+  [data-theme="amber"] {
+    --primary-50: 255 251 235;
+    --primary-100: 254 243 199;
+    --primary-200: 253 230 138;
+    --primary-300: 252 211 77;
+    --primary-400: 251 191 36;
+    --primary-500: 245 158 11;
+    --primary-600: 217 119 6;
+    --primary-700: 180 83 9;
+    --primary-800: 146 64 14;
+    --primary-900: 120 53 15;
+  }
+
+  [data-mode="light"] {
+    /* Light Mode (Inverted Slate) */
+    --surface-950: 248 250 252;
+    --surface-900: 241 245 249;
+    --surface-800: 226 232 240;
+    --surface-700: 203 213 225;
+    --surface-600: 148 163 184;
+    --surface-500: 100 116 139;
+    --surface-400: 71 85 105;
+    --surface-300: 51 65 85;
+    --surface-200: 30 41 59;
+    --surface-100: 15 23 42;
+    --surface-50: 2 6 23;
+  }
+
   * {
     @apply border-slate-700;
   }
@@ -27,10 +121,11 @@
 
 @layer components {
   .glass-card {
-    @apply bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl;
+    @apply bg-slate-800/50 backdrop-blur-sm rounded-2xl;
+    border: 1px solid rgb(var(--primary-800) / 0.2);
   }
   .btn-primary {
-    @apply bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-2 rounded-lg transition-all duration-200 active:scale-95 shadow-lg shadow-cyan-500/20;
+    @apply bg-primary-500 hover:bg-primary-400 text-slate-950 font-semibold px-4 py-2 rounded-lg transition-all duration-200 active:scale-95 shadow-lg shadow-primary-500/20;
   }
   .btn-secondary {
     @apply bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium px-4 py-2 rounded-lg transition-all duration-200 active:scale-95;
@@ -39,13 +134,26 @@
     @apply hover:bg-slate-700/50 text-slate-400 hover:text-slate-100 font-medium px-3 py-2 rounded-lg transition-all duration-200;
   }
   .input-field {
-    @apply bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 rounded-lg px-4 py-2.5 w-full focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all duration-200;
+    @apply bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 rounded-lg px-4 py-2.5 w-full focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30 transition-all duration-200;
   }
+  /* Legacy sidebar-link — kept for any pages that still use it */
   .sidebar-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-700/60 transition-all duration-200 text-sm font-medium cursor-pointer;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 transition-all duration-200 text-sm font-medium cursor-pointer;
   }
   .sidebar-link.active {
-    @apply bg-cyan-500/15 text-cyan-400 border border-cyan-500/20;
+    color: rgb(var(--primary-300));
+    background: rgb(var(--primary-500) / 0.12);
+  }
+  /* New theme-aware nav item states */
+  .sidebar-nav-active {
+    color: white;
+    background: rgb(var(--primary-500) / 0.15);
+  }
+  .sidebar-nav-idle {
+    @apply text-slate-400 hover:text-slate-100;
+  }
+  .sidebar-nav-idle:hover {
+    background: rgb(var(--primary-500) / 0.07);
   }
   .stat-card {
     @apply glass-card p-5 animate-fade-in;
@@ -66,14 +174,25 @@
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-400 to-blue-400 bg-clip-text text-transparent;
   }
   .glow-cyan {
-    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+    box-shadow: 0 0 20px rgb(var(--primary-500) / 0.3);
   }
   .bg-grid {
-    background-image: linear-gradient(rgba(6,182,212,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(6,182,212,0.04) 1px, transparent 1px);
+    background-image: linear-gradient(rgb(var(--primary-500) / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--primary-500) / 0.04) 1px, transparent 1px);
     background-size: 40px 40px;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

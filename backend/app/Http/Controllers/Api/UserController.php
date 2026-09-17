@@ -56,12 +56,36 @@ class UserController extends Controller
         return response()->json(null, 204);
     }
 
+    public function updateById(Request $request, User $user)
+    {
+        $this->authorizeAdmin($request);
+
+        $validated = $request->validate([
+            'name'     => 'sometimes|string|max:255',
+            'email'    => 'sometimes|email|unique:users,email,' . $user->id,
+            'role'     => 'sometimes|in:admin,user',
+            'password' => 'sometimes|string|min:8|nullable',
+        ]);
+
+        if (!empty($validated['password'])) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
+
+        $user->update($validated);
+        return response()->json($user);
+    }
+
     public function update(Request $request)
     {
         $validated = $request->validate([
             'name'     => 'sometimes|string|max:255',
             'email'    => 'sometimes|email|unique:users,email,' . $request->user()->id,
             'timezone' => 'sometimes|string|timezone',
+            'theme'    => 'sometimes|string|max:50',
+            'mode'     => 'sometimes|in:light,dark',
+            'avatar'   => 'sometimes|string|nullable',
         ]);
 
         $request->user()->update($validated);

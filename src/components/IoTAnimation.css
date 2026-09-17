@@ -1,0 +1,133 @@
+:root {
+  --bg-1: #0a1420;
+  --bg-2: #0d1b2a;
+  --grid: rgba(41,151,255,0.06);
+  --line: #1b3a4b;
+  --cyan: #2997ff;
+  --cyan-dim: #0071e3;
+  --amber: #fbbf24;
+  --hub: #ffffff;
+  --text: #cbd5e1;
+  --text-dim: #64748b;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/11;
+  background: transparent;
+  overflow: hidden;
+}
+
+.grid-line { stroke: var(--grid); stroke-width: 1; }
+
+.link {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.6;
+}
+
+.pulse {
+  fill: var(--cyan);
+  filter: drop-shadow(0 0 4px var(--cyan));
+  offset-rotate: 0deg;
+  animation-name: travel;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.device-box {
+  fill: #0f2233;
+  stroke: #1e3a4f;
+  stroke-width: 1.4;
+}
+
+.device-box.connected {
+  stroke: var(--cyan-dim);
+}
+
+.device-icon {
+  stroke: var(--text);
+  stroke-width: 1.6;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.device-label {
+  fill: var(--text);
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+.status-dot {
+  fill: var(--text-dim);
+}
+
+.status-dot.on {
+  fill: var(--cyan);
+}
+
+.hub-core {
+  fill: #0f2233;
+  stroke: var(--cyan-dim);
+  stroke-width: 1.6;
+}
+
+.hub-ring {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 1.4;
+  opacity: 0;
+  transform-origin: center;
+}
+
+.hub-icon {
+  stroke: var(--hub);
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caption {
+  fill: var(--text-dim);
+  font-size: 12px;
+}
+
+.caption-value {
+  fill: var(--cyan);
+  font-weight: 600;
+}
+
+@keyframes travel {
+  0%   { offset-distance: 0%;  opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+@keyframes ring-pulse {
+  0%   { transform: scale(0.55); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+@keyframes hub-breathe {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(41,151,255,0.35)); }
+  50%      { filter: drop-shadow(0 0 16px rgba(41,151,255,0.7)); }
+}
+
+@keyframes label-fade {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+
+.hub-group {
+  animation: hub-breathe 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .pulse{ animation: none; opacity: 0; }
+  .hub-ring{ animation: none; opacity: 0; }
+  .hub-group{ animation: none; }
+}

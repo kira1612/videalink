@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Database, Activity, Clock, Cpu, Download, Plus, X, Trash2, LayoutGrid, GripVertical, ChevronRight, Settings, Move, Maximize2, Minimize2, LineChart as LineChartIcon, BarChart2 as BarChartIcon, PieChart as PieChartIcon, Activity as AreaChartIcon, Radar as RadarChartIcon, Hash, Gauge as GaugeIcon, Radio, ToggleRight, MapPin, CircleDashed } from 'lucide-react';
+import { ArrowLeft, Database, Activity, Clock, Cpu, Download, Plus, X, Trash2, LayoutGrid, GripVertical, ChevronRight, Settings, Move, Maximize2, Minimize2, LineChart as LineChartIcon, BarChart2 as BarChartIcon, PieChart as PieChartIcon, Activity as AreaChartIcon, Radar as RadarChartIcon, Hash, Gauge as GaugeIcon, Radio, ToggleRight, MapPin, CircleDashed, SlidersHorizontal, Zap, Terminal } from 'lucide-react';
 import { bucketsApi, mqttApi } from '../services/api';
 import { StatusBadge } from '../components/UI/Badge';
 import {
@@ -50,7 +50,11 @@ const CHART_TYPES = [
   { value: 'gauge',  label: 'Gauge / Meter', icon: GaugeIcon, category: 'widget' },
   { value: 'status', label: 'Indicator',     icon: Radio, category: 'widget' },
   { value: 'switch', label: 'Switch / Toggle',icon: ToggleRight, category: 'widget' },
+  { value: 'combo',  label: 'Combo (2 in 1)', icon: LayoutGrid, category: 'widget' },
   { value: 'map',    label: 'Map / GPS',     icon: MapPin, category: 'widget' },
+  { value: 'slider', label: 'Analog Slider', icon: SlidersHorizontal, category: 'widget' },
+  { value: 'action', label: 'Action Button', icon: Zap, category: 'widget' },
+  { value: 'log',    label: 'Log Console',   icon: Terminal, category: 'widget' },
 ];
 
 const SIZE_OPTIONS = [
@@ -59,9 +63,232 @@ const SIZE_OPTIONS = [
   { value: '3', label: 'Large (3 cols)',  cols: 3 },
 ];
 
+// ─── Stateful Widget Components ─────────────────────────────────────────────
+function SwitchWidget({ widget, latestVal }) {
+  const initialIsOn = String(latestVal).toLowerCase() === '1' || String(latestVal).toLowerCase() === 'on' || String(latestVal) === 'true';
+  const switchColor = widget.config?.color || '#06b6d4';
+
+  const [isOn, setIsOn] = useState(initialIsOn);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => { setIsOn(initialIsOn); }, [latestVal]);
+
+  const handleToggle = async (e) => {
+    e.stopPropagation();
+    if (sending) return;
+    const newState = isOn ? 0 : 1;
+    const topic = widget.config?.topic || `iot/device/${widget.field}/set`;
+
+    setIsOn(!isOn);
+    setSending(true);
+
+    try {
+      await mqttApi.publish(topic, JSON.stringify({ [widget.field]: newState }));
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'success',
+        title: `Command sent: ${newState ? 'ON' : 'OFF'}`,
+        showConfirmButton: false, timer: 1500, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399'
+      });
+    } catch (err) {
+      setIsOn(isOn);
+      Swal.fire({
+        toast: true, position: 'top-end', icon: 'error',
+        title: 'Failed to send command',
+        showConfirmButton: false, timer: 2000, background: '#1e293b', color: '#e2e8f0'
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4">
+      <button
+        className="relative inline-flex h-12 w-24 items-center rounded-full transition-colors duration-300 focus:outline-none cursor-pointer disabled:opacity-50"
+        style={{ backgroundColor: isOn ? switchColor : '#334155' }}
+        onClick={handleToggle}
+        disabled={sending}
+      >
+        <span
+          className="inline-block h-10 w-10 transform rounded-full bg-white shadow-md transition-transform duration-300"
+          style={{ transform: isOn ? 'translateX(52px)' : 'translateX(4px)' }}
+        />
+      </button>
+      <div className="text-center">
+        <span className={`text-lg font-bold transition-colors duration-200 ${isOn ? 'text-cyan-400' : 'text-slate-400'}`}>
+          {isOn ? (widget.config?.onLabel || 'ON') : (widget.config?.offLabel || 'OFF')}
+        </span>
+        <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">{widget.field}</p>
+      </div>
+    </div>
+  );
+}
+
+function SliderWidget({ widget, latestVal }) {
+  const min = parseFloat(widget.config?.min) || 0;
+  const max = parseFloat(widget.config?.max) || 100;
+  const step = parseFloat(widget.config?.step) || 1;
+  const sliderColor = widget.config?.color || '#06b6d4';
+  
+  const [sliderVal, setSliderVal] = useState(parseFloat(latestVal) || min);
+  const [sending, setSending] = useState(false);
+  
+  useEffect(() => { 
+     const val = parseFloat(latestVal);
+     if (!isNaN(val)) setSliderVal(val); 
+  }, [latestVal]);
+
+  const handleMouseUp = async () => {
+    const topic = widget.config?.topic || `iot/device/${widget.field}/set`;
+    setSending(true);
+    try {
+      await mqttApi.publish(topic, JSON.stringify({ [widget.field]: sliderVal }));
+      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Sent: ${sliderVal}`, showConfirmButton: false, timer: 1000, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399' });
+    } catch (err) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to send', showConfirmButton: false, timer: 2000, background: '#1e293b', color: '#e2e8f0' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const percent = ((sliderVal - min) / (max - min)) * 100;
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-8 w-full">
+      <style>{`
+        .premium-slider-${widget.id}::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 4px solid ${sliderColor};
+          box-shadow: 0 0 15px ${sliderColor}80, 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+          cursor: pointer;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+          margin-top: -8px; /* Centers thumb on the track */
+        }
+        .premium-slider-${widget.id}::-webkit-slider-thumb:hover {
+          transform: scale(1.15);
+        }
+        .premium-slider-${widget.id}::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #ffffff;
+          border: 4px solid ${sliderColor};
+          box-shadow: 0 0 15px ${sliderColor}80;
+          cursor: pointer;
+          transition: transform 0.2s ease;
+        }
+      `}</style>
+      
+      {/* Premium Value Display */}
+      <div 
+        className="relative flex flex-col items-center justify-center mb-6"
+      >
+        <div 
+          className="px-6 py-2 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-inner flex items-baseline gap-1"
+          style={{ boxShadow: `0 0 25px ${sliderColor}15, inset 0 2px 4px rgba(0,0,0,0.5)` }}
+        >
+          <span className="text-4xl font-black tabular-nums tracking-tighter" style={{ color: sliderColor, textShadow: `0 0 15px ${sliderColor}50` }}>
+            {sliderVal}
+          </span>
+          {widget.unit && <span className="text-slate-400 font-semibold text-lg">{widget.unit}</span>}
+        </div>
+        <span className="text-xs text-slate-500 font-bold tracking-widest uppercase mt-3">{widget.field}</span>
+      </div>
+
+      {/* Custom Sleek Slider */}
+      <div className="w-full relative flex items-center">
+        <input 
+          type="range" 
+          min={min} max={max} step={step} 
+          value={sliderVal} 
+          onChange={(e) => setSliderVal(parseFloat(e.target.value))} 
+          onMouseUp={handleMouseUp} 
+          onTouchEnd={handleMouseUp}
+          disabled={sending}
+          className={`premium-slider-${widget.id} w-full h-3 rounded-full appearance-none cursor-pointer disabled:opacity-50 outline-none transition-all duration-300`}
+          style={{ 
+            background: `linear-gradient(to right, ${sliderColor} ${percent}%, #1e293b ${percent}%)`,
+            boxShadow: `inset 0 2px 5px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05)`
+          }}
+        />
+      </div>
+      
+      <div className="flex justify-between w-full text-[10px] text-slate-500 font-bold mt-3">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+}
+
+function ActionWidget({ widget }) {
+  const btnColor = widget.config?.color || '#3b82f6';
+  const [sending, setSending] = useState(false);
+
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (sending) return;
+    setSending(true);
+    const topic = widget.config?.topic || `iot/device/${widget.field}/set`;
+    const payloadStr = widget.config?.payload || '1';
+
+    try {
+      await mqttApi.publish(topic, payloadStr);
+      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Action Triggered`, showConfirmButton: false, timer: 1000, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399' });
+    } catch (err) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Action Failed', showConfirmButton: false, timer: 2000, background: '#1e293b', color: '#e2e8f0' });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
+      <button 
+        onClick={handleClick}
+        disabled={sending}
+        className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 disabled:opacity-50 focus:outline-none"
+        style={{ backgroundColor: `${btnColor}20`, border: `2px solid ${btnColor}` }}
+      >
+        {sending ? (
+          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: btnColor, borderTopColor: 'transparent' }} />
+        ) : (
+          <Zap size={32} style={{ color: btnColor }} className="mb-1" />
+        )}
+      </button>
+      <span className="text-base font-bold text-slate-200">{widget.config?.btnLabel || 'Trigger Action'}</span>
+    </div>
+  );
+}
+
 // ─── Single Widget Renderer ─────────────────────────────────────────────────
 function WidgetChart({ widget, chartData, color }) {
   const h = widget.h === 'tall' ? 320 : 220;
+
+  const renderFields = widget.config?.fields?.length > 0 ? widget.config.fields : [widget.field];
+  const getFieldColor = (f, i) => {
+    if (widget.config?.fieldColors?.[f]) return widget.config.fieldColors[f];
+    return renderFields.length > 1 ? getColor(i) : activeColor;
+  };
+
+  if (widget.type === 'combo') {
+    const isStack = widget.config?.layout === 'stack';
+    return (
+      <div className={`w-full h-full flex ${isStack ? 'flex-col' : 'flex-row'} divide-slate-800/50 ${isStack ? 'divide-y' : 'divide-x'}`}>
+        <div className="flex-1 w-full h-full relative overflow-hidden p-2">
+           <WidgetChart widget={widget.config?.widgetA} chartData={chartData} color={color} />
+        </div>
+        <div className="flex-1 w-full h-full relative overflow-hidden p-2">
+           <WidgetChart widget={widget.config?.widgetB} chartData={chartData} color={color} />
+        </div>
+      </div>
+    );
+  }
 
   if (!chartData || chartData.length === 0) {
     return (
@@ -74,10 +301,22 @@ function WidgetChart({ widget, chartData, color }) {
 
   const latestVal = chartData[chartData.length - 1]?.[widget.field] ?? '-';
 
+  // ── Alert Threshold Override ──
+  let activeColor = color || '#06b6d4'; // Fallback to cyan if color is missing
+  const isNumeric = ['stat', 'gauge', 'line', 'bar', 'area'].includes(widget.type);
+  const val = parseFloat(latestVal);
+  const threshold = parseFloat(widget.config?.alertThreshold);
+  let isAlertActive = false;
+  
+  if (isNumeric && !isNaN(val) && !isNaN(threshold) && val >= threshold) {
+    activeColor = widget.config?.alertColor || '#ef4444';
+    isAlertActive = true;
+  }
+
   if (widget.type === 'stat') {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
-        <span className="text-5xl font-black flex items-baseline gap-2" style={{ color }}>
+        <span className={`text-5xl font-black flex items-baseline gap-2 ${isAlertActive ? 'animate-pulse' : ''}`} style={{ color: activeColor }}>
           {latestVal}
           {widget.unit && <span className="text-2xl text-slate-400 font-medium">{widget.unit}</span>}
         </span>
@@ -102,7 +341,7 @@ function WidgetChart({ widget, chartData, color }) {
     const percent = (normalized - min) / (max - min);
     
     const pieData = [
-      { name: 'Value', value: percent, fill: color },
+      { name: 'Value', value: percent, fill: activeColor },
       { name: 'Remaining', value: 1 - percent, fill: '#334155' }
     ];
 
@@ -129,7 +368,7 @@ function WidgetChart({ widget, chartData, color }) {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute bottom-4 flex flex-col items-center">
-          <span className="text-3xl font-black text-slate-100">{val}</span>
+          <span className={`text-3xl font-black text-slate-100 ${isAlertActive ? 'text-rose-400 animate-pulse' : ''}`}>{val}</span>
           <span className="text-xs text-slate-500">{widget.unit || widget.field}</span>
         </div>
       </div>
@@ -166,45 +405,26 @@ function WidgetChart({ widget, chartData, color }) {
     );
   }
 
-  if (widget.type === 'switch') {
-    const isOn = String(latestVal).toLowerCase() === '1' || String(latestVal).toLowerCase() === 'on' || String(latestVal) === 'true';
-    const switchColor = widget.config?.color || '#06b6d4'; // default cyan
-    
-    // Publish MQTT message when switch is toggled
-    const handleToggle = async (e) => {
-      e.stopPropagation();
-      const newState = isOn ? 0 : 1; // Send 0 for off, 1 for on
-      const topic = widget.config?.topic || `iot/device/${widget.field}/set`;
-      
-      try {
-        await mqttApi.publish(topic, JSON.stringify({ [widget.field]: newState }));
-        
-        Swal.fire({
-          toast: true, position: 'top-end', icon: 'success',
-          title: `Command sent: ${newState ? 'ON' : 'OFF'}`,
-          showConfirmButton: false, timer: 1500, background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399'
-        });
-      } catch (err) {
-        Swal.fire({
-          toast: true, position: 'top-end', icon: 'error',
-          title: 'Failed to send command',
-          showConfirmButton: false, timer: 2000, background: '#1e293b', color: '#e2e8f0'
-        });
-      }
-    };
+  if (widget.type === 'switch') return <SwitchWidget widget={widget} latestVal={latestVal} />;
+  if (widget.type === 'slider') return <SliderWidget widget={widget} latestVal={latestVal} />;
+  if (widget.type === 'action') return <ActionWidget widget={widget} />;
 
+  if (widget.type === 'log') {
+    const logs = chartData.slice(-20).reverse();
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <button 
-          className="relative inline-flex h-12 w-24 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
-          style={{ backgroundColor: isOn ? switchColor : '#334155' }}
-          onClick={handleToggle}
-        >
-          <span className={`inline-block h-10 w-10 transform rounded-full bg-white transition-transform ${isOn ? 'translate-x-13' : 'translate-x-1'}`} />
-        </button>
-        <div className="text-center">
-          <span className="text-lg font-bold text-slate-200">{isOn ? 'ON' : 'OFF'}</span>
-          <p className="text-xs text-slate-500 mt-1 uppercase">{widget.field}</p>
+      <div className="w-full h-full bg-slate-950 p-3 rounded-lg flex flex-col font-mono text-[10px] leading-relaxed border border-slate-800/50" style={{ height: h }}>
+        <div className="shrink-0 pb-2 mb-2 border-b border-slate-800 flex items-center gap-2 text-slate-400">
+          <Terminal size={12} className="text-emerald-400" />
+          <span>Console: {widget.field}</span>
+        </div>
+        <div className="flex-1 overflow-y-auto flex flex-col gap-1 pr-1 custom-scrollbar">
+          {logs.map((log, i) => (
+            <div key={i} className="flex items-start gap-3 hover:bg-slate-900/50 p-1 rounded transition-colors">
+              <span className="text-slate-600 shrink-0 whitespace-nowrap">[{log.timestamp}]</span>
+              <span className="text-slate-300 break-all">{typeof log[widget.field] === 'object' ? JSON.stringify(log[widget.field]) : String(log[widget.field] ?? '-')}</span>
+            </div>
+          ))}
+          {logs.length === 0 && <span className="text-slate-500 italic">No logs available...</span>}
         </div>
       </div>
     );
@@ -284,7 +504,11 @@ function WidgetChart({ widget, chartData, color }) {
             <PolarGrid stroke="#334155" />
             <PolarAngleAxis dataKey="timestamp" stroke="#64748b" fontSize={11} />
             <PolarRadiusAxis stroke="#334155" fontSize={9} />
-            <Radar dataKey={widget.field} stroke={color} fill={color} fillOpacity={0.25} isAnimationActive={false} />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return <Radar key={f} name={f} dataKey={f} stroke={c} fill={c} fillOpacity={0.25} isAnimationActive={false} />;
+            })}
+            {renderFields.length > 1 && <Legend wrapperStyle={{ fontSize: '10px' }} />}
             <Tooltip
               contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }}
               itemStyle={{ color: '#e2e8f0' }}
@@ -304,7 +528,11 @@ function WidgetChart({ widget, chartData, color }) {
             <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
             <YAxis stroke="#64748b" fontSize={10} />
             <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
-            <Bar dataKey={widget.field} fill={color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            {renderFields.length > 1 && <Legend wrapperStyle={{ fontSize: '10px' }} />}
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return <Bar key={f} name={f} dataKey={f} fill={c} radius={[4, 4, 0, 0]} isAnimationActive={false} />;
+            })}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -317,16 +545,25 @@ function WidgetChart({ widget, chartData, color }) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
             <defs>
-              <linearGradient id={`grad-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={color} stopOpacity={0.02} />
-              </linearGradient>
+              {renderFields.map((f, i) => {
+                const c = getFieldColor(f, i);
+                return (
+                  <linearGradient key={`grad-${widget.id}-${f}`} id={`grad-${widget.id}-${f}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={c} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={c} stopOpacity={0.02} />
+                  </linearGradient>
+                );
+              })}
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
             <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
             <YAxis stroke="#64748b" fontSize={10} />
             <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
-            <Area type="monotone" dataKey={widget.field} stroke={color} strokeWidth={2.5} fill={`url(#grad-${widget.id})`} dot={false} isAnimationActive={false} />
+            {renderFields.length > 1 && <Legend wrapperStyle={{ fontSize: '10px' }} />}
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return <Area key={f} name={f} type="monotone" dataKey={f} stroke={c} strokeWidth={2.5} fill={`url(#grad-${widget.id}-${f})`} dot={false} isAnimationActive={false} />;
+            })}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -342,7 +579,11 @@ function WidgetChart({ widget, chartData, color }) {
           <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} tickMargin={8} />
           <YAxis stroke="#64748b" fontSize={10} />
           <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }} itemStyle={{ color: '#e2e8f0' }} />
-          <Line type="monotone" dataKey={widget.field} stroke={color} strokeWidth={2.5} dot={{ r: 2.5, fill: '#1e293b' }} activeDot={{ r: 5, strokeWidth: 0 }} isAnimationActive={false} />
+          {renderFields.length > 1 && <Legend wrapperStyle={{ fontSize: '10px' }} />}
+          {renderFields.map((f, i) => {
+            const c = getFieldColor(f, i);
+            return <Line key={f} name={f} type="monotone" dataKey={f} stroke={c} strokeWidth={2.5} dot={{ r: 2.5, fill: '#1e293b' }} activeDot={{ r: 5, strokeWidth: 0 }} isAnimationActive={false} />;
+          })}
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -453,7 +694,7 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
       {/* Ghost Resize Box */}
       {ghostSize && (
         <div 
-          className="absolute top-0 left-0 rounded-2xl border-2 border-dashed border-cyan-400 bg-cyan-500/10 z-50 pointer-events-none backdrop-blur-[2px] transition-none"
+          className="absolute top-0 left-0 rounded-2xl border-2 border-dashed border-primary-400 bg-primary-500/10 z-50 pointer-events-none backdrop-blur-[2px] transition-none"
           style={{ width: `${ghostSize.w}px`, height: `${ghostSize.h}px` }}
         />
       )}
@@ -477,7 +718,7 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
             <>
               <button
                 onClick={() => onEdit(widget)}
-                className="text-slate-500 hover:text-cyan-400 p-1 rounded hover:bg-slate-700/50 transition-colors"
+                className="text-slate-500 hover:text-primary-400 p-1 rounded hover:bg-slate-700/50 transition-colors"
                 title="Edit widget"
               >
                 <Settings size={14} />
@@ -513,7 +754,7 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
       {editMode && (
         <div
           onPointerDown={handlePointerDown}
-          className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-slate-500 hover:text-cyan-400 transition-colors z-10"
+          className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 text-slate-500 hover:text-primary-400 transition-colors z-10"
           title="Drag to resize"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -536,6 +777,7 @@ export default function BucketDetail() {
   const [widgets, setWidgets] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [cloudConnected, setCloudConnected] = useState(true);
   // Modal states
   const [showWidgetModal, setShowWidgetModal] = useState(false);
   const [editingWidget, setEditingWidget] = useState(null); // for editing existing
@@ -543,6 +785,7 @@ export default function BucketDetail() {
   const [formType, setFormType] = useState('line');
   const [formColor, setFormColor] = useState('');
   const [modalStep, setModalStep] = useState(1);
+  const [previewWidget, setPreviewWidget] = useState(null);
   const lastUpdateRef = useRef(0);
 
   const sensors = useSensors(
@@ -575,9 +818,11 @@ export default function BucketDetail() {
         const next = bucketRes.data.widgets || [];
         return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
       });
+      setCloudConnected(true);
     } catch (err) {
       console.error(err);
       setError('Failed to load bucket data.');
+      setCloudConnected(false);
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -596,6 +841,13 @@ export default function BucketDetail() {
   };
 
   const chartData = formatChartData(records);
+
+  // ── Calculate Stale Data ──
+  const isStale = useMemo(() => {
+    if (!chartData || chartData.length === 0) return false;
+    const latestTimestamp = new Date(chartData[chartData.length - 1].timestamp).getTime();
+    return (Date.now() - latestTimestamp) > 5 * 60 * 1000; // > 5 minutes
+  }, [chartData]);
 
   // ── Save widgets to API ──
   const saveWidgets = useCallback(async (newWidgets) => {
@@ -624,27 +876,113 @@ export default function BucketDetail() {
   };
 
   // ── Add / Edit Widget Submit ──
+  const handleFormChange = (e) => {
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const data = Object.fromEntries(fd);
+    const multiFields = fd.getAll('multiFields');
+    
+    const currentType = data.type || formType;
+    const isMulti = ['line', 'area', 'bar', 'radar'].includes(currentType);
+
+    const fieldColors = {};
+    if (isMulti) {
+      multiFields.forEach(f => {
+        if (data[`color_${f}`]) fieldColors[f] = data[`color_${f}`];
+      });
+    }
+    
+    setPreviewWidget({
+      id: 'preview',
+      type: currentType,
+      field: data.field || (currentType === 'combo' ? 'combo' : isMulti ? 'multi' : bucket?.fields?.[0]),
+      title: data.title || (currentType === 'combo' ? 'Combo Widget' : isMulti ? `Multi ${currentType}` : `${data.field || bucket?.fields?.[0] || 'Field'} ${currentType}`),
+      w: data.w || '1',
+      h: data.h || 'normal',
+      unit: data.unit || null,
+      config: currentType === 'combo' ? {
+        layout: data.layout || 'split',
+        widgetA: {
+          type: data.typeA || 'gauge',
+          field: data.fieldA || bucket?.fields?.[0],
+          unit: data.unitA,
+          config: { min: data.minA, max: data.maxA, onLabel: data.onLabelA, offLabel: data.offLabelA, topic: data.topicA }
+        },
+        widgetB: {
+          type: data.typeB || 'switch',
+          field: data.fieldB || bucket?.fields?.[0],
+          unit: data.unitB,
+          config: { min: data.minB, max: data.maxB, onLabel: data.onLabelB, offLabel: data.offLabelB, topic: data.topicB }
+        }
+      } : {
+        fields: isMulti ? (multiFields.length > 0 ? multiFields : [bucket?.fields?.[0]]) : undefined,
+        fieldColors: isMulti ? fieldColors : undefined,
+        min: data.min || 0,
+        max: data.max || 100,
+        onLabel: data.onLabel || 'Online',
+        offLabel: data.offLabel || 'Offline',
+        topic: data.topic || null,
+        color: data.color || formColor || null,
+        alertThreshold: data.alertThreshold || null,
+        alertColor: data.alertColor || '#ef4444',
+        step: data.step || 1,
+        payload: data.payload || null,
+        btnLabel: data.btnLabel || null,
+      }
+    });
+  };
+
   const handleWidgetSubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd);
+    const multiFields = fd.getAll('multiFields');
+    const isMulti = ['line', 'area', 'bar', 'radar'].includes(data.type);
+
+    const fieldColors = {};
+    if (isMulti) {
+      multiFields.forEach(f => {
+        if (data[`color_${f}`]) fieldColors[f] = data[`color_${f}`];
+      });
+    }
 
     setSubmitting(true);
     try {
       const widgetPayload = {
         type: data.type,
-        field: data.field,
-        title: data.title || `${data.field} ${data.type}`,
+        field: data.field || (data.type === 'combo' ? 'combo' : isMulti ? 'multi' : ''),
+        title: data.title || (data.type === 'combo' ? 'Combo Widget' : isMulti ? `Multi ${data.type}` : `${data.field} ${data.type}`),
         w: data.w || '1',
         h: data.h || 'normal',
         unit: data.unit || null,
-        config: {
+        config: data.type === 'combo' ? {
+          layout: data.layout || 'split',
+          widgetA: {
+            type: data.typeA,
+            field: data.fieldA,
+            unit: data.unitA,
+            config: { min: data.minA, max: data.maxA, onLabel: data.onLabelA, offLabel: data.offLabelA, topic: data.topicA }
+          },
+          widgetB: {
+            type: data.typeB,
+            field: data.fieldB,
+            unit: data.unitB,
+            config: { min: data.minB, max: data.maxB, onLabel: data.onLabelB, offLabel: data.offLabelB, topic: data.topicB }
+          }
+        } : {
+          fields: isMulti ? (multiFields.length > 0 ? multiFields : [bucket?.fields?.[0]]) : undefined,
+          fieldColors: isMulti ? fieldColors : undefined,
           min: data.min || 0,
           max: data.max || 100,
           onLabel: data.onLabel || 'Online',
           offLabel: data.offLabel || 'Offline',
           topic: data.topic || null,
           color: data.color || null,
+          alertThreshold: data.alertThreshold || null,
+          alertColor: data.alertColor || '#ef4444',
+          step: data.step || 1,
+          payload: data.payload || null,
+          btnLabel: data.btnLabel || null,
         }
       };
 
@@ -709,6 +1047,7 @@ export default function BucketDetail() {
     setFormType(widget.type);
     setFormColor(widget.config?.color || '');
     setModalStep(1);
+    setPreviewWidget(widget);
     setShowWidgetModal(true);
   };
   
@@ -718,6 +1057,13 @@ export default function BucketDetail() {
     setFormType('line');
     setFormColor('');
     setModalStep(1);
+    setPreviewWidget({
+      id: 'preview',
+      type: 'line',
+      field: bucket?.fields?.[0] || 'field',
+      title: 'Preview Widget',
+      w: '1', h: 'normal', config: {}
+    });
     setShowWidgetModal(true);
   };
 
@@ -753,9 +1099,22 @@ export default function BucketDetail() {
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-100">{bucket.name}</h2>
-            <StatusBadge status={bucket.enabled ? 'online' : 'offline'} label={bucket.enabled ? 'Active' : 'Disabled'} />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={bucket.enabled ? 'online' : 'offline'} label={bucket.enabled ? 'Active' : 'Disabled'} />
+              
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${cloudConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                <div className={`w-2 h-2 rounded-full ${cloudConnected ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-rose-500'}`} />
+                {cloudConnected ? 'Broker Connected' : 'Broker Disconnected'}
+              </div>
+
+              {isStale && bucket.enabled && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/20 text-[11px] font-semibold uppercase tracking-wide">
+                   ⚠️ Stale Data (&gt; 5m)
+                </div>
+              )}
+            </div>
           </div>
           <p className="text-slate-400 text-sm mt-1">{bucket.description || 'Customizable IoT Dashboard'}</p>
         </div>
@@ -781,7 +1140,7 @@ export default function BucketDetail() {
       {/* ─── Stats row ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-card p-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400"><Cpu size={16} /></div>
+          <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center text-primary-400"><Cpu size={16} /></div>
           <div><p className="text-xs text-slate-400">Device</p><p className="font-semibold text-slate-200 text-sm">{bucket.device?.name || bucket.device || 'Unknown'}</p></div>
         </div>
         <div className="glass-card p-4 flex items-center gap-3">
@@ -812,7 +1171,7 @@ export default function BucketDetail() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors border-b-2 -mb-[1px] ${
                 activeTab === tab.id 
-                  ? 'border-cyan-400 text-cyan-400 bg-cyan-950/20' 
+                  ? 'border-primary-400 text-primary-400 bg-primary-950/20' 
                   : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
             >
@@ -867,20 +1226,43 @@ export default function BucketDetail() {
             <Cpu size={18} className="text-violet-400" /> Connection Instructions
           </h3>
           {bucket.mqtt_topic ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-1">MQTT Topic</p>
-                <p className="text-cyan-400 font-mono text-sm">{bucket.mqtt_topic}</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-1 font-medium uppercase tracking-wider">MQTT Subscribe Topic (Listen to Devices)</p>
+                  <p className="text-primary-400 font-mono text-sm">{bucket.mqtt_topic}</p>
+                </div>
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-1 font-medium uppercase tracking-wider">MQTT Publish Topic (Send Commands)</p>
+                  <p className="text-emerald-400 font-mono text-sm">iot/device/{bucket.id}/set</p>
+                </div>
               </div>
-              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-1">Payload Format (JSON)</p>
-                <pre className="text-emerald-400 font-mono text-sm mt-2 p-3 bg-slate-950 rounded-md overflow-x-auto">{`{\n  ${bucket.fields?.map(f => `"${f}": 123.4`).join(',\n  ') || '"value": 123.4'}\n}`}</pre>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">Expected Payload Format (JSON)</p>
+                  <pre className="text-amber-400 font-mono text-sm p-3 bg-slate-950 rounded-md overflow-x-auto border border-slate-800">
+{`{
+  ${bucket.fields?.map(f => `"${f}": 25.5`).join(',\n  ') || '"temperature": 25.5'}
+}`}
+                  </pre>
+                  <p className="text-xs text-slate-500 mt-3">Ensure your device sends data matching this exact JSON schema.</p>
+                </div>
+                
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
+                  <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">Example cURL Test</p>
+                  <pre className="text-violet-400 font-mono text-sm p-3 bg-slate-950 rounded-md overflow-x-auto border border-slate-800 break-all whitespace-pre-wrap">
+{`curl -X POST http://127.0.0.1:8000/api/v1/mqtt/publish \\
+-H "Content-Type: application/json" \\
+-d '{"topic": "${bucket.mqtt_topic}", "message": {${bucket.fields?.map(f => `"${f}": 25.5`).join(', ') || '"temperature": 25.5'}}}'`}
+                  </pre>
+                </div>
               </div>
             </div>
           ) : (
             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
               <p className="text-xs text-slate-500 mb-1">REST API Endpoint</p>
-              <p className="text-cyan-400 font-mono text-sm">POST http://your-server/api/v1/buckets/{bucket.id}/records</p>
+              <p className="text-primary-400 font-mono text-sm">POST http://your-server/api/v1/buckets/{bucket.id}/records</p>
             </div>
           )}
         </div>
@@ -893,7 +1275,7 @@ export default function BucketDetail() {
             <h4 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
               <Database size={18} className="text-violet-400" /> Raw Records
             </h4>
-            <button className="text-sm flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors">
+            <button className="text-sm flex items-center gap-2 text-primary-400 hover:text-primary-300 transition-colors">
               <Download size={16} /> Export CSV
             </button>
           </div>
@@ -912,7 +1294,7 @@ export default function BucketDetail() {
                   <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{record.timestamp || record.recorded_at || 'Unknown'}</td>
                     {bucket.fields?.map(field => (
-                      <td key={field} className="px-4 py-3 text-cyan-400 font-mono">
+                      <td key={field} className="px-4 py-3 text-primary-400 font-mono">
                         {record[field] !== undefined ? record[field] : '-'}
                       </td>
                     ))}
@@ -929,19 +1311,23 @@ export default function BucketDetail() {
       {/* ─── Add/Edit Widget Modal ─── */}
       {showWidgetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="glass-card w-full max-w-lg my-auto animate-scale-in">
-            <div className="p-6 border-b border-slate-700/50 flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-bold text-slate-100">{editingWidget ? 'Edit Widget' : 'Add Dashboard Widget'}</h3>
-                <p className="text-slate-400 text-sm mt-1">Configure visualization for your IoT data</p>
+          <div className="glass-card w-full max-w-5xl my-auto animate-scale-in flex flex-col lg:flex-row max-h-[90vh]">
+            
+            {/* LEFT SIDE: FORM */}
+            <div className="w-full lg:w-1/2 flex flex-col border-slate-700/50 lg:border-r overflow-y-auto">
+              <div className="p-6 border-b border-slate-700/50 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100">{editingWidget ? 'Edit Widget' : 'Add Dashboard Widget'}</h3>
+                  <p className="text-slate-400 text-sm mt-1">Configure visualization for your IoT data</p>
+                </div>
+                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors lg:hidden">
+                  <X size={20} />
+                </button>
               </div>
-              <button onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
 
-            <form 
-              onSubmit={handleWidgetSubmit} 
+              <form 
+                onChange={handleFormChange}
+                onSubmit={handleWidgetSubmit} 
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.target.tagName === 'INPUT' && modalStep < 3) {
                   e.preventDefault();
@@ -957,8 +1343,8 @@ export default function BucketDetail() {
                   { step: 2, label: 'Appearance' },
                   { step: 3, label: 'Data & Config' }
                 ].map(s => (
-                  <div key={s.step} className={`flex items-center gap-2 ${modalStep === s.step ? 'text-cyan-400' : (modalStep > s.step ? 'text-emerald-400' : 'text-slate-500')}`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep === s.step ? 'bg-cyan-500/20 ring-1 ring-cyan-500/50' : (modalStep > s.step ? 'bg-emerald-500/20' : 'bg-slate-800')}`}>
+                  <div key={s.step} className={`flex items-center gap-2 ${modalStep === s.step ? 'text-primary-400' : (modalStep > s.step ? 'text-emerald-400' : 'text-slate-500')}`}>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep === s.step ? 'bg-primary-500/20 ring-1 ring-primary-500/50' : (modalStep > s.step ? 'bg-emerald-500/20' : 'bg-slate-800')}`}>
                       {s.step}
                     </div>
                     <span className="text-xs font-medium uppercase tracking-wider hidden sm:block">{s.label}</span>
@@ -986,7 +1372,7 @@ export default function BucketDetail() {
                                 onChange={(e) => setFormType(e.target.value)}
                                 className="sr-only peer"
                               />
-                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-cyan-400/80 peer-checked:bg-cyan-500/10 peer-checked:text-cyan-400 peer-checked:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
+                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-primary-400/80 peer-checked:bg-primary-500/10 peer-checked:text-primary-400 peer-checked:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
                                 <Icon size={26} strokeWidth={1.5} className="mb-2" />
                                 <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
                               </div>
@@ -1052,7 +1438,7 @@ export default function BucketDetail() {
                           onClick={() => setFormColor(c.value)}
                           className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center shadow-lg ${
                             formColor === c.value 
-                              ? 'border-white ring-2 ring-cyan-500/50' 
+                              ? 'border-white ring-2 ring-primary-500/50' 
                               : 'border-transparent'
                           }`}
                           style={{ backgroundColor: c.value || '#334155' }}
@@ -1065,7 +1451,7 @@ export default function BucketDetail() {
                     {/* Custom Color Picker & Text Input */}
                     <div className="flex gap-3 items-center">
                       <div 
-                        className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-600 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500"
+                        className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-600 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500"
                         title="Custom Color Picker"
                       >
                         <input
@@ -1149,81 +1535,188 @@ export default function BucketDetail() {
 
               {/* STEP 3: Data & Config */}
               <div className={modalStep === 3 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
-                  <input
-                    name="title"
-                    type="text"
-                    defaultValue={editingWidget?.title || ''}
-                    placeholder="e.g. Temperature Over Time"
-                    className="input-field w-full"
-                  />
-                </div>
-
-                {/* Data Field */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Data Field</label>
-                  <select
-                    name="field"
-                    defaultValue={editingWidget?.field || bucket.fields?.[0] || ''}
-                    className="input-field w-full appearance-none"
-                    required
-                  >
-                    {bucket.fields?.map(f => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
-                  {(!bucket.fields || bucket.fields.length === 0) && (
-                    <p className="text-rose-400 text-xs mt-2">This bucket has no fields defined.</p>
-                  )}
-                </div>
-
-                {/* Dynamic Settings */}
-                {(formType === 'stat' || formType === 'gauge') && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Unit</label>
-                    <input
-                      name="unit"
-                      type="text"
-                      defaultValue={editingWidget?.unit || ''}
-                      placeholder="e.g. °C, %, ppm"
-                      className="input-field w-full"
-                    />
-                  </div>
-                )}
                 
-                {formType === 'gauge' && (
-                  <div className="grid grid-cols-2 gap-4">
+                {formType !== 'combo' ? (
+                  <>
+                    {/* Standard Widget Config */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Min Value</label>
-                      <input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" />
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
+                      <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temperature Over Time" className="input-field w-full" />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Max Value</label>
-                      <input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" />
-                    </div>
-                  </div>
-                )}
 
-                {formType === 'status' && (
-                  <div className="grid grid-cols-2 gap-4">
+                    {['line', 'area', 'bar', 'radar'].includes(formType) ? (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Data Fields (Multi-select)</label>
+                        <div className="grid grid-cols-2 gap-2 p-3 bg-slate-900/50 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto custom-scrollbar">
+                          {bucket.fields?.map((f, idx) => {
+                            const isChecked = (previewWidget || editingWidget)?.config?.fields?.includes(f) || false;
+                            return (
+                              <div key={f} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors">
+                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-white flex-1">
+                                  <input 
+                                    type="checkbox" 
+                                    name="multiFields" 
+                                    value={f} 
+                                    defaultChecked={editingWidget?.config?.fields?.includes(f) || false}
+                                    className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-slate-900" 
+                                  />
+                                  <span className="truncate">{f}</span>
+                                </label>
+                                {isChecked && (
+                                  <input 
+                                    type="color" 
+                                    name={`color_${f}`} 
+                                    defaultValue={editingWidget?.config?.fieldColors?.[f] || getColor(idx)} 
+                                    className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0"
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Data Field</label>
+                        <select name="field" defaultValue={editingWidget?.field || bucket.fields?.[0] || ''} className="input-field w-full appearance-none" required={formType !== 'combo'}>
+                          {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                    )}
+
+                    {(formType === 'stat' || formType === 'gauge') && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Unit</label>
+                        <input name="unit" type="text" defaultValue={editingWidget?.unit || ''} placeholder="e.g. °C, %, ppm" className="input-field w-full" />
+                      </div>
+                    )}
+                    
+                    {formType === 'gauge' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Min Value</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Max Value</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
+                      </div>
+                    )}
+
+                    {['stat', 'gauge', 'line', 'bar', 'area'].includes(formType) && (
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50 mt-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-1">Critical Threshold</label>
+                          <p className="text-[10px] text-slate-500 mb-2">Change color if value &ge; this</p>
+                          <input name="alertThreshold" type="number" step="any" defaultValue={editingWidget?.config?.alertThreshold || ''} placeholder="e.g. 80" className="input-field w-full" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-1">Alert Color</label>
+                          <p className="text-[10px] text-slate-500 mb-2">Color when threshold is met</p>
+                          <div className="flex gap-2 items-center">
+                            <input name="alertColor" type="color" defaultValue={editingWidget?.config?.alertColor || '#ef4444'} className="w-10 h-10 rounded-lg cursor-pointer bg-slate-800 border border-slate-700 p-1" />
+                            <span className="text-xs text-slate-400">Pick color</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {formType === 'status' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">On Label (1, true)</label><input name="onLabel" type="text" defaultValue={editingWidget?.config?.onLabel || 'Online'} className="input-field w-full" /></div>
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Off Label (0, false)</label><input name="offLabel" type="text" defaultValue={editingWidget?.config?.offLabel || 'Offline'} className="input-field w-full" /></div>
+                      </div>
+                    )}
+                    
+                    {formType === 'switch' && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label>
+                        <input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} placeholder="e.g. home/livingroom/light/set" className="input-field w-full" />
+                      </div>
+                    )}
+
+                    {formType === 'slider' && (
+                      <div className="space-y-4">
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Min</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Max</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Step</label><input name="step" type="number" step="any" defaultValue={editingWidget?.config?.step || 1} className="input-field w-full" /></div>
+                        </div>
+                      </div>
+                    )}
+
+                    {formType === 'action' && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Button Label</label><input name="btnLabel" type="text" defaultValue={editingWidget?.config?.btnLabel || 'Trigger'} className="input-field w-full" /></div>
+                        </div>
+                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Payload (Text / JSON)</label><input name="payload" type="text" defaultValue={editingWidget?.config?.payload || '1'} className="input-field w-full font-mono text-sm" placeholder='e.g. {"cmd": "start"}' /></div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Combo Widget Config */}
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">On Label (1, true, normal)</label>
-                      <input name="onLabel" type="text" defaultValue={editingWidget?.config?.onLabel || 'Online'} className="input-field w-full" />
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
+                      <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temp & Heater Control" className="input-field w-full" />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Off Label (0, false, bahaya)</label>
-                      <input name="offLabel" type="text" defaultValue={editingWidget?.config?.offLabel || 'Offline'} className="input-field w-full" />
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Layout</label>
+                      <select name="layout" defaultValue={editingWidget?.config?.layout || 'split'} className="input-field w-full appearance-none">
+                        <option value="split">Split Horizontal (Side-by-side)</option>
+                        <option value="stack">Stack Vertical (Top/Bottom)</option>
+                      </select>
                     </div>
-                  </div>
-                )}
-                
-                {formType === 'switch' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic (for sending command)</label>
-                    <input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} placeholder="e.g. home/livingroom/light/set" className="input-field w-full" />
-                  </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                      {/* Sub-Widget A */}
+                      <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
+                        <h4 className="text-sm font-bold text-primary-400">Widget A (Left/Top)</h4>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
+                          <select name="typeA" defaultValue={editingWidget?.config?.widgetA?.type || 'gauge'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                            {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
+                          <select name="fieldA" defaultValue={editingWidget?.config?.widgetA?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                            {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.min || editingWidget?.config?.widgetA?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                          <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.max || editingWidget?.config?.widgetA?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                        </div>
+                      </div>
+
+                      {/* Sub-Widget B */}
+                      <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
+                        <h4 className="text-sm font-bold text-emerald-400">Widget B (Right/Bottom)</h4>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
+                          <select name="typeB" defaultValue={editingWidget?.config?.widgetB?.type || 'switch'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                            {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
+                          <select name="fieldB" defaultValue={editingWidget?.config?.widgetB?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                            {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.min || editingWidget?.config?.widgetB?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                          <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.max || editingWidget?.config?.widgetB?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -1274,6 +1767,50 @@ export default function BucketDetail() {
                 </div>
               </div>
             </form>
+            </div>
+
+            {/* RIGHT SIDE: LIVE PREVIEW */}
+            <div className="w-full lg:w-1/2 p-6 flex flex-col bg-slate-900/50 rounded-b-xl lg:rounded-r-xl lg:rounded-bl-none">
+              <div className="flex items-center justify-between mb-6 shrink-0">
+                <h3 className="text-lg font-semibold text-slate-300 flex items-center gap-2">
+                  <Maximize2 size={18} className="text-emerald-400" /> Live Preview
+                </h3>
+                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors hidden lg:block">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 flex items-center justify-center relative min-h-[350px]">
+                {previewWidget ? (() => {
+                  const fieldsToMock = [
+                    previewWidget.field,
+                    previewWidget.config?.widgetA?.field,
+                    previewWidget.config?.widgetB?.field,
+                    ...(bucket?.fields || [])
+                  ].filter(Boolean);
+
+                  const previewData = (chartData && chartData.length > 0) ? chartData : Array.from({ length: 10 }).map((_, i) => {
+                    const row = { timestamp: `10:0${i}` };
+                    fieldsToMock.forEach(f => { row[f] = 20 + i * 5 + Math.floor(Math.random() * 10); });
+                    return row;
+                  });
+
+                  return (
+                    <div className="w-full max-w-md pointer-events-none transition-all">
+                      <WidgetChart widget={previewWidget} chartData={previewData} color={formColor || previewWidget?.config?.color || undefined} />
+                    </div>
+                  );
+                })() : (
+                  <div className="text-center text-slate-500 animate-pulse">
+                    <Maximize2 size={32} className="mx-auto mb-2 opacity-50" />
+                    <p>Select a widget type to preview</p>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-center text-slate-500 mt-4 shrink-0">
+                {chartData?.length > 0 ? 'Preview uses actual live data from your bucket.' : 'Preview uses simulated data (bucket has no records yet).'}
+              </p>
+            </div>
+            
           </div>
         </div>
       )}
