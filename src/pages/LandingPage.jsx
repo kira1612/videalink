@@ -1,8 +1,97 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Cpu, Zap, Database, Globe, ChevronRight } from 'lucide-react';
+import { Cpu, Zap, Database, Globe, ChevronRight, Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Settings2 } from 'lucide-react';
 import IoTAnimation from '../components/IoTAnimation';
 import ParticleTunnel from '../components/ParticleTunnel';
+import FeatureShowcase from '../components/FeatureShowcase';
+
+// --- THEME PRESETS (MacBook-style) ---
+const THEMES = [
+  {
+    id: 'midnight',
+    label: { id: 'Tengah Malam', en: 'Midnight' },
+    swatch: 'linear-gradient(135deg, #1c2333 0%, #2d3a52 50%, #3b4a6b 100%)',
+    primary: '#4f7bff',
+    secondary: '#7c9dff',
+    accent: '#a5bcff',
+    bg: '#0d1117',
+    surface: '#161d2c',
+    surface2: '#1e2a3f',
+    glow: 'rgba(79,123,255,0.35)',
+    chartColors: ['#4f7bff', '#7c9dff', '#a5bcff', '#2d5aff'],
+    border: '#2d3a52',
+  },
+  {
+    id: 'starlight',
+    label: { id: 'Cahaya Bintang', en: 'Starlight' },
+    swatch: 'linear-gradient(135deg, #d4c9b8 0%, #e8dfd2 50%, #f5f0ea 100%)',
+    primary: '#8b7355',
+    secondary: '#a08c6e',
+    accent: '#c4a882',
+    bg: '#1a1714',
+    surface: '#242019',
+    surface2: '#2e2a22',
+    glow: 'rgba(160,140,110,0.35)',
+    chartColors: ['#c4a882', '#a08c6e', '#8b7355', '#d4b896'],
+    border: '#3d3628',
+  },
+  {
+    id: 'sky',
+    label: { id: 'Biru Langit', en: 'Sky Blue' },
+    swatch: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #7dd3fc 100%)',
+    primary: '#0ea5e9',
+    secondary: '#38bdf8',
+    accent: '#7dd3fc',
+    bg: '#030e1a',
+    surface: '#061728',
+    surface2: '#0a2038',
+    glow: 'rgba(14,165,233,0.35)',
+    chartColors: ['#0ea5e9', '#38bdf8', '#7dd3fc', '#0284c7'],
+    border: '#0a3050',
+  },
+  {
+    id: 'aurora',
+    label: { id: 'Aurora', en: 'Aurora' },
+    swatch: 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #a7f3d0 100%)',
+    primary: '#10b981',
+    secondary: '#34d399',
+    accent: '#6ee7b7',
+    bg: '#011a0f',
+    surface: '#06231a',
+    surface2: '#0b3025',
+    glow: 'rgba(16,185,129,0.35)',
+    chartColors: ['#10b981', '#34d399', '#6ee7b7', '#059669'],
+    border: '#0e3d28',
+  },
+  {
+    id: 'rose',
+    label: { id: 'Mawar', en: 'Rose' },
+    swatch: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 50%, #fda4af 100%)',
+    primary: '#f43f5e',
+    secondary: '#fb7185',
+    accent: '#fda4af',
+    bg: '#1a0509',
+    surface: '#240a10',
+    surface2: '#301018',
+    glow: 'rgba(244,63,94,0.35)',
+    chartColors: ['#f43f5e', '#fb7185', '#fda4af', '#e11d48'],
+    border: '#4a1020',
+  },
+  {
+    id: 'violet',
+    label: { id: 'Violet', en: 'Violet' },
+    swatch: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%)',
+    primary: '#7c3aed',
+    secondary: '#a78bfa',
+    accent: '#c4b5fd',
+    bg: '#0d0814',
+    surface: '#150f21',
+    surface2: '#1e162e',
+    glow: 'rgba(124,58,237,0.35)',
+    chartColors: ['#7c3aed', '#a78bfa', '#c4b5fd', '#6d28d9'],
+    border: '#2d1a50',
+  },
+];
 
 // --- TRANSLATIONS DICTIONARY ---
 const dict = {
@@ -37,6 +126,20 @@ const dict = {
     connDesc: 'Integrasi asli untuk perangkat keras dan protokol paling mumpuni di dunia.',
     featMagic: 'Fitur yang terasa seperti sihir.',
     featDesc: 'Semua yang Anda butuhkan untuk mengatur ekosistem IoT masif, dibangun dalam satu pengalaman yang mulus.',
+    // MacBook feature section
+    chooseTheme: 'Tema',
+    featColor: 'Warna',
+    featColorDesc: 'Enam pilihan tema warna elegan — dari Tengah Malam yang dalam hingga Aurora yang hidup. Setiap tema menyesuaikan seluruh UI secara instan, termasuk chart, badge, dan sidebar. Jadikan platform ini benar-benar milik Anda.',
+    featRealtime: 'Telemetri Waktu Nyata',
+    featRealtimeDesc: 'Data sensor mengalir langsung ke dashboard dalam hitungan milidetik via WebSocket. Tidak ada polling, tidak ada refresh — hanya aliran data yang selalu hidup dan responsif.',
+    featDevices: 'Manajemen Perangkat',
+    featDevicesDesc: 'Pantau ribuan perangkat sekaligus. Lacak status online/offline, atur endpoint API, dan autentikasi ESP32, Arduino, atau Raspberry Pi Anda dari satu panel terpusat.',
+    featSecurity: 'Keamanan Berlapis',
+    featSecurityDesc: 'Setiap koneksi perangkat dilindungi token unik. Payload divalidasi sebelum disimpan. Rate limiting otomatis mencegah flooding data dari perangkat nakal.',
+    featBuckets: 'Wadah Data Terorganisir',
+    featBucketsDesc: 'Kelompokkan data sensor ke dalam bucket deret waktu yang terstruktur. Buat widget visualisasi dari bucket mana pun — line chart, gauge, atau tabel histori — secara drag-and-drop.',
+    featAlerts: 'Notifikasi & Alarm',
+    featAlertsDesc: 'Atur threshold untuk setiap metrik sensor. Ketika nilai melampaui batas, sistem langsung mengirim notifikasi real-time — tidak ada data kritis yang terlewat.',
     dataBuckets: 'Wadah Data & Telemetri.',
     dataBucketsDesc: 'Simpan data sensor IoT Anda dalam wadah deret waktu yang terorganisir. Visualisasikan tren secara instan dengan widget waktu nyata interaktif kami dan jangan pernah melewatkan satu titik data pun.',
     devMan: 'Manajemen Perangkat.',
@@ -92,6 +195,20 @@ const dict = {
     connDesc: 'Native integrations for the world\'s most capable hardware and protocols.',
     featMagic: 'Features that feel like magic.',
     featDesc: 'Everything you need to orchestrate a massive IoT ecosystem, built into one seamless experience.',
+    // MacBook feature section
+    chooseTheme: 'Theme',
+    featColor: 'Color',
+    featColorDesc: 'Six elegant color themes — from deep Midnight to vibrant Aurora. Every theme instantly adapts the entire UI including charts, badges, and sidebar. Make this platform truly yours.',
+    featRealtime: 'Real-time Telemetry',
+    featRealtimeDesc: 'Sensor data flows directly to the dashboard in milliseconds via WebSocket. No polling, no refresh — just a live, always-responsive data stream.',
+    featDevices: 'Device Management',
+    featDevicesDesc: 'Monitor thousands of devices at once. Track online/offline status, manage API endpoints, and authenticate your ESP32, Arduino, or Raspberry Pi from one central panel.',
+    featSecurity: 'Layered Security',
+    featSecurityDesc: 'Every device connection is protected by a unique token. Payloads are validated before storage. Automatic rate limiting prevents data flooding from rogue devices.',
+    featBuckets: 'Organized Data Buckets',
+    featBucketsDesc: 'Group sensor data into structured time-series buckets. Build visualization widgets from any bucket — line charts, gauges, or history tables — via drag-and-drop.',
+    featAlerts: 'Notifications & Alerts',
+    featAlertsDesc: 'Set thresholds for any sensor metric. When a value exceeds the limit, the system instantly sends a real-time notification — no critical data goes unnoticed.',
     dataBuckets: 'Data Buckets & Telemetry.',
     dataBucketsDesc: 'Store your IoT sensor data in organized time-series buckets. Visualize trends instantly with our interactive real-time widgets and never miss a single data point.',
     devMan: 'Device Management.',
@@ -377,74 +494,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── FEATURES (ALTERNATING GRID / ZIGZAG) ── */}
-      <section className="py-40 px-6 bg-black">
-        <div className="max-w-[1200px] mx-auto relative z-10">
-          <FadeIn className="text-center mb-32">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-[#f5f5f7]">
-              {t.featMagic}
-            </h2>
-            <p className="mt-6 text-xl text-[#86868b] max-w-2xl mx-auto">
-              {t.featDesc}
-            </p>
-          </FadeIn>
-
-          {/* Feature 1 */}
-          <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24 mb-40">
-            <div className="flex-1 lg:order-1 order-2">
-              <FadeIn direction="left">
-                <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-[#f5f5f7] mb-6">{t.dataBuckets}</h3>
-                <p className="text-lg md:text-xl text-[#86868b] leading-relaxed">
-                  {t.dataBucketsDesc}
-                </p>
-              </FadeIn>
-            </div>
-            <div className="flex-1 lg:order-2 order-1 w-full relative group">
-              <FadeIn direction="scale">
-                <div className="absolute inset-0 bg-[#0071e3]/20 blur-[80px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
-                <img src="/assets/telemetry.png" alt="Data Buckets & Telemetry" className="relative z-10 w-full aspect-video object-cover rounded-3xl border border-[#333336] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]" />
-              </FadeIn>
-            </div>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24 mb-40">
-            <div className="flex-1 order-2 w-full relative group">
-              <FadeIn direction="scale">
-                <div className="absolute inset-0 bg-[#a78bfa]/20 blur-[80px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
-                <img src="/assets/map.png" alt="Device Management" className="relative z-10 w-full aspect-video object-cover rounded-3xl border border-[#333336] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]" />
-              </FadeIn>
-            </div>
-            <div className="flex-1 order-1">
-              <FadeIn direction="right">
-                <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-[#f5f5f7] mb-6">{t.devMan}</h3>
-                <p className="text-lg md:text-xl text-[#86868b] leading-relaxed">
-                  {t.devManDesc}
-                </p>
-              </FadeIn>
-            </div>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-            <div className="flex-1 lg:order-1 order-2">
-              <FadeIn direction="left">
-                <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-[#f5f5f7] mb-6">{t.intCust}</h3>
-                <p className="text-lg md:text-xl text-[#86868b] leading-relaxed">
-                  {t.intCustDesc}
-                </p>
-              </FadeIn>
-            </div>
-            <div className="flex-1 lg:order-2 order-1 w-full relative group">
-              <FadeIn direction="scale">
-                <div className="absolute inset-0 bg-[#10b981]/20 blur-[80px] rounded-full pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
-                <img src="/assets/customization.png" alt="Interface Customization" className="relative z-10 w-full aspect-video object-cover rounded-3xl border border-[#333336] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]" />
-              </FadeIn>
-            </div>
-          </div>
-
-        </div>
-      </section>
+      {/* ── MACBOOK-STYLE FEATURE SHOWCASE ── */}
+      <FeatureShowcase t={t} lang={lang} />
 
       {/* ── PRICING ── */}
       <section id="pricing" className="relative py-40 px-6 bg-black">
