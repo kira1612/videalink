@@ -88,4 +88,22 @@ export const userApi = {
   updatePassword: (data) => api.put('/user/password', data),
 };
 
+// Rooms
+export const roomsApi = {
+  list: () => api.get('/rooms'),
+  get: (id) => api.get(`/rooms/${id}`),
+  create: (data) => api.post('/rooms', data),
+  update: (id, data) => api.put(`/rooms/${id}`, data),
+  delete: (id) => api.delete(`/rooms/${id}`),
+};
+
+// Automations
+export const automationsApi = {
+  list: () => api.get('/automations'),
+  get: (id) => api.get(`/automations/${id}`),
+  create: (data) => api.post('/automations', data),
+  update: (id, data) => api.put(`/automations/${id}`, data),
+  delete: (id) => api.delete(`/automations/${id}`),
+};
+
 export default api;

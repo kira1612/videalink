@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Database, Webhook, Settings,
   ChevronLeft, ChevronRight, LogOut, Users, Radio,
+  Home, Zap, Box as BoxIcon
 } from 'lucide-react';
 import { authApi } from '../../services/api';
 
@@ -17,6 +18,13 @@ const navGroups = [
       { to: '/app/devices',   icon: Cpu,      label: 'Devices' },
       { to: '/app/buckets',   icon: Database,  label: 'Data Buckets' },
       { to: '/app/endpoints', icon: Webhook,   label: 'Endpoints' },
+    ],
+  },
+  {
+    label: 'Smart Home',
+    items: [
+      { to: '/app/rooms',       icon: Home, label: 'Rooms' },
+      { to: '/app/automations', icon: Zap,  label: 'Automations' },
     ],
   },
   {

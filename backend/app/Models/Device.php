@@ -8,9 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 class Device extends Model
 {
     use HasFactory;
-
     protected $fillable = [
-        'user_id', 'name', 'type', 'protocol', 'broker_config', 'credentials', 'status', 'ip',
+        'user_id', 'room_id', 'name', 'type', 'protocol', 'broker_config', 'credentials', 'status', 'ip',
         'location', 'firmware', 'signal', 'uptime',
         'tags', 'resources', 'last_seen_at',
     ];
@@ -25,6 +24,11 @@ class Device extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
     }
 
     public function dataBuckets()

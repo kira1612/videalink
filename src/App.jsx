@@ -11,6 +11,9 @@ import Endpoints from './pages/Endpoints';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import LandingPage from './pages/LandingPage';
+import Rooms from './pages/Rooms';
+import Automations from './pages/Automations';
+import FloorPlan from './pages/FloorPlan';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('iot_token');
@@ -124,6 +127,9 @@ export default function App() {
           <Route path="buckets" element={<Buckets />} />
           <Route path="buckets/:id" element={<BucketDetail />} />
           <Route path="endpoints" element={<Endpoints />} />
+          <Route path="rooms" element={<Rooms />} />
+          <Route path="automations" element={<Automations />} />
+          <Route path="floorplan" element={<FloorPlan />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
         </Route>

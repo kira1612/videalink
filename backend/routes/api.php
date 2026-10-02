@@ -6,15 +6,20 @@ use App\Http\Controllers\Api\BucketController;
 use App\Http\Controllers\Api\EndpointController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\AutomationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/devices/{device}/telemetry', [DeviceController::class, 'telemetry']);
+    // Terapkan Rate Limiting khusus untuk perangkat (contoh: 60 request per menit) agar tidak rentan DDoS
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('/devices/{device}/telemetry', [DeviceController::class, 'telemetry']);
+    });
+    
     Route::get('/buckets/mqtt-map', [BucketController::class, 'mqttMap']);
-    Route::post('/buckets/{bucket}/records', [BucketController::class, 'storeRecord']);
 });
 
 // Protected routes (require Sanctum token)
@@ -36,8 +41,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/dashboard/activity', [DashboardController::class, 'activity']);
 
-    // Devices
+    // Devices & Smart Home Features
     Route::apiResource('devices', DeviceController::class);
+    Route::apiResource('rooms', RoomController::class);
+    Route::apiResource('automations', AutomationController::class);
 
     // Data Buckets
     Route::get('/buckets', [BucketController::class, 'index']);
@@ -47,6 +54,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::patch('/buckets/{bucket}/toggle', [BucketController::class, 'toggle']);
     Route::put('/buckets/{bucket}/widgets', [BucketController::class, 'updateWidgets']);
     Route::get('/buckets/{bucket}/records', [BucketController::class, 'records']);
+    Route::post('/buckets/{bucket}/records', [BucketController::class, 'storeRecord']);
 
     // MQTT
     Route::post('/mqtt/publish', [App\Http\Controllers\Api\MqttController::class, 'publish']);

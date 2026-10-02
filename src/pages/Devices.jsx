@@ -4,9 +4,9 @@ import {
   Plus, Search, Cpu, MoreVertical, X, Shuffle, Check,
   Settings2, Info, RefreshCw, LayoutGrid, List,
   MapPin, Clock, Zap, Signal, ChevronRight, ArrowUpRight,
-  Activity, WifiOff, AlertTriangle,
+  Activity, WifiOff, AlertTriangle, Home,
 } from 'lucide-react';
-import { devicesApi } from '../services/api';
+import { devicesApi, roomsApi } from '../services/api';
 import Swal from 'sweetalert2';
 import { TypeBadge } from '../components/UI/Badge';
 
@@ -213,7 +213,7 @@ function DeviceRow({ device, onDelete, activeDropdown, setActiveDropdown }) {
 /* ────────────────────────────────────────────────────────────────────────
    ADD DEVICE MODAL
 ──────────────────────────────────────────────────────────────────────── */
-function AddDeviceModal({ onClose, onSuccess }) {
+function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
   const [protocol, setProtocol] = useState('http');
   const [creds, setCreds]       = useState('');
   const [busy, setBusy]         = useState(false);
@@ -230,7 +230,15 @@ function AddDeviceModal({ onClose, onSuccess }) {
     if (!d.type) return Swal.fire({ title: 'Required', text: 'Select a type.', icon: 'warning', background: '#1e293b', color: '#f8fafc' });
     setBusy(true);
     try {
-      await devicesApi.create({ name: d.name || d.id, type: d.type, protocol: d.protocol || 'http', broker_config: d.protocol === 'mqtt' ? { host: d.broker_host, port: d.broker_port, topic: d.broker_topic } : null, credentials: d.credentials, location: 'N/A' });
+      await devicesApi.create({ 
+        name: d.name || d.id, 
+        type: d.type, 
+        room_id: d.room_id || null,
+        protocol: d.protocol || 'http', 
+        broker_config: d.protocol === 'mqtt' ? { host: d.broker_host, port: d.broker_port, topic: d.broker_topic } : null, 
+        credentials: d.credentials, 
+        location: 'N/A' 
+      });
       onSuccess(); onClose();
       Swal.fire({ title: 'Device added!', icon: 'success', background: '#1e293b', color: '#f8fafc' });
     } catch (err) {
@@ -270,6 +278,16 @@ function AddDeviceModal({ onClose, onSuccess }) {
                 <option value="NodeMCU">NodeMCU</option>
               </select>
             </Field>
+            
+            <Field label="Room (Optional)">
+              <select name="room_id" className="input-field" defaultValue="">
+                <option value="">No Room (Unassigned)</option>
+                {rooms.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </Field>
+
             <Field label="Protocol">
               <div className="grid grid-cols-2 gap-2">
                 {['http', 'mqtt'].map(p => (
@@ -364,6 +382,7 @@ function FieldSection({ icon: Icon, title, accent = false, children }) {
 ════════════════════════════════════════════════════════════════════════ */
 export default function Devices() {
   const [devices, setDevices]           = useState([]);
+  const [rooms, setRooms]               = useState([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState('');
   const [tab, setTab]                   = useState('all');
@@ -376,7 +395,14 @@ export default function Devices() {
 
   const load = async () => {
     setRefreshing(true);
-    try { setDevices((await devicesApi.list()).data); }
+    try { 
+      const [devRes, roomRes] = await Promise.all([
+        devicesApi.list(),
+        roomsApi.list()
+      ]);
+      setDevices(devRes.data);
+      setRooms(roomRes.data);
+    }
     catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -541,7 +567,7 @@ export default function Devices() {
         </p>
       )}
 
-      {showAdd && <AddDeviceModal onClose={() => setShowAdd(false)} onSuccess={load} />}
+      {showAdd && <AddDeviceModal onClose={() => setShowAdd(false)} onSuccess={load} rooms={rooms} />}
     </div>
   );
 }

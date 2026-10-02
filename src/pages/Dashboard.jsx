@@ -9,6 +9,7 @@ import { dashboardApi, devicesApi } from '../services/api';
 import { RealtimeLineChart, MultiLineChart } from '../components/Charts/RealtimeChart';
 import { StatusBadge } from '../components/UI/Badge';
 import ThermostatWidget from '../components/Widgets/ThermostatWidget';
+import SmartSwitchWidget from '../components/Widgets/SmartSwitchWidget';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Stat Card — uses Tailwind slate for bg/text (light/dark adaptive)
@@ -322,6 +323,8 @@ export default function Dashboard() {
           />
         </div>
         <div className="flex flex-col gap-4">
+          <SmartSwitchWidget title="Lampu Ruang Tamu" initialState={true} topic="home/living-room/light" />
+          <SmartSwitchWidget title="Lampu Teras" initialState={false} topic="home/porch/light" />
           <ThermostatWidget title="Living Room AC" initialValue={22} min={16} max={30} />
         </div>
       </div>

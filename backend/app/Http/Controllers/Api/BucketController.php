@@ -54,18 +54,39 @@ class BucketController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // 1. Validasi awal untuk mendapatkan ID perangkat
+        $request->validate([
             'device_id'  => 'required|exists:devices,id',
+        ]);
+
+        // 2. Pastikan perangkat milik user yang sedang login
+        $device = Device::where('id', $request->device_id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        // 3. Susun aturan validasi berdasarkan protokol perangkat
+        $rules = [
             'name'       => 'required|string|max:255',
             'description'=> 'nullable|string',
             'fields'     => 'nullable|array',
-            'mqtt_topic' => 'nullable|string|max:255',
-        ]);
+        ];
 
-        // Ensure device belongs to authenticated user
-        $device = Device::where('id', $validated['device_id'])
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
+        if ($device->protocol === 'mqtt') {
+            // Jika perangkat pakai MQTT, maka mqtt_topic WAJIB diisi 
+            // dan idealnya harus unik agar tidak bentrok dengan bucket lain
+            $rules['mqtt_topic'] = 'required|string|max:255|unique:data_buckets,mqtt_topic';
+        } else {
+            // Jika HTTP, tolak jika mengirimkan mqtt_topic
+            $rules['mqtt_topic'] = 'prohibited';
+        }
+
+        $validated = $request->validate($rules);
+        $validated['device_id'] = $device->id;
+
+        // Kosongkan secara eksplisit jika protokolnya HTTP
+        if ($device->protocol === 'http') {
+            $validated['mqtt_topic'] = null;
+        }
 
         $bucket = DataBucket::create($validated);
         return response()->json($bucket, 201);
@@ -154,10 +175,19 @@ class BucketController extends Controller
     {
         $this->authorizeBucket($request, $bucket);
 
+        $validated = $request->validate([
+            'payload' => 'required|array',
+            'timestamp' => 'nullable|integer',
+        ]);
+
+        $recordedAt = isset($validated['timestamp']) 
+            ? \Carbon\Carbon::createFromTimestamp($validated['timestamp']) 
+            : now();
+
         $record = BucketRecord::create([
             'data_bucket_id' => $bucket->id,
-            'data'           => $request->all(),
-            'recorded_at'    => now(),
+            'data'           => $validated['payload'],
+            'recorded_at'    => $recordedAt,
         ]);
 
         return response()->json($record, 201);

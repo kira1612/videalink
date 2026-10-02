@@ -22,6 +22,7 @@ class DeviceController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'room_id' => 'nullable|exists:rooms,id',
             'type' => 'required|string',
             'protocol' => 'required|in:http,mqtt',
             'broker_config' => 'nullable|array',
@@ -40,6 +41,8 @@ class DeviceController extends Controller
             'status' => 'offline',
             'signal' => -60,
             'uptime' => '-',
+            // Generate token unik jika tidak disediakan dari frontend
+            'credentials' => $validated['credentials'] ?? \Illuminate\Support\Str::random(32),
         ]);
 
         ActivityLog::create([
@@ -65,6 +68,7 @@ class DeviceController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
+            'room_id' => 'nullable|exists:rooms,id',
             'type' => 'sometimes|string',
             'protocol' => 'sometimes|in:http,mqtt',
             'broker_config' => 'nullable|array',
@@ -106,23 +110,43 @@ class DeviceController extends Controller
 
     public function telemetry(Request $request, Device $device)
     {
-        // For a dummy endpoint, we can accept public POSTs to this device if it exists
-        // Find the device's first active bucket
+        // 1. Keamanan: Autentikasi Perangkat via HTTP Header
+        $token = $request->header('X-Device-Token') ?? $request->bearerToken();
+        
+        if (!$token || $device->credentials !== $token) {
+            return response()->json(['message' => 'Unauthorized device. Invalid or missing token.'], 401);
+        }
+
+        // 2. Validasi Payload (Jangan pernah percaya input mentah)
+        $validated = $request->validate([
+            'payload' => 'required|array', // Data sensor harus berada di dalam object "payload"
+            'timestamp' => 'nullable|integer', // Optional: Unix timestamp dari perangkat (jika offline buffering)
+        ]);
+
+        // Cari bucket aktif untuk perangkat ini
         $bucket = \App\Models\DataBucket::where('device_id', $device->id)->where('enabled', true)->first();
 
         if (!$bucket) {
             return response()->json(['message' => 'No active bucket for this device'], 404);
         }
 
+        // 3. Tangani Offline Buffering (Gunakan timestamp perangkat jika ada, jika tidak gunakan waktu server)
+        $recordedAt = isset($validated['timestamp']) 
+            ? \Carbon\Carbon::createFromTimestamp($validated['timestamp']) 
+            : now();
+
         $record = \App\Models\BucketRecord::create([
             'data_bucket_id' => $bucket->id,
-            'data' => $request->all(),
-            'recorded_at' => now(),
+            'data' => $validated['payload'],
+            'recorded_at' => $recordedAt,
         ]);
 
-        // Update device last seen
+        // Update status perangkat menjadi online dan terakhir terlihat
         $device->update(['last_seen_at' => now(), 'status' => 'online']);
 
-        return response()->json($record, 201);
+        return response()->json([
+            'message' => 'Telemetry accepted',
+            'recorded_at' => $record->recorded_at,
+        ], 201);
     }
 }
