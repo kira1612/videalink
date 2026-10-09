@@ -300,7 +300,7 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-[1200px] mx-auto px-6 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <img src="/videa_link_logo.png" alt="Videa Link Logo" className="h-8 md:h-10 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform" />
+            <img src="/new_videa_link_logo.png" alt="Videa Link Logo" className="h-8 md:h-10 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform" />
           </div>
           <div className="hidden md:flex items-center gap-10">
             <a href="#overview" className="text-[13px] font-medium text-[#f5f5f7] hover:opacity-70 transition-opacity">{t.overview}</a>

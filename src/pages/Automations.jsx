@@ -255,7 +255,7 @@ export default function Automations() {
                   <p className="text-[12px] text-slate-500">Konfigurasi alur kerja IF-THEN</p>
                 </div>
               </div>
-              <button onClick={closeModal} className="text-slate-500 hover:text-white transition-colors bg-slate-800 p-2 rounded-lg"><X size={16} /></button>
+              <button onClick={closeModal} className="text-slate-500 hover:text-slate-100 transition-colors bg-slate-800 p-2 rounded-lg"><X size={16} /></button>
             </div>
             
             <form onSubmit={handleSubmit} className="p-6">

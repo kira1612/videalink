@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { roomsApi } from '../services/api';
 import { Home, Plus, Edit2, Trash2, X, Loader2, LayoutGrid, Box } from 'lucide-react';
+import Swal from 'sweetalert2';
 import FloorPlan from './FloorPlan';
 
 export default function Rooms() {
@@ -57,8 +58,26 @@ export default function Rooms() {
       }
       handleCloseModal();
       fetchRooms();
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Berhasil menyimpan data',
+        showConfirmButton: false,
+        timer: 3000,
+        background: '#0f172a',
+        color: '#f1f5f9',
+        iconColor: '#10b981'
+      });
     } catch (err) {
-      alert('Gagal menyimpan data.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Oops...',
+        text: 'Gagal menyimpan data.',
+        background: '#0f172a',
+        color: '#f1f5f9',
+        confirmButtonColor: '#3b82f6'
+      });
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -66,12 +85,43 @@ export default function Rooms() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Hapus ruangan ini beserta relasinya?')) {
+    const result = await Swal.fire({
+      title: 'Hapus ruangan?',
+      text: "Data ruangan beserta relasinya akan dihapus permanen!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#334155',
+      confirmButtonText: 'Ya, hapus!',
+      cancelButtonText: 'Batal',
+      background: '#0f172a',
+      color: '#f1f5f9'
+    });
+
+    if (result.isConfirmed) {
       try {
         await roomsApi.delete(id);
         fetchRooms();
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'Ruangan berhasil dihapus',
+          showConfirmButton: false,
+          timer: 3000,
+          background: '#0f172a',
+          color: '#f1f5f9',
+          iconColor: '#10b981'
+        });
       } catch (err) {
-        alert('Gagal menghapus ruangan.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: 'Terjadi kesalahan saat menghapus ruangan.',
+          background: '#0f172a',
+          color: '#f1f5f9',
+          confirmButtonColor: '#3b82f6'
+        });
       }
     }
   };
@@ -86,16 +136,16 @@ export default function Rooms() {
           <p className="text-slate-400 text-sm mt-1">Kelola daftar ruangan dan rancang tata letak 3D rumah Anda.</p>
         </div>
         
-        <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1">
+        <div className="flex bg-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-1 shadow-inner">
           <button 
-            onClick={() => setActiveTab('list')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-all ${activeTab === 'list' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            onClick={() => { setActiveTab('list'); fetchRooms(); }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'list' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
           >
             <LayoutGrid size={16} /> Data Ruangan
           </button>
           <button 
             onClick={() => setActiveTab('3d')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-all ${activeTab === '3d' ? 'bg-primary-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === '3d' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
           >
             <Box size={16} /> 3D Floor Plan
           </button>
@@ -106,7 +156,7 @@ export default function Rooms() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative" style={{ height: 'calc(100vh - 180px)' }}>
           {selectedRoomId ? (
             <div className="absolute inset-0 overflow-y-auto">
-              <FloorPlan hideHeader={true} roomId={selectedRoomId} key={selectedRoomId} />
+              <FloorPlan hideHeader={true} roomId={selectedRoomId} roomName={rooms.find(r => r.id === selectedRoomId)?.name} key={selectedRoomId} />
             </div>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
@@ -134,7 +184,21 @@ export default function Rooms() {
           </div>
 
       {loading ? (
-        <div className="text-center text-slate-500 py-10">Memuat data...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="bg-slate-900 border border-slate-800 rounded-xl p-5 animate-pulse">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-12 h-12 rounded-lg bg-slate-800/50"></div>
+                  <div className="flex-1 space-y-3">
+                    <div className="h-5 bg-slate-800/50 rounded-md w-1/2"></div>
+                    <div className="h-4 bg-slate-800/50 rounded-md w-3/4"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {rooms.map(room => (
@@ -152,7 +216,7 @@ export default function Rooms() {
                 <div className="flex flex-col gap-2">
                   <button 
                     onClick={() => { setSelectedRoomId(room.id); setActiveTab('3d'); }} 
-                    className="flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                    className="flex items-center justify-center gap-2 bg-primary-500/10 text-primary-400 hover:bg-primary-500 hover:text-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
                   >
                     <Box size={14} /> Desain 3D
                   </button>
@@ -182,7 +246,7 @@ export default function Rooms() {
               <h2 className="text-xl font-bold text-slate-100">
                 {editingRoom ? 'Edit Ruangan' : 'Tambah Ruangan Baru'}
               </h2>
-              <button onClick={handleCloseModal} className="text-slate-400 hover:text-white transition-colors">
+              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-100 transition-colors">
                 <X size={20} />
               </button>
             </div>

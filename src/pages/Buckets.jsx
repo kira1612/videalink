@@ -72,10 +72,10 @@ function BucketCard({ bucket, onToggle, onDelete, activeDropdown, setActiveDropd
             </button>
             {isOpen && (
               <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-30 overflow-hidden py-1" style={{ animation: 'fadeInDown .1s ease-out' }} onClick={e => e.stopPropagation()}>
-                <Link to={`/app/buckets/${bucket.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                <Link to={`/app/buckets/${bucket.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
                   <ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Data
                 </Link>
-                <button onClick={() => { onToggle(bucket); setActiveDropdown(null); }} className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                <button onClick={() => { onToggle(bucket); setActiveDropdown(null); }} className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
                   {bucket.enabled ? <><Activity size={13} className="text-amber-400"/> Disable</> : <><Check size={13} className="text-emerald-400"/> Enable</>}
                 </button>
                 <div className="h-px bg-slate-800 my-1 mx-3" />
@@ -163,8 +163,8 @@ function BucketRow({ bucket, onToggle, onDelete, activeDropdown, setActiveDropdo
         </button>
         {isOpen && (
           <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-30 overflow-hidden py-1" style={{ animation: 'fadeInDown .1s ease-out' }} onClick={e => e.stopPropagation()}>
-            <Link to={`/app/buckets/${bucket.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"><ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Data</Link>
-            <button onClick={() => { onToggle(bucket); setActiveDropdown(null); }} className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+            <Link to={`/app/buckets/${bucket.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100"><ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Data</Link>
+            <button onClick={() => { onToggle(bucket); setActiveDropdown(null); }} className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
               {bucket.enabled ? <><Activity size={13} className="text-amber-400"/> Disable</> : <><Check size={13} className="text-emerald-400"/> Enable</>}
             </button>
             <div className="h-px bg-slate-800 my-1 mx-3" />

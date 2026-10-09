@@ -288,7 +288,7 @@ export default function Settings() {
                   <Icon size={18} className={isActive ? 'text-primary-400' : 'text-slate-500'} />
                 </div>
                 <div>
-                  <h4 className={`font-semibold text-sm ${isActive ? 'text-primary-100' : 'text-slate-300'}`}>{tab.label}</h4>
+                  <h4 className={`font-semibold text-sm ${isActive ? 'text-slate-100' : 'text-slate-300'}`}>{tab.label}</h4>
                   <p className="text-xs text-slate-500 mt-0.5">{tab.desc}</p>
                 </div>
               </button>
@@ -436,8 +436,8 @@ export default function Settings() {
 
                   <div className="p-5 rounded-xl border border-primary-500/20 bg-primary-500/5 flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-primary-300 mb-1">Theme Preview</h4>
-                      <p className="text-xs text-primary-200/70">The currently selected accent color is applied.</p>
+                      <h4 className="text-sm font-semibold text-slate-100 mb-1">Theme Preview</h4>
+                      <p className="text-xs text-slate-400">The currently selected accent color is applied.</p>
                     </div>
                     <button className="btn-primary text-xs py-1.5 px-4 pointer-events-none">Active Theme</button>
                   </div>
@@ -553,8 +553,8 @@ export default function Settings() {
                     <div className="flex gap-3">
                       <div className="text-orange-400 flex-shrink-0 mt-0.5"><Shield size={18} /></div>
                       <div>
-                        <h4 className="text-sm font-semibold text-orange-200 mb-1">Keep your token secure</h4>
-                        <p className="text-xs text-orange-200/70">
+                        <h4 className="text-sm font-semibold text-slate-100 mb-1">Keep your token secure</h4>
+                        <p className="text-xs text-slate-400">
                           This token grants full access to your devices via API. Do not share it or expose it in client-side code.
                         </p>
                       </div>

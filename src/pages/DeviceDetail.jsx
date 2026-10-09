@@ -95,7 +95,7 @@ export default function DeviceDetail() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-4 mb-2">
-        <Link to="/app/devices" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+        <Link to="/app/devices" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1">
@@ -304,7 +304,7 @@ export default function DeviceDetail() {
                 <h3 className="text-xl font-bold text-slate-100">Edit Device</h3>
                 <p className="text-slate-400 text-sm mt-1">Update device settings</p>
               </div>
-              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors">
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>

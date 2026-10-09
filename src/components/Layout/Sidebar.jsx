@@ -6,6 +6,7 @@ import {
   Home, Zap, Box as BoxIcon
 } from 'lucide-react';
 import { authApi } from '../../services/api';
+import Swal from 'sweetalert2';
 
 const navGroups = [
   {
@@ -55,11 +56,22 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   }, []);
 
   const handleLogout = async () => {
-    try { await authApi.logout(); } catch (e) {}
-    localStorage.removeItem('iot_token');
-    localStorage.removeItem('iot_user');
-    window.dispatchEvent(new Event('user-updated'));
-    navigate('/');
+    const result = await Swal.fire({
+      title: 'Keluar dari Videa Link?',
+      text: 'Anda harus login kembali untuk mengakses dashboard.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, Keluar',
+      cancelButtonText: 'Batal',
+    });
+
+    if (result.isConfirmed) {
+      try { await authApi.logout(); } catch (e) {}
+      localStorage.removeItem('iot_token');
+      localStorage.removeItem('iot_user');
+      navigate('/');
+      setTimeout(() => window.dispatchEvent(new Event('user-updated')), 10);
+    }
   };
 
   const visibleGroups = navGroups
@@ -89,7 +101,22 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         `}
       >
         <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
-          <img src="/videa_link_icon.png" alt="VideaLink Icon" className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]" />
+          <div 
+            className="w-full h-full transition-colors duration-500"
+            style={{
+              backgroundColor: 'rgb(var(--primary-500))',
+              maskImage: `url('/new_videa_link_icon.png')`,
+              WebkitMaskImage: `url('/new_videa_link_icon.png')`,
+              maskSize: 'contain',
+              WebkitMaskSize: 'contain',
+              maskRepeat: 'no-repeat',
+              WebkitMaskRepeat: 'no-repeat',
+              maskPosition: 'center',
+              WebkitMaskPosition: 'center',
+              filter: 'drop-shadow(0 0 10px rgb(var(--primary-500) / 0.4))'
+            }}
+            title="Videa Link"
+          />
         </div>
 
         <button
@@ -235,7 +262,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                 : userInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-bold text-white leading-none truncate">{currentUser.name}</p>
+              <p className="text-[14px] font-bold text-slate-100 leading-none truncate">{currentUser.name}</p>
               <p className="text-[12px] text-slate-400 font-medium leading-none truncate mt-1">{currentUser.email || 'Administrator'}</p>
             </div>
             <button

@@ -85,7 +85,7 @@ function UserRow({ user, currentUserId, onDelete, onEdit, activeDropdown, setAct
           >
             <button
               onClick={() => { onEdit(user); setActiveDropdown(null); }}
-              className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors"
             >
               <Pencil size={13} className="text-primary-400" /> Edit User
             </button>

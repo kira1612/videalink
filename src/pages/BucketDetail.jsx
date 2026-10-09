@@ -983,6 +983,7 @@ export default function BucketDetail() {
           step: data.step || 1,
           payload: data.payload || null,
           btnLabel: data.btnLabel || null,
+          showIn3D: !!data.showIn3D,
         }
       };
 
@@ -1095,7 +1096,7 @@ export default function BucketDetail() {
 
       {/* ─── Header ─── */}
       <div className="flex items-center gap-4 mb-2">
-        <Link to="/app/buckets" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+        <Link to="/app/buckets" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1">
@@ -1320,7 +1321,7 @@ export default function BucketDetail() {
                   <h3 className="text-xl font-bold text-slate-100">{editingWidget ? 'Edit Widget' : 'Add Dashboard Widget'}</h3>
                   <p className="text-slate-400 text-sm mt-1">Configure visualization for your IoT data</p>
                 </div>
-                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors lg:hidden">
+                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition-colors lg:hidden">
                   <X size={20} />
                 </button>
               </div>
@@ -1552,7 +1553,7 @@ export default function BucketDetail() {
                             const isChecked = (previewWidget || editingWidget)?.config?.fields?.includes(f) || false;
                             return (
                               <div key={f} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors">
-                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-white flex-1">
+                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-slate-100 flex-1">
                                   <input 
                                     type="checkbox" 
                                     name="multiFields" 
@@ -1648,6 +1649,24 @@ export default function BucketDetail() {
                           <div><label className="block text-sm font-medium text-slate-300 mb-2">Button Label</label><input name="btnLabel" type="text" defaultValue={editingWidget?.config?.btnLabel || 'Trigger'} className="input-field w-full" /></div>
                         </div>
                         <div><label className="block text-sm font-medium text-slate-300 mb-2">Payload (Text / JSON)</label><input name="payload" type="text" defaultValue={editingWidget?.config?.payload || '1'} className="input-field w-full font-mono text-sm" placeholder='e.g. {"cmd": "start"}' /></div>
+                      </div>
+                    )}
+
+                    {/* 3D Floor Plan Integration */}
+                    {formType !== 'combo' && formType !== 'map' && formType !== 'log' && (
+                      <div className="pt-4 mt-4 border-t border-slate-700/50">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input 
+                            type="checkbox" 
+                            name="showIn3D" 
+                            defaultChecked={editingWidget?.config?.showIn3D || false}
+                            className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 mt-1" 
+                          />
+                          <div>
+                            <span className="block text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Tampilkan di 3D Room Popup</span>
+                            <span className="block text-xs text-slate-500 mt-1">Nilai widget ini akan ikut tampil saat perangkat diklik di halaman 3D Floor Plan.</span>
+                          </div>
+                        </label>
                       </div>
                     )}
                   </>
@@ -1775,7 +1794,7 @@ export default function BucketDetail() {
                 <h3 className="text-lg font-semibold text-slate-300 flex items-center gap-2">
                   <Maximize2 size={18} className="text-emerald-400" /> Live Preview
                 </h3>
-                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors hidden lg:block">
+                <button type="button" onClick={() => { setShowWidgetModal(false); setEditingWidget(null); }} className="text-slate-400 hover:text-slate-100 p-2 rounded-lg hover:bg-slate-800 transition-colors hidden lg:block">
                   <X size={20} />
                 </button>
               </div>

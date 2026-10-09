@@ -240,15 +240,30 @@ export default function Dashboard() {
     <div className="space-y-5 pb-10 animate-fade-in max-w-[1400px]">
 
       {/* ── HERO HEADER ── */}
-      <div className="relative rounded-2xl p-6 overflow-hidden bg-slate-900 border border-slate-800/80">
-        {/* Radial accent bg */}
+      <div className="relative rounded-2xl p-6 sm:p-8 overflow-hidden bg-slate-900 border border-slate-800/80 shadow-xl group">
+        {/* Dynamic Theme Glows (Mesh Gradient) */}
         <div
-          className="absolute inset-0 pointer-events-none rounded-2xl"
+          className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none opacity-40 group-hover:opacity-60 transition-opacity duration-700"
+          style={{ background: 'rgb(var(--primary-500) / 0.35)' }}
+        />
+        <div
+          className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none opacity-30 group-hover:opacity-50 transition-opacity duration-700"
+          style={{ background: 'rgb(var(--primary-600) / 0.25)' }}
+        />
+        
+        {/* Subtle Tech Grid Texture */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-[0.04]"
           style={{
-            backgroundImage: `radial-gradient(ellipse at 0% 60%, rgb(var(--primary-500) / 0.07) 0%, transparent 55%),
-                              radial-gradient(ellipse at 95% 5%,  rgb(var(--primary-600) / 0.04) 0%, transparent 45%)`,
+            backgroundImage: `linear-gradient(rgb(var(--primary-500)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--primary-500)) 1px, transparent 1px)`,
+            backgroundSize: '32px 32px'
           }}
         />
+
+        {/* Videa Link Transparent Logo Watermark */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-0">
+          <div className="w-[300px] sm:w-[450px] h-24 sm:h-32 logo-watermark select-none group-hover:opacity-[0.25] transition-opacity duration-500" />
+        </div>
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
           <div>

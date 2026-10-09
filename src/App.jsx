@@ -28,8 +28,8 @@ const ProtectedRoute = ({ children }) => {
     const handleLogout = () => {
       localStorage.removeItem('iot_token');
       localStorage.removeItem('iot_user');
-      window.dispatchEvent(new Event('user-updated'));
       navigate('/login', { replace: true });
+      setTimeout(() => window.dispatchEvent(new Event('user-updated')), 10);
     };
 
     const resetTimer = () => {

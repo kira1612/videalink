@@ -2,13 +2,68 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="ThingsIO — A powerful IoT platform to connect, monitor, and control your devices" />
-    <title>ThingsIO — IoT Platform</title>
+    <meta name="description" content="Videa Link — A powerful IoT platform to connect, monitor, and control your devices" />
+    <title>Videa Link</title>
+    <link id="favicon" rel="icon" type="image/png" href="/new_videa_link_icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      (function() {
+        try {
+          var userStr = localStorage.getItem('iot_user');
+          var savedTheme = localStorage.getItem('iot_theme');
+          var savedMode = localStorage.getItem('iot_mode');
+
+          if (userStr) {
+            var user = JSON.parse(userStr);
+            if (user.theme) savedTheme = user.theme;
+            if (user.mode) savedMode = user.mode;
+          }
+
+          if (savedTheme && savedTheme !== 'cyan') {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+          }
+          if (savedMode && savedMode === 'light') {
+            document.documentElement.setAttribute('data-mode', 'light');
+          }
+        } catch (e) {}
+
+        // Dynamic Favicon coloring
+        window.updateFavicon = function() {
+          try {
+            var color = getComputedStyle(document.documentElement).getPropertyValue('--primary-500').trim();
+            if (!color) return;
+            
+            var canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            var ctx = canvas.getContext('2d');
+            
+            var img = new Image();
+            img.src = '/new_videa_link_icon.png';
+            img.onload = function() {
+              ctx.drawImage(img, 0, 0, 128, 128);
+              ctx.globalCompositeOperation = 'source-in';
+              if (color.indexOf('rgb') === -1) {
+                color = 'rgb(' + color.replace(/\s+/g, ',') + ')';
+              }
+              ctx.fillStyle = color;
+              ctx.fillRect(0, 0, 128, 128);
+              
+              var favicon = document.getElementById('favicon');
+              if (favicon) favicon.href = canvas.toDataURL('image/png');
+            };
+          } catch(e) {}
+        };
+
+        window.addEventListener('theme-updated', window.updateFavicon);
+        window.addEventListener('load', function() {
+          setTimeout(window.updateFavicon, 50);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

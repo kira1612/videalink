@@ -88,10 +88,10 @@ function DeviceCard({ device, onDelete, activeDropdown, setActiveDropdown }) {
             </button>
             {isOpen && (
               <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-30 overflow-hidden py-1" style={{ animation: 'fadeInDown .1s ease-out' }} onClick={e => e.stopPropagation()}>
-                <Link to={`/app/devices/${device.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                <Link to={`/app/devices/${device.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
                   <ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Details
                 </Link>
-                <Link to={`/app/devices/${device.id}?edit=true`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                <Link to={`/app/devices/${device.id}?edit=true`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
                   <Settings2 size={13} className="text-slate-500" /> Edit Device
                 </Link>
                 <div className="h-px bg-slate-800 my-1 mx-3" />
@@ -199,8 +199,8 @@ function DeviceRow({ device, onDelete, activeDropdown, setActiveDropdown }) {
         </button>
         {isOpen && (
           <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-30 overflow-hidden py-1" style={{ animation: 'fadeInDown .1s ease-out' }} onClick={e => e.stopPropagation()}>
-            <Link to={`/app/devices/${device.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"><ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Details</Link>
-            <Link to={`/app/devices/${device.id}?edit=true`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"><Settings2 size={13} className="text-slate-500" /> Edit</Link>
+            <Link to={`/app/devices/${device.id}`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100"><ArrowUpRight size={13} style={{ color: 'rgb(var(--primary-400))' }} /> View Details</Link>
+            <Link to={`/app/devices/${device.id}?edit=true`} className="flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100"><Settings2 size={13} className="text-slate-500" /> Edit</Link>
             <div className="h-px bg-slate-800 my-1 mx-3" />
             <button onClick={() => { onDelete(device.id); setActiveDropdown(null); }} className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-rose-400 hover:bg-rose-500/10"><X size={13} /> Delete</button>
           </div>

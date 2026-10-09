@@ -12,6 +12,7 @@ class DeviceController extends Controller
     public function index(Request $request)
     {
         $devices = Device::where('user_id', $request->user()->id)
+            ->with('dataBuckets')
             ->latest()
             ->get();
 
@@ -74,6 +75,8 @@ class DeviceController extends Controller
             'broker_config' => 'nullable|array',
             'broker_config.host' => 'sometimes|string',
             'broker_config.port' => 'sometimes|integer',
+            'broker_config.position' => 'sometimes|array',
+            'broker_config.popup_layout' => 'sometimes|array',
             'credentials' => 'nullable|string',
             'location' => 'nullable|string',
             'ip' => 'nullable|string',

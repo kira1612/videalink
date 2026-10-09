@@ -170,6 +170,64 @@
   .table-row-hover {
     @apply hover:bg-slate-700/30 transition-colors duration-150;
   }
+
+  .logo-watermark {
+    background-color: rgb(var(--primary-500));
+    -webkit-mask-image: url('/new_videa_link_logo.png');
+    mask-image: url('/new_videa_link_logo.png');
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    opacity: 0.15;
+  }
+  [data-mode="light"] .logo-watermark {
+    opacity: 0.12;
+  }
+
+  /* ── SweetAlert2 Theme Overrides ── */
+  div:where(.swal2-container) div:where(.swal2-popup) {
+    background-color: rgb(var(--surface-900)) !important;
+    color: rgb(var(--surface-50)) !important;
+    border: 1px solid rgb(var(--primary-800) / 0.2);
+    border-radius: 1.5rem !important;
+    backdrop-filter: blur(8px);
+  }
+  div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm {
+    background-color: rgb(var(--primary-500)) !important;
+    color: #fff !important;
+    border-radius: 0.75rem !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgb(var(--primary-500) / 0.25) !important;
+    transition: all 0.2s;
+  }
+  div:where(.swal2-container) button:where(.swal2-styled).swal2-confirm:hover {
+    background-color: rgb(var(--primary-400)) !important;
+    transform: translateY(-1px);
+  }
+  div:where(.swal2-container) button:where(.swal2-styled).swal2-cancel {
+    background-color: rgb(var(--surface-700)) !important;
+    color: rgb(var(--surface-100)) !important;
+    border-radius: 0.75rem !important;
+    font-weight: 500 !important;
+    transition: all 0.2s;
+  }
+  div:where(.swal2-container) button:where(.swal2-styled).swal2-cancel:hover {
+    background-color: rgb(var(--surface-600)) !important;
+  }
+  div:where(.swal2-container) h2:where(.swal2-title) {
+    color: rgb(var(--surface-50)) !important;
+  }
+  div:where(.swal2-container) div:where(.swal2-html-container) {
+    color: rgb(var(--surface-400)) !important;
+  }
+  div:where(.swal2-container) .swal2-icon.swal2-question,
+  div:where(.swal2-container) .swal2-icon.swal2-info {
+    border-color: rgb(var(--primary-500)) !important;
+    color: rgb(var(--primary-400)) !important;
+  }
 }
 
 @layer utilities {
