@@ -20,10 +20,10 @@ import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Fix leaflet icon issue
 let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 import {
@@ -40,27 +40,27 @@ const COLORS = ['#22d3ee', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#fb923c'
 const getColor = (i) => COLORS[i % COLORS.length];
 
 const CHART_TYPES = [
-  { value: 'line',   label: 'Line Chart',    icon: LineChartIcon, category: 'chart' },
-  { value: 'area',   label: 'Area Chart',    icon: AreaChartIcon, category: 'chart' },
-  { value: 'bar',    label: 'Bar Chart',     icon: BarChartIcon, category: 'chart' },
-  { value: 'pie',    label: 'Pie Chart',     icon: PieChartIcon, category: 'chart' },
-  { value: 'donut',  label: 'Donut Chart',   icon: CircleDashed, category: 'chart' },
-  { value: 'radar',  label: 'Radar Chart',   icon: RadarChartIcon, category: 'chart' },
-  { value: 'stat',   label: 'Value / Stat',  icon: Hash, category: 'widget' },
-  { value: 'gauge',  label: 'Gauge / Meter', icon: GaugeIcon, category: 'widget' },
-  { value: 'status', label: 'Indicator',     icon: Radio, category: 'widget' },
-  { value: 'switch', label: 'Switch / Toggle',icon: ToggleRight, category: 'widget' },
-  { value: 'combo',  label: 'Combo (2 in 1)', icon: LayoutGrid, category: 'widget' },
-  { value: 'map',    label: 'Map / GPS',     icon: MapPin, category: 'widget' },
+  { value: 'line', label: 'Line Chart', icon: LineChartIcon, category: 'chart' },
+  { value: 'area', label: 'Area Chart', icon: AreaChartIcon, category: 'chart' },
+  { value: 'bar', label: 'Bar Chart', icon: BarChartIcon, category: 'chart' },
+  { value: 'pie', label: 'Pie Chart', icon: PieChartIcon, category: 'chart' },
+  { value: 'donut', label: 'Donut Chart', icon: CircleDashed, category: 'chart' },
+  { value: 'radar', label: 'Radar Chart', icon: RadarChartIcon, category: 'chart' },
+  { value: 'stat', label: 'Value / Stat', icon: Hash, category: 'widget' },
+  { value: 'gauge', label: 'Gauge / Meter', icon: GaugeIcon, category: 'widget' },
+  { value: 'status', label: 'Indicator', icon: Radio, category: 'widget' },
+  { value: 'switch', label: 'Switch / Toggle', icon: ToggleRight, category: 'widget' },
+  { value: 'combo', label: 'Combo (2 in 1)', icon: LayoutGrid, category: 'widget' },
+  { value: 'map', label: 'Map / GPS', icon: MapPin, category: 'widget' },
   { value: 'slider', label: 'Analog Slider', icon: SlidersHorizontal, category: 'widget' },
   { value: 'action', label: 'Action Button', icon: Zap, category: 'widget' },
-  { value: 'log',    label: 'Log Console',   icon: Terminal, category: 'widget' },
+  { value: 'log', label: 'Log Console', icon: Terminal, category: 'widget' },
 ];
 
 const SIZE_OPTIONS = [
-  { value: '1', label: 'Small (1 col)',  cols: 1 },
+  { value: '1', label: 'Small (1 col)', cols: 1 },
   { value: '2', label: 'Medium (2 cols)', cols: 2 },
-  { value: '3', label: 'Large (3 cols)',  cols: 3 },
+  { value: '3', label: 'Large (3 cols)', cols: 3 },
 ];
 
 // ─── Stateful Widget Components ─────────────────────────────────────────────
@@ -129,13 +129,13 @@ function SliderWidget({ widget, latestVal }) {
   const max = parseFloat(widget.config?.max) || 100;
   const step = parseFloat(widget.config?.step) || 1;
   const sliderColor = widget.config?.color || '#06b6d4';
-  
+
   const [sliderVal, setSliderVal] = useState(parseFloat(latestVal) || min);
   const [sending, setSending] = useState(false);
-  
-  useEffect(() => { 
-     const val = parseFloat(latestVal);
-     if (!isNaN(val)) setSliderVal(val); 
+
+  useEffect(() => {
+    const val = parseFloat(latestVal);
+    if (!isNaN(val)) setSliderVal(val);
   }, [latestVal]);
 
   const handleMouseUp = async () => {
@@ -183,12 +183,12 @@ function SliderWidget({ widget, latestVal }) {
           transition: transform 0.2s ease;
         }
       `}</style>
-      
+
       {/* Premium Value Display */}
-      <div 
+      <div
         className="relative flex flex-col items-center justify-center mb-6"
       >
-        <div 
+        <div
           className="px-6 py-2 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-inner flex items-baseline gap-1"
           style={{ boxShadow: `0 0 25px ${sliderColor}15, inset 0 2px 4px rgba(0,0,0,0.5)` }}
         >
@@ -202,22 +202,22 @@ function SliderWidget({ widget, latestVal }) {
 
       {/* Custom Sleek Slider */}
       <div className="w-full relative flex items-center">
-        <input 
-          type="range" 
-          min={min} max={max} step={step} 
-          value={sliderVal} 
-          onChange={(e) => setSliderVal(parseFloat(e.target.value))} 
-          onMouseUp={handleMouseUp} 
+        <input
+          type="range"
+          min={min} max={max} step={step}
+          value={sliderVal}
+          onChange={(e) => setSliderVal(parseFloat(e.target.value))}
+          onMouseUp={handleMouseUp}
           onTouchEnd={handleMouseUp}
           disabled={sending}
           className={`premium-slider-${widget.id} w-full h-3 rounded-full appearance-none cursor-pointer disabled:opacity-50 outline-none transition-all duration-300`}
-          style={{ 
+          style={{
             background: `linear-gradient(to right, ${sliderColor} ${percent}%, #1e293b ${percent}%)`,
             boxShadow: `inset 0 2px 5px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05)`
           }}
         />
       </div>
-      
+
       <div className="flex justify-between w-full text-[10px] text-slate-500 font-bold mt-3">
         <span>{min}</span>
         <span>{max}</span>
@@ -249,7 +249,7 @@ function ActionWidget({ widget }) {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
-      <button 
+      <button
         onClick={handleClick}
         disabled={sending}
         className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 disabled:opacity-50 focus:outline-none"
@@ -281,10 +281,10 @@ function WidgetChart({ widget, chartData, color }) {
     return (
       <div className={`w-full h-full flex ${isStack ? 'flex-col' : 'flex-row'} divide-slate-800/50 ${isStack ? 'divide-y' : 'divide-x'}`}>
         <div className="flex-1 w-full h-full relative overflow-hidden p-2">
-           <WidgetChart widget={widget.config?.widgetA} chartData={chartData} color={color} />
+          <WidgetChart widget={widget.config?.widgetA} chartData={chartData} color={color} />
         </div>
         <div className="flex-1 w-full h-full relative overflow-hidden p-2">
-           <WidgetChart widget={widget.config?.widgetB} chartData={chartData} color={color} />
+          <WidgetChart widget={widget.config?.widgetB} chartData={chartData} color={color} />
         </div>
       </div>
     );
@@ -307,7 +307,7 @@ function WidgetChart({ widget, chartData, color }) {
   const val = parseFloat(latestVal);
   const threshold = parseFloat(widget.config?.alertThreshold);
   let isAlertActive = false;
-  
+
   if (isNumeric && !isNaN(val) && !isNaN(threshold) && val >= threshold) {
     activeColor = widget.config?.alertColor || '#ef4444';
     isAlertActive = true;
@@ -331,15 +331,15 @@ function WidgetChart({ widget, chartData, color }) {
     const val = parseFloat(latestVal) || 0;
     const min = parseFloat(widget.config?.min) || 0;
     const max = parseFloat(widget.config?.max) || 100;
-    
+
     // Normalize value between min and max
     let normalized = val;
     if (normalized < min) normalized = min;
     if (normalized > max) normalized = max;
-    
+
     // Calculate percentage for half-circle
     const percent = (normalized - min) / (max - min);
-    
+
     const pieData = [
       { name: 'Value', value: percent, fill: activeColor },
       { name: 'Remaining', value: 1 - percent, fill: '#334155' }
@@ -379,7 +379,7 @@ function WidgetChart({ widget, chartData, color }) {
     const valStr = String(latestVal).toLowerCase();
     const isOk = valStr === '1' || valStr === 'true' || valStr === 'on' || valStr === 'normal' || valStr === 'online';
     const isBad = valStr === '0' || valStr === 'false' || valStr === 'off' || valStr === 'bahaya' || valStr === 'offline';
-    
+
     let stateColor = '#64748b'; // default gray
     let icon = '⚪';
     let label = latestVal;
@@ -434,7 +434,7 @@ function WidgetChart({ widget, chartData, color }) {
     // Assuming field contains "lat,lng" e.g. "-6.2,106.8"
     let lat = -6.2;
     let lng = 106.8;
-    
+
     if (typeof latestVal === 'string' && latestVal.includes(',')) {
       const parts = latestVal.split(',');
       if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -612,7 +612,7 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
     e.stopPropagation();
     e.preventDefault(); // Prevent text selection
     setResizing(true);
-    
+
     const rect = e.currentTarget.parentElement.getBoundingClientRect();
     startDragRef.current = {
       x: e.clientX,
@@ -622,15 +622,15 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
       baseWidth: rect.width,
       baseHeight: rect.height,
     };
-    
+
     setGhostSize({ w: rect.width, h: rect.height });
 
     const handlePointerMove = (moveEvent) => {
       if (!startDragRef.current) return;
-      
+
       const dx = moveEvent.clientX - startDragRef.current.x;
       const dy = moveEvent.clientY - startDragRef.current.y;
-      
+
       // Update pixel-perfect ghost box size
       setGhostSize({
         w: Math.max(150, startDragRef.current.baseWidth + dx),
@@ -641,12 +641,12 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
     const handlePointerUp = (upEvent) => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      
+
       if (!startDragRef.current) return;
-      
+
       const dx = upEvent.clientX - startDragRef.current.x;
       const dy = upEvent.clientY - startDragRef.current.y;
-      
+
       // Calculate final snapped values based on total drag distance
       let newW = startDragRef.current.startW;
       if (dx > 120) newW = Math.min(3, startDragRef.current.startW + 1);
@@ -660,12 +660,12 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
 
       const finalW = newW.toString();
       const finalH = newH;
-      
+
       setLocalW(finalW);
       setLocalH(finalH);
       setGhostSize(null);
       setResizing(false);
-      
+
       if (finalW !== widget.w || finalH !== widget.h) {
         if (onResize) {
           onResize(widget.id, { w: finalW, h: finalH });
@@ -686,14 +686,14 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
+    <div
+      ref={setNodeRef}
+      style={style}
       className={`glass-card p-5 relative group flex flex-col gap-3 transition-[grid-column] duration-300 ease-in-out ${localH === 'tall' ? 'min-h-[400px]' : ''}`}
     >
       {/* Ghost Resize Box */}
       {ghostSize && (
-        <div 
+        <div
           className="absolute top-0 left-0 rounded-2xl border-2 border-dashed border-primary-400 bg-primary-500/10 z-50 pointer-events-none backdrop-blur-[2px] transition-none"
           style={{ width: `${ghostSize.w}px`, height: `${ghostSize.h}px` }}
         />
@@ -758,8 +758,8 @@ function SortableWidget({ widget, index, chartData, onDelete, onEdit, onResize, 
           title="Drag to resize"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 0L0 12H12V0Z" fill="currentColor" opacity="0.5"/>
-            <path d="M12 6L6 12H12V6Z" fill="currentColor"/>
+            <path d="M12 0L0 12H12V0Z" fill="currentColor" opacity="0.5" />
+            <path d="M12 6L6 12H12V6Z" fill="currentColor" />
           </svg>
         </div>
       )}
@@ -810,11 +810,11 @@ export default function BucketDetail() {
       ]);
       setBucket(prev => JSON.stringify(prev) === JSON.stringify(bucketRes.data) ? prev : bucketRes.data);
       setRecords(prev => JSON.stringify(prev) === JSON.stringify(recordsRes.data) ? prev : recordsRes.data);
-      
+
       setWidgets(prev => {
         // Prevent stale fetch from overwriting local state if an update happened recently
         if (fetchStartTime < lastUpdateRef.current) return prev;
-        
+
         const next = bucketRes.data.widgets || [];
         return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
       });
@@ -881,7 +881,7 @@ export default function BucketDetail() {
     const fd = new FormData(form);
     const data = Object.fromEntries(fd);
     const multiFields = fd.getAll('multiFields');
-    
+
     const currentType = data.type || formType;
     const isMulti = ['line', 'area', 'bar', 'radar'].includes(currentType);
 
@@ -891,7 +891,7 @@ export default function BucketDetail() {
         if (data[`color_${f}`]) fieldColors[f] = data[`color_${f}`];
       });
     }
-    
+
     setPreviewWidget({
       id: 'preview',
       type: currentType,
@@ -1051,7 +1051,7 @@ export default function BucketDetail() {
     setPreviewWidget(widget);
     setShowWidgetModal(true);
   };
-  
+
   // ── Open add modal ──
   const handleAddWidget = () => {
     setEditingWidget(null);
@@ -1104,7 +1104,7 @@ export default function BucketDetail() {
             <h2 className="text-2xl font-bold text-slate-100">{bucket.name}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={bucket.enabled ? 'online' : 'offline'} label={bucket.enabled ? 'Active' : 'Disabled'} />
-              
+
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${cloudConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                 <div className={`w-2 h-2 rounded-full ${cloudConnected ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-rose-500'}`} />
                 {cloudConnected ? 'Broker Connected' : 'Broker Disconnected'}
@@ -1112,7 +1112,7 @@ export default function BucketDetail() {
 
               {isStale && bucket.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/20 text-[11px] font-semibold uppercase tracking-wide">
-                   ⚠️ Stale Data (&gt; 5m)
+                  ⚠️ Stale Data (&gt; 5m)
                 </div>
               )}
             </div>
@@ -1123,11 +1123,10 @@ export default function BucketDetail() {
           {widgets.length > 0 && (
             <button
               onClick={() => setEditMode(e => !e)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                editMode
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${editMode
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
             >
               {editMode ? <><Move size={15} /> Done Editing</> : <><Settings size={15} /> Edit Layout</>}
             </button>
@@ -1170,11 +1169,10 @@ export default function BucketDetail() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors border-b-2 -mb-[1px] ${
-                activeTab === tab.id 
-                  ? 'border-primary-400 text-primary-400 bg-primary-950/20' 
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`flex items-center gap-2 px-5 py-3 font-medium text-sm transition-colors border-b-2 -mb-[1px] ${activeTab === tab.id
+                ? 'border-primary-400 text-primary-400 bg-primary-950/20'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <Icon size={16} />
               {tab.label}
@@ -1243,17 +1241,17 @@ export default function BucketDetail() {
                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
                   <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">Expected Payload Format (JSON)</p>
                   <pre className="text-amber-400 font-mono text-sm p-3 bg-slate-950 rounded-md overflow-x-auto border border-slate-800">
-{`{
+                    {`{
   ${bucket.fields?.map(f => `"${f}": 25.5`).join(',\n  ') || '"temperature": 25.5'}
 }`}
                   </pre>
                   <p className="text-xs text-slate-500 mt-3">Ensure your device sends data matching this exact JSON schema.</p>
                 </div>
-                
+
                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
                   <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">Example cURL Test</p>
                   <pre className="text-violet-400 font-mono text-sm p-3 bg-slate-950 rounded-md overflow-x-auto border border-slate-800 break-all whitespace-pre-wrap">
-{`curl -X POST http://127.0.0.1:8000/api/v1/mqtt/publish \\
+                    {`curl -X POST https://videalink.my.id/api/v1/mqtt/publish \\
 -H "Content-Type: application/json" \\
 -d '{"topic": "${bucket.mqtt_topic}", "message": {${bucket.fields?.map(f => `"${f}": 25.5`).join(', ') || '"temperature": 25.5'}}}'`}
                   </pre>
@@ -1313,7 +1311,7 @@ export default function BucketDetail() {
       {showWidgetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
           <div className="glass-card w-full max-w-5xl my-auto animate-scale-in flex flex-col lg:flex-row max-h-[90vh]">
-            
+
             {/* LEFT SIDE: FORM */}
             <div className="w-full lg:w-1/2 flex flex-col border-slate-700/50 lg:border-r overflow-y-auto">
               <div className="p-6 border-b border-slate-700/50 flex justify-between items-center shrink-0">
@@ -1326,466 +1324,465 @@ export default function BucketDetail() {
                 </button>
               </div>
 
-              <form 
+              <form
                 onChange={handleFormChange}
-                onSubmit={handleWidgetSubmit} 
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.target.tagName === 'INPUT' && modalStep < 3) {
-                  e.preventDefault();
-                  setModalStep(s => s + 1);
-                }
-              }}
-              className="p-6"
-            >
-              {/* Stepper Header */}
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/50">
-                {[
-                  { step: 1, label: 'Widget Type' },
-                  { step: 2, label: 'Appearance' },
-                  { step: 3, label: 'Data & Config' }
-                ].map(s => (
-                  <div key={s.step} className={`flex items-center gap-2 ${modalStep === s.step ? 'text-primary-400' : (modalStep > s.step ? 'text-emerald-400' : 'text-slate-500')}`}>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep === s.step ? 'bg-primary-500/20 ring-1 ring-primary-500/50' : (modalStep > s.step ? 'bg-emerald-500/20' : 'bg-slate-800')}`}>
-                      {s.step}
-                    </div>
-                    <span className="text-xs font-medium uppercase tracking-wider hidden sm:block">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* STEP 1: Widget Type */}
-              <div className={modalStep === 1 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
-                <div>
-                  <div className="space-y-4">
-                    {/* Charts Group */}
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Data Charts</h4>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        {CHART_TYPES.filter(c => c.category === 'chart').map(ct => {
-                          const Icon = ct.icon;
-                          return (
-                            <label key={ct.value} className="relative cursor-pointer group">
-                              <input
-                                type="radio"
-                                name="type"
-                                value={ct.value}
-                                defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
-                                onChange={(e) => setFormType(e.target.value)}
-                                className="sr-only peer"
-                              />
-                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-primary-400/80 peer-checked:bg-primary-500/10 peer-checked:text-primary-400 peer-checked:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
-                                <Icon size={26} strokeWidth={1.5} className="mb-2" />
-                                <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
-                              </div>
-                            </label>
-                          );
-                        })}
+                onSubmit={handleWidgetSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && modalStep < 3) {
+                    e.preventDefault();
+                    setModalStep(s => s + 1);
+                  }
+                }}
+                className="p-6"
+              >
+                {/* Stepper Header */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700/50">
+                  {[
+                    { step: 1, label: 'Widget Type' },
+                    { step: 2, label: 'Appearance' },
+                    { step: 3, label: 'Data & Config' }
+                  ].map(s => (
+                    <div key={s.step} className={`flex items-center gap-2 ${modalStep === s.step ? 'text-primary-400' : (modalStep > s.step ? 'text-emerald-400' : 'text-slate-500')}`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep === s.step ? 'bg-primary-500/20 ring-1 ring-primary-500/50' : (modalStep > s.step ? 'bg-emerald-500/20' : 'bg-slate-800')}`}>
+                        {s.step}
                       </div>
+                      <span className="text-xs font-medium uppercase tracking-wider hidden sm:block">{s.label}</span>
                     </div>
-
-                    {/* Components Group */}
-                    <div>
-                      <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Components & Controls</h4>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        {CHART_TYPES.filter(c => c.category === 'widget').map(ct => {
-                          const Icon = ct.icon;
-                          return (
-                            <label key={ct.value} className="relative cursor-pointer group">
-                              <input
-                                type="radio"
-                                name="type"
-                                value={ct.value}
-                                defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
-                                onChange={(e) => setFormType(e.target.value)}
-                                className="sr-only peer"
-                              />
-                              <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-fuchsia-400/80 peer-checked:bg-fuchsia-500/10 peer-checked:text-fuchsia-400 peer-checked:shadow-[0_0_15px_rgba(232,121,249,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
-                                <Icon size={26} strokeWidth={1.5} className="mb-2" />
-                                <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* STEP 2: Appearance */}
-              <div className={modalStep === 2 ? 'block space-y-6 min-h-[300px]' : 'hidden'}>
-                {/* Color Selector */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Color (Optional)</label>
-                  
-                  {/* Hidden input to ensure FormData captures the color */}
-                  <input type="hidden" name="color" value={formColor} />
-
-                  <div className="flex flex-col gap-4">
-                    {/* Predefined Swatches */}
-                    <div className="flex gap-3 flex-wrap items-center">
-                      {[
-                        { label: 'Auto (Default)', value: '' },
-                        { label: 'Cyan', value: '#22d3ee' },
-                        { label: 'Emerald', value: '#34d399' },
-                        { label: 'Rose', value: '#f43f5e' },
-                        { label: 'Violet', value: '#a78bfa' },
-                        { label: 'Amber', value: '#fbbf24' },
-                      ].map(c => (
-                        <button
-                          type="button"
-                          key={c.label}
-                          title={c.label}
-                          onClick={() => setFormColor(c.value)}
-                          className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center shadow-lg ${
-                            formColor === c.value 
-                              ? 'border-white ring-2 ring-primary-500/50' 
-                              : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: c.value || '#334155' }}
-                        >
-                          {c.value === '' && <span className="text-[10px] text-slate-400 font-medium">Auto</span>}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Custom Color Picker & Text Input */}
-                    <div className="flex gap-3 items-center">
-                      <div 
-                        className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-600 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500"
-                        title="Custom Color Picker"
-                      >
-                        <input
-                          type="color"
-                          value={formColor || '#22d3ee'}
-                          onChange={(e) => setFormColor(e.target.value)}
-                          className="absolute -top-2 -left-2 w-14 h-14 cursor-pointer"
-                        />
-                      </div>
-                      <input
-                        type="text"
-                        value={formColor}
-                        onChange={(e) => setFormColor(e.target.value)}
-                        placeholder="Auto (#hexcode)"
-                        className="input-field max-w-[150px]"
-                      />
-                      {formColor && (
-                        <button 
-                          type="button" 
-                          onClick={() => setFormColor('')} 
-                          className="text-xs text-slate-400 hover:text-rose-400"
-                        >
-                          Clear (Auto)
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Width */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Width</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {SIZE_OPTIONS.map(sz => (
-                      <label key={sz.value} className="relative cursor-pointer">
-                        <input
-                          type="radio"
-                          name="w"
-                          value={sz.value}
-                          defaultChecked={editingWidget ? editingWidget.w === sz.value : sz.value === '1'}
-                          className="sr-only peer"
-                        />
-                        <div className="flex flex-col items-center gap-1 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-violet-400/70 peer-checked:bg-violet-500/10 peer-checked:text-violet-300 hover:border-slate-500 transition-all text-center">
-                          <div className="flex gap-0.5">
-                            {Array.from({ length: sz.cols }).map((_, i) => (
-                              <div key={i} className="w-4 h-4 rounded-sm bg-current opacity-70" />
-                            ))}
-                            {Array.from({ length: 3 - sz.cols }).map((_, i) => (
-                              <div key={i} className="w-4 h-4 rounded-sm bg-slate-600 opacity-30" />
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-medium">{sz.label}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Height */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-3">Widget Height</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[{ value: 'normal', label: 'Normal', icon: <Minimize2 size={16} /> }, { value: 'tall', label: 'Tall', icon: <Maximize2 size={16} /> }].map(h => (
-                      <label key={h.value} className="relative cursor-pointer">
-                        <input
-                          type="radio"
-                          name="h"
-                          value={h.value}
-                          defaultChecked={editingWidget ? editingWidget.h === h.value : h.value === 'normal'}
-                          className="sr-only peer"
-                        />
-                        <div className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-emerald-400/70 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 hover:border-slate-500 transition-all">
-                          {h.icon}
-                          <span className="text-sm font-medium">{h.label}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* STEP 3: Data & Config */}
-              <div className={modalStep === 3 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
-                
-                {formType !== 'combo' ? (
-                  <>
-                    {/* Standard Widget Config */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
-                      <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temperature Over Time" className="input-field w-full" />
-                    </div>
-
-                    {['line', 'area', 'bar', 'radar'].includes(formType) ? (
+                {/* STEP 1: Widget Type */}
+                <div className={modalStep === 1 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
+                  <div>
+                    <div className="space-y-4">
+                      {/* Charts Group */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Data Fields (Multi-select)</label>
-                        <div className="grid grid-cols-2 gap-2 p-3 bg-slate-900/50 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto custom-scrollbar">
-                          {bucket.fields?.map((f, idx) => {
-                            const isChecked = (previewWidget || editingWidget)?.config?.fields?.includes(f) || false;
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Data Charts</h4>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {CHART_TYPES.filter(c => c.category === 'chart').map(ct => {
+                            const Icon = ct.icon;
                             return (
-                              <div key={f} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors">
-                                <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-slate-100 flex-1">
-                                  <input 
-                                    type="checkbox" 
-                                    name="multiFields" 
-                                    value={f} 
-                                    defaultChecked={editingWidget?.config?.fields?.includes(f) || false}
-                                    className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-slate-900" 
-                                  />
-                                  <span className="truncate">{f}</span>
-                                </label>
-                                {isChecked && (
-                                  <input 
-                                    type="color" 
-                                    name={`color_${f}`} 
-                                    defaultValue={editingWidget?.config?.fieldColors?.[f] || getColor(idx)} 
-                                    className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0"
-                                  />
-                                )}
-                              </div>
+                              <label key={ct.value} className="relative cursor-pointer group">
+                                <input
+                                  type="radio"
+                                  name="type"
+                                  value={ct.value}
+                                  defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
+                                  onChange={(e) => setFormType(e.target.value)}
+                                  className="sr-only peer"
+                                />
+                                <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-primary-400/80 peer-checked:bg-primary-500/10 peer-checked:text-primary-400 peer-checked:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
+                                  <Icon size={26} strokeWidth={1.5} className="mb-2" />
+                                  <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
+                                </div>
+                              </label>
                             );
                           })}
                         </div>
                       </div>
-                    ) : (
+
+                      {/* Components Group */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Data Field</label>
-                        <select name="field" defaultValue={editingWidget?.field || bucket.fields?.[0] || ''} className="input-field w-full appearance-none" required={formType !== 'combo'}>
-                          {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
-                        </select>
-                      </div>
-                    )}
-
-                    {(formType === 'stat' || formType === 'gauge') && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Unit</label>
-                        <input name="unit" type="text" defaultValue={editingWidget?.unit || ''} placeholder="e.g. °C, %, ppm" className="input-field w-full" />
-                      </div>
-                    )}
-                    
-                    {formType === 'gauge' && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Min Value</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Max Value</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
-                      </div>
-                    )}
-
-                    {['stat', 'gauge', 'line', 'bar', 'area'].includes(formType) && (
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50 mt-4">
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-1">Critical Threshold</label>
-                          <p className="text-[10px] text-slate-500 mb-2">Change color if value &ge; this</p>
-                          <input name="alertThreshold" type="number" step="any" defaultValue={editingWidget?.config?.alertThreshold || ''} placeholder="e.g. 80" className="input-field w-full" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-1">Alert Color</label>
-                          <p className="text-[10px] text-slate-500 mb-2">Color when threshold is met</p>
-                          <div className="flex gap-2 items-center">
-                            <input name="alertColor" type="color" defaultValue={editingWidget?.config?.alertColor || '#ef4444'} className="w-10 h-10 rounded-lg cursor-pointer bg-slate-800 border border-slate-700 p-1" />
-                            <span className="text-xs text-slate-400">Pick color</span>
-                          </div>
+                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Components & Controls</h4>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                          {CHART_TYPES.filter(c => c.category === 'widget').map(ct => {
+                            const Icon = ct.icon;
+                            return (
+                              <label key={ct.value} className="relative cursor-pointer group">
+                                <input
+                                  type="radio"
+                                  name="type"
+                                  value={ct.value}
+                                  defaultChecked={editingWidget ? editingWidget.type === ct.value : ct.value === 'line'}
+                                  onChange={(e) => setFormType(e.target.value)}
+                                  className="sr-only peer"
+                                />
+                                <div className="flex flex-col items-center justify-center p-3 h-[85px] rounded-xl border border-slate-700 bg-slate-800/40 text-slate-400 peer-checked:border-fuchsia-400/80 peer-checked:bg-fuchsia-500/10 peer-checked:text-fuchsia-400 peer-checked:shadow-[0_0_15px_rgba(232,121,249,0.15)] hover:bg-slate-800 hover:border-slate-500 hover:text-slate-200 transition-all text-center">
+                                  <Icon size={26} strokeWidth={1.5} className="mb-2" />
+                                  <span className="text-[11px] font-medium leading-tight">{ct.label}</span>
+                                </div>
+                              </label>
+                            );
+                          })}
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
+                </div>
 
-                    {formType === 'status' && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">On Label (1, true)</label><input name="onLabel" type="text" defaultValue={editingWidget?.config?.onLabel || 'Online'} className="input-field w-full" /></div>
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Off Label (0, false)</label><input name="offLabel" type="text" defaultValue={editingWidget?.config?.offLabel || 'Offline'} className="input-field w-full" /></div>
-                      </div>
-                    )}
-                    
-                    {formType === 'switch' && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label>
-                        <input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} placeholder="e.g. home/livingroom/light/set" className="input-field w-full" />
-                      </div>
-                    )}
+                {/* STEP 2: Appearance */}
+                <div className={modalStep === 2 ? 'block space-y-6 min-h-[300px]' : 'hidden'}>
+                  {/* Color Selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-3">Widget Color (Optional)</label>
 
-                    {formType === 'slider' && (
-                      <div className="space-y-4">
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Min</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Max</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Step</label><input name="step" type="number" step="any" defaultValue={editingWidget?.config?.step || 1} className="input-field w-full" /></div>
-                        </div>
-                      </div>
-                    )}
+                    {/* Hidden input to ensure FormData captures the color */}
+                    <input type="hidden" name="color" value={formColor} />
 
-                    {formType === 'action' && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
-                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Button Label</label><input name="btnLabel" type="text" defaultValue={editingWidget?.config?.btnLabel || 'Trigger'} className="input-field w-full" /></div>
-                        </div>
-                        <div><label className="block text-sm font-medium text-slate-300 mb-2">Payload (Text / JSON)</label><input name="payload" type="text" defaultValue={editingWidget?.config?.payload || '1'} className="input-field w-full font-mono text-sm" placeholder='e.g. {"cmd": "start"}' /></div>
+                    <div className="flex flex-col gap-4">
+                      {/* Predefined Swatches */}
+                      <div className="flex gap-3 flex-wrap items-center">
+                        {[
+                          { label: 'Auto (Default)', value: '' },
+                          { label: 'Cyan', value: '#22d3ee' },
+                          { label: 'Emerald', value: '#34d399' },
+                          { label: 'Rose', value: '#f43f5e' },
+                          { label: 'Violet', value: '#a78bfa' },
+                          { label: 'Amber', value: '#fbbf24' },
+                        ].map(c => (
+                          <button
+                            type="button"
+                            key={c.label}
+                            title={c.label}
+                            onClick={() => setFormColor(c.value)}
+                            className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center shadow-lg ${formColor === c.value
+                              ? 'border-white ring-2 ring-primary-500/50'
+                              : 'border-transparent'
+                              }`}
+                            style={{ backgroundColor: c.value || '#334155' }}
+                          >
+                            {c.value === '' && <span className="text-[10px] text-slate-400 font-medium">Auto</span>}
+                          </button>
+                        ))}
                       </div>
-                    )}
 
-                    {/* 3D Floor Plan Integration */}
-                    {formType !== 'combo' && formType !== 'map' && formType !== 'log' && (
-                      <div className="pt-4 mt-4 border-t border-slate-700/50">
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            name="showIn3D" 
-                            defaultChecked={editingWidget?.config?.showIn3D || false}
-                            className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 mt-1" 
+                      {/* Custom Color Picker & Text Input */}
+                      <div className="flex gap-3 items-center">
+                        <div
+                          className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-600 focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500"
+                          title="Custom Color Picker"
+                        >
+                          <input
+                            type="color"
+                            value={formColor || '#22d3ee'}
+                            onChange={(e) => setFormColor(e.target.value)}
+                            className="absolute -top-2 -left-2 w-14 h-14 cursor-pointer"
                           />
-                          <div>
-                            <span className="block text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Tampilkan di 3D Room Popup</span>
-                            <span className="block text-xs text-slate-500 mt-1">Nilai widget ini akan ikut tampil saat perangkat diklik di halaman 3D Floor Plan.</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={formColor}
+                          onChange={(e) => setFormColor(e.target.value)}
+                          placeholder="Auto (#hexcode)"
+                          className="input-field max-w-[150px]"
+                        />
+                        {formColor && (
+                          <button
+                            type="button"
+                            onClick={() => setFormColor('')}
+                            className="text-xs text-slate-400 hover:text-rose-400"
+                          >
+                            Clear (Auto)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Width */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-3">Widget Width</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {SIZE_OPTIONS.map(sz => (
+                        <label key={sz.value} className="relative cursor-pointer">
+                          <input
+                            type="radio"
+                            name="w"
+                            value={sz.value}
+                            defaultChecked={editingWidget ? editingWidget.w === sz.value : sz.value === '1'}
+                            className="sr-only peer"
+                          />
+                          <div className="flex flex-col items-center gap-1 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-violet-400/70 peer-checked:bg-violet-500/10 peer-checked:text-violet-300 hover:border-slate-500 transition-all text-center">
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: sz.cols }).map((_, i) => (
+                                <div key={i} className="w-4 h-4 rounded-sm bg-current opacity-70" />
+                              ))}
+                              {Array.from({ length: 3 - sz.cols }).map((_, i) => (
+                                <div key={i} className="w-4 h-4 rounded-sm bg-slate-600 opacity-30" />
+                              ))}
+                            </div>
+                            <span className="text-[10px] font-medium">{sz.label}</span>
                           </div>
                         </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Height */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-3">Widget Height</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[{ value: 'normal', label: 'Normal', icon: <Minimize2 size={16} /> }, { value: 'tall', label: 'Tall', icon: <Maximize2 size={16} /> }].map(h => (
+                        <label key={h.value} className="relative cursor-pointer">
+                          <input
+                            type="radio"
+                            name="h"
+                            value={h.value}
+                            defaultChecked={editingWidget ? editingWidget.h === h.value : h.value === 'normal'}
+                            className="sr-only peer"
+                          />
+                          <div className="flex items-center justify-center gap-2 p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-slate-400 peer-checked:border-emerald-400/70 peer-checked:bg-emerald-500/10 peer-checked:text-emerald-300 hover:border-slate-500 transition-all">
+                            {h.icon}
+                            <span className="text-sm font-medium">{h.label}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* STEP 3: Data & Config */}
+                <div className={modalStep === 3 ? 'block space-y-5 min-h-[300px]' : 'hidden'}>
+
+                  {formType !== 'combo' ? (
+                    <>
+                      {/* Standard Widget Config */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
+                        <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temperature Over Time" className="input-field w-full" />
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Combo Widget Config */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
-                      <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temp & Heater Control" className="input-field w-full" />
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Layout</label>
-                      <select name="layout" defaultValue={editingWidget?.config?.layout || 'split'} className="input-field w-full appearance-none">
-                        <option value="split">Split Horizontal (Side-by-side)</option>
-                        <option value="stack">Stack Vertical (Top/Bottom)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                      {/* Sub-Widget A */}
-                      <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
-                        <h4 className="text-sm font-bold text-primary-400">Widget A (Left/Top)</h4>
-                        
+                      {['line', 'area', 'bar', 'radar'].includes(formType) ? (
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
-                          <select name="typeA" defaultValue={editingWidget?.config?.widgetA?.type || 'gauge'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
-                            {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                          </select>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Data Fields (Multi-select)</label>
+                          <div className="grid grid-cols-2 gap-2 p-3 bg-slate-900/50 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto custom-scrollbar">
+                            {bucket.fields?.map((f, idx) => {
+                              const isChecked = (previewWidget || editingWidget)?.config?.fields?.includes(f) || false;
+                              return (
+                                <div key={f} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition-colors">
+                                  <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-slate-100 flex-1">
+                                    <input
+                                      type="checkbox"
+                                      name="multiFields"
+                                      value={f}
+                                      defaultChecked={editingWidget?.config?.fields?.includes(f) || false}
+                                      className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-slate-900"
+                                    />
+                                    <span className="truncate">{f}</span>
+                                  </label>
+                                  {isChecked && (
+                                    <input
+                                      type="color"
+                                      name={`color_${f}`}
+                                      defaultValue={editingWidget?.config?.fieldColors?.[f] || getColor(idx)}
+                                      className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        
+                      ) : (
                         <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
-                          <select name="fieldA" defaultValue={editingWidget?.config?.widgetA?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Data Field</label>
+                          <select name="field" defaultValue={editingWidget?.field || bucket.fields?.[0] || ''} className="input-field w-full appearance-none" required={formType !== 'combo'}>
                             {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
                           </select>
                         </div>
+                      )}
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.min || editingWidget?.config?.widgetA?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
-                          <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.max || editingWidget?.config?.widgetA?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                      {(formType === 'stat' || formType === 'gauge') && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Unit</label>
+                          <input name="unit" type="text" defaultValue={editingWidget?.unit || ''} placeholder="e.g. °C, %, ppm" className="input-field w-full" />
                         </div>
+                      )}
+
+                      {formType === 'gauge' && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Min Value</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Max Value</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
+                        </div>
+                      )}
+
+                      {['stat', 'gauge', 'line', 'bar', 'area'].includes(formType) && (
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50 mt-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Critical Threshold</label>
+                            <p className="text-[10px] text-slate-500 mb-2">Change color if value &ge; this</p>
+                            <input name="alertThreshold" type="number" step="any" defaultValue={editingWidget?.config?.alertThreshold || ''} placeholder="e.g. 80" className="input-field w-full" />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Alert Color</label>
+                            <p className="text-[10px] text-slate-500 mb-2">Color when threshold is met</p>
+                            <div className="flex gap-2 items-center">
+                              <input name="alertColor" type="color" defaultValue={editingWidget?.config?.alertColor || '#ef4444'} className="w-10 h-10 rounded-lg cursor-pointer bg-slate-800 border border-slate-700 p-1" />
+                              <span className="text-xs text-slate-400">Pick color</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {formType === 'status' && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">On Label (1, true)</label><input name="onLabel" type="text" defaultValue={editingWidget?.config?.onLabel || 'Online'} className="input-field w-full" /></div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Off Label (0, false)</label><input name="offLabel" type="text" defaultValue={editingWidget?.config?.offLabel || 'Offline'} className="input-field w-full" /></div>
+                        </div>
+                      )}
+
+                      {formType === 'switch' && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label>
+                          <input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} placeholder="e.g. home/livingroom/light/set" className="input-field w-full" />
+                        </div>
+                      )}
+
+                      {formType === 'slider' && (
+                        <div className="space-y-4">
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div><label className="block text-sm font-medium text-slate-300 mb-2">Min</label><input name="min" type="number" defaultValue={editingWidget?.config?.min || 0} className="input-field w-full" /></div>
+                            <div><label className="block text-sm font-medium text-slate-300 mb-2">Max</label><input name="max" type="number" defaultValue={editingWidget?.config?.max || 100} className="input-field w-full" /></div>
+                            <div><label className="block text-sm font-medium text-slate-300 mb-2">Step</label><input name="step" type="number" step="any" defaultValue={editingWidget?.config?.step || 1} className="input-field w-full" /></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {formType === 'action' && (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label className="block text-sm font-medium text-slate-300 mb-2">Target MQTT Topic</label><input name="topic" type="text" defaultValue={editingWidget?.config?.topic || `iot/device/${bucket.id}/set`} className="input-field w-full" /></div>
+                            <div><label className="block text-sm font-medium text-slate-300 mb-2">Button Label</label><input name="btnLabel" type="text" defaultValue={editingWidget?.config?.btnLabel || 'Trigger'} className="input-field w-full" /></div>
+                          </div>
+                          <div><label className="block text-sm font-medium text-slate-300 mb-2">Payload (Text / JSON)</label><input name="payload" type="text" defaultValue={editingWidget?.config?.payload || '1'} className="input-field w-full font-mono text-sm" placeholder='e.g. {"cmd": "start"}' /></div>
+                        </div>
+                      )}
+
+                      {/* 3D Floor Plan Integration */}
+                      {formType !== 'combo' && formType !== 'map' && formType !== 'log' && (
+                        <div className="pt-4 mt-4 border-t border-slate-700/50">
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              name="showIn3D"
+                              defaultChecked={editingWidget?.config?.showIn3D || false}
+                              className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500/50 mt-1"
+                            />
+                            <div>
+                              <span className="block text-sm font-medium text-emerald-400 group-hover:text-emerald-300">Tampilkan di 3D Room Popup</span>
+                              <span className="block text-xs text-slate-500 mt-1">Nilai widget ini akan ikut tampil saat perangkat diklik di halaman 3D Floor Plan.</span>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Combo Widget Config */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Widget Title</label>
+                        <input name="title" type="text" defaultValue={editingWidget?.title || ''} placeholder="e.g. Temp & Heater Control" className="input-field w-full" />
                       </div>
 
-                      {/* Sub-Widget B */}
-                      <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
-                        <h4 className="text-sm font-bold text-emerald-400">Widget B (Right/Bottom)</h4>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
-                          <select name="typeB" defaultValue={editingWidget?.config?.widgetB?.type || 'switch'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
-                            {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
-                          <select name="fieldB" defaultValue={editingWidget?.config?.widgetB?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
-                            {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Layout</label>
+                        <select name="layout" defaultValue={editingWidget?.config?.layout || 'split'} className="input-field w-full appearance-none">
+                          <option value="split">Split Horizontal (Side-by-side)</option>
+                          <option value="stack">Stack Vertical (Top/Bottom)</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                        {/* Sub-Widget A */}
+                        <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
+                          <h4 className="text-sm font-bold text-primary-400">Widget A (Left/Top)</h4>
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
+                            <select name="typeA" defaultValue={editingWidget?.config?.widgetA?.type || 'gauge'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                              {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
+                            <select name="fieldA" defaultValue={editingWidget?.config?.widgetA?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                              {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.min || editingWidget?.config?.widgetA?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                            <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxA" type="text" defaultValue={editingWidget?.config?.widgetA?.config?.max || editingWidget?.config?.widgetA?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.min || editingWidget?.config?.widgetB?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
-                          <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.max || editingWidget?.config?.widgetB?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                        {/* Sub-Widget B */}
+                        <div className="space-y-4 p-4 rounded-xl border border-slate-700/50 bg-slate-800/30">
+                          <h4 className="text-sm font-bold text-emerald-400">Widget B (Right/Bottom)</h4>
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
+                            <select name="typeB" defaultValue={editingWidget?.config?.widgetB?.type || 'switch'} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                              {CHART_TYPES.filter(t => t.value !== 'combo').map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Data Field</label>
+                            <select name="fieldB" defaultValue={editingWidget?.config?.widgetB?.field || bucket.fields?.[0] || ''} className="input-field w-full py-1.5 px-3 text-xs appearance-none">
+                              {bucket.fields?.map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div><label className="block text-[10px] text-slate-500 mb-1">Min/Unit/On</label><input name="minB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.min || editingWidget?.config?.widgetB?.unit || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                            <div><label className="block text-[10px] text-slate-500 mb-1">Max/Topic/Off</label><input name="maxB" type="text" defaultValue={editingWidget?.config?.widgetB?.config?.max || editingWidget?.config?.widgetB?.config?.topic || ''} className="input-field w-full py-1 px-2 text-xs" /></div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
 
-              {/* Navigation Footer */}
-              <div className="pt-6 mt-6 flex justify-between gap-3 border-t border-slate-700/50">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (modalStep > 1) {
-                      setModalStep(s => s - 1);
-                    } else {
-                      setShowWidgetModal(false);
-                      setEditingWidget(null);
-                    }
-                  }}
-                  className="btn-secondary px-6"
-                  disabled={submitting}
-                >
-                  {modalStep > 1 ? 'Back' : 'Cancel'}
-                </button>
-                
-                <div className="flex gap-2">
+                {/* Navigation Footer */}
+                <div className="pt-6 mt-6 flex justify-between gap-3 border-t border-slate-700/50">
                   <button
                     type="button"
-                    onClick={() => setModalStep(s => s + 1)}
-                    className={`btn-primary px-6 ${modalStep < 3 ? 'block' : 'hidden'}`}
+                    onClick={() => {
+                      if (modalStep > 1) {
+                        setModalStep(s => s - 1);
+                      } else {
+                        setShowWidgetModal(false);
+                        setEditingWidget(null);
+                      }
+                    }}
+                    className="btn-secondary px-6"
+                    disabled={submitting}
                   >
-                    Next Step
+                    {modalStep > 1 ? 'Back' : 'Cancel'}
                   </button>
 
-                  <button
-                    type="submit"
-                    className={`btn-primary px-6 flex items-center gap-2 min-w-[130px] justify-center ${modalStep === 3 ? 'block' : 'hidden'}`}
-                    disabled={!bucket.fields || bucket.fields.length === 0 || submitting}
-                  >
-                    {submitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Saving...
-                      </>
-                    ) : (
-                      editingWidget ? 'Save Changes' : 'Add Widget'
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModalStep(s => s + 1)}
+                      className={`btn-primary px-6 ${modalStep < 3 ? 'block' : 'hidden'}`}
+                    >
+                      Next Step
+                    </button>
+
+                    <button
+                      type="submit"
+                      className={`btn-primary px-6 flex items-center gap-2 min-w-[130px] justify-center ${modalStep === 3 ? 'block' : 'hidden'}`}
+                      disabled={!bucket.fields || bucket.fields.length === 0 || submitting}
+                    >
+                      {submitting ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        editingWidget ? 'Save Changes' : 'Add Widget'
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </form>
+              </form>
             </div>
 
             {/* RIGHT SIDE: LIVE PREVIEW */}
@@ -1829,7 +1826,7 @@ export default function BucketDetail() {
                 {chartData?.length > 0 ? 'Preview uses actual live data from your bucket.' : 'Preview uses simulated data (bucket has no records yet).'}
               </p>
             </div>
-            
+
           </div>
         </div>
       )}

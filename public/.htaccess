@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Jangan sentuh file/folder nyata (termasuk folder /api milik Laravel)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # SPA fallback: /login, /app/dashboard, dll. -> index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
