@@ -9,7 +9,7 @@ import { Plus, Minus, Wifi, Activity, Shield, Layers, Bell } from 'lucide-react'
 //   public/assets/themes/<id>.png
 //   Contoh: public/assets/themes/dark-cyan.png
 // ─────────────────────────────────────────────────────────────────────────────
-const THEMES = [
+export const THEMES = [
   // ── DARK MODE ──────────────────────────────────────────────────────────────
   {
     id:      'dark-cyan',
@@ -296,15 +296,37 @@ function getFeatures(t) {
 }
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
-export default function FeatureShowcase({ t, lang }) {
-  const [activeTheme, setActiveTheme] = useState(THEMES[0]);
+export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThemeChange }) {
+  const [internalTheme, setInternalTheme] = useState(THEMES[0]);
+  const activeTheme = propTheme || internalTheme;
   const [openItem,    setOpenItem]    = useState('color');
   const [sectionRef, sectionVisible] = useFadeIn(0.08);
 
   const features = getFeatures(t);
 
   const selectTheme = (th) => {
-    setActiveTheme(th);
+    if (onThemeChange) {
+      onThemeChange(th);
+    } else {
+      setInternalTheme(th);
+    }
+
+    try {
+      const colorName = th.id.replace('dark-', '').replace('light-', '');
+      if (colorName === 'cyan') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', colorName);
+      }
+
+      if (th.mode === 'light') {
+        document.documentElement.setAttribute('data-mode', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-mode');
+      }
+
+      window.dispatchEvent(new CustomEvent('theme-updated'));
+    } catch (e) {}
   };
 
   // Tentukan gambar & glow yang tampil di panel kanan
@@ -318,18 +340,32 @@ export default function FeatureShowcase({ t, lang }) {
 
   return (
     <section
-      ref={sectionRef}
-      id="mac-features"
+      id="features"
       style={{
+        scrollMarginTop: '100px',
         padding:    'clamp(64px, 10vw, 120px) clamp(16px, 4vw, 48px)',
         background: '#000',
-        opacity:    sectionVisible ? 1 : 0,
-        transform:  sectionVisible ? 'translateY(0)' : 'translateY(56px)',
-        transition: 'opacity 0.9s cubic-bezier(0.16,1,0.3,1), transform 0.9s cubic-bezier(0.16,1,0.3,1)',
       }}
     >
       {/* ── Heading ── */}
       <div style={{ maxWidth: 1200, margin: '0 auto 64px', textAlign: 'center' }}>
+        <div
+          style={{
+            display: 'inline-block',
+            padding: '6px 16px',
+            borderRadius: '9999px',
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            marginBottom: '16px',
+            border: `1px solid ${activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)'}`,
+            backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
+            color: activeTheme?.primary || '#38bdf8',
+          }}
+        >
+          {lang === 'id' ? 'FITUR UTAMA' : 'KEY FEATURES'}
+        </div>
         <h2 style={{
           fontSize:      'clamp(1.8rem, 5vw, 4rem)',
           fontWeight:    800,

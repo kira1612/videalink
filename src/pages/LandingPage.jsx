@@ -1,105 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Cpu, Zap, Database, Globe, ChevronRight, Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Settings2 } from 'lucide-react';
+import { Cpu, Zap, Database, Globe, ChevronRight, ChevronDown, Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Settings2, Menu, X } from 'lucide-react';
 import IoTAnimation from '../components/IoTAnimation';
 import ParticleTunnel from '../components/ParticleTunnel';
-import FeatureShowcase from '../components/FeatureShowcase';
+import FeatureShowcase, { THEMES } from '../components/FeatureShowcase';
+import IndustryShowcase from '../components/IndustryShowcase';
+import PricingSection from '../components/PricingSection';
+import FAQSection from '../components/FAQSection';
+import CTABanner from '../components/CTABanner';
+import FooterSection from '../components/FooterSection';
 
-// --- THEME PRESETS (MacBook-style) ---
-const THEMES = [
-  {
-    id: 'midnight',
-    label: { id: 'Tengah Malam', en: 'Midnight' },
-    swatch: 'linear-gradient(135deg, #1c2333 0%, #2d3a52 50%, #3b4a6b 100%)',
-    primary: '#4f7bff',
-    secondary: '#7c9dff',
-    accent: '#a5bcff',
-    bg: '#0d1117',
-    surface: '#161d2c',
-    surface2: '#1e2a3f',
-    glow: 'rgba(79,123,255,0.35)',
-    chartColors: ['#4f7bff', '#7c9dff', '#a5bcff', '#2d5aff'],
-    border: '#2d3a52',
-  },
-  {
-    id: 'starlight',
-    label: { id: 'Cahaya Bintang', en: 'Starlight' },
-    swatch: 'linear-gradient(135deg, #d4c9b8 0%, #e8dfd2 50%, #f5f0ea 100%)',
-    primary: '#8b7355',
-    secondary: '#a08c6e',
-    accent: '#c4a882',
-    bg: '#1a1714',
-    surface: '#242019',
-    surface2: '#2e2a22',
-    glow: 'rgba(160,140,110,0.35)',
-    chartColors: ['#c4a882', '#a08c6e', '#8b7355', '#d4b896'],
-    border: '#3d3628',
-  },
-  {
-    id: 'sky',
-    label: { id: 'Biru Langit', en: 'Sky Blue' },
-    swatch: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #7dd3fc 100%)',
-    primary: '#0ea5e9',
-    secondary: '#38bdf8',
-    accent: '#7dd3fc',
-    bg: '#030e1a',
-    surface: '#061728',
-    surface2: '#0a2038',
-    glow: 'rgba(14,165,233,0.35)',
-    chartColors: ['#0ea5e9', '#38bdf8', '#7dd3fc', '#0284c7'],
-    border: '#0a3050',
-  },
-  {
-    id: 'aurora',
-    label: { id: 'Aurora', en: 'Aurora' },
-    swatch: 'linear-gradient(135deg, #10b981 0%, #34d399 50%, #a7f3d0 100%)',
-    primary: '#10b981',
-    secondary: '#34d399',
-    accent: '#6ee7b7',
-    bg: '#011a0f',
-    surface: '#06231a',
-    surface2: '#0b3025',
-    glow: 'rgba(16,185,129,0.35)',
-    chartColors: ['#10b981', '#34d399', '#6ee7b7', '#059669'],
-    border: '#0e3d28',
-  },
-  {
-    id: 'rose',
-    label: { id: 'Mawar', en: 'Rose' },
-    swatch: 'linear-gradient(135deg, #f43f5e 0%, #fb7185 50%, #fda4af 100%)',
-    primary: '#f43f5e',
-    secondary: '#fb7185',
-    accent: '#fda4af',
-    bg: '#1a0509',
-    surface: '#240a10',
-    surface2: '#301018',
-    glow: 'rgba(244,63,94,0.35)',
-    chartColors: ['#f43f5e', '#fb7185', '#fda4af', '#e11d48'],
-    border: '#4a1020',
-  },
-  {
-    id: 'violet',
-    label: { id: 'Violet', en: 'Violet' },
-    swatch: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%)',
-    primary: '#7c3aed',
-    secondary: '#a78bfa',
-    accent: '#c4b5fd',
-    bg: '#0d0814',
-    surface: '#150f21',
-    surface2: '#1e162e',
-    glow: 'rgba(124,58,237,0.35)',
-    chartColors: ['#7c3aed', '#a78bfa', '#c4b5fd', '#6d28d9'],
-    border: '#2d1a50',
-  },
-];
+// Theme presets imported from FeatureShowcase
 
 // --- TRANSLATIONS DICTIONARY ---
 const dict = {
   id: {
     overview: 'Ringkasan',
+    features: 'Fitur',
+    industry: 'Industri',
     performance: 'Performa',
     connectivity: 'Konektivitas',
     pricing: 'Harga',
+    faq: 'FAQ',
     signIn: 'Masuk',
     buy: 'Beli',
     heroTitle: 'Videa Link.',
@@ -124,6 +46,7 @@ const dict = {
     connEverything: 'Hubungkan segalanya.',
     compNothing: 'Tanpa kompromi.',
     connDesc: 'Integrasi asli untuk perangkat keras dan protokol paling mumpuni di dunia.',
+    protoHwLabel: 'PROTOKOL & PERANGKAT KERAS YANG DIDUKUNG',
     featMagic: 'Fitur yang terasa seperti sihir.',
     featDesc: 'Semua yang Anda butuhkan untuk mengatur ekosistem IoT masif, dibangun dalam satu pengalaman yang mulus.',
     // MacBook feature section
@@ -166,9 +89,12 @@ const dict = {
   },
   en: {
     overview: 'Overview',
+    features: 'Features',
+    industry: 'Industry',
     performance: 'Performance',
     connectivity: 'Connectivity',
     pricing: 'Pricing',
+    faq: 'FAQ',
     signIn: 'Sign In',
     buy: 'Buy',
     heroTitle: 'Videa Link.',
@@ -193,6 +119,7 @@ const dict = {
     connEverything: 'Connect everything.',
     compNothing: 'Compromise nothing.',
     connDesc: 'Native integrations for the world\'s most capable hardware and protocols.',
+    protoHwLabel: 'SUPPORTED PROTOCOLS & HARDWARE',
     featMagic: 'Features that feel like magic.',
     featDesc: 'Everything you need to orchestrate a massive IoT ecosystem, built into one seamless experience.',
     // MacBook feature section
@@ -235,42 +162,92 @@ const dict = {
   }
 };
 
-// --- FADE IN COMPONENT (Improved Scroll Animation) ---
-const FadeIn = ({ children, delay = 0, direction = 'up', className = '', threshold = 0.25 }) => {
-  const [isVisible, setIsVisible] = useState(false);
+// --- FADE IN COMPONENT (Cinematic 3D Bi-directional Scroll Enter & Exit Animation) ---
+const FadeIn = ({ children, delay = 0, direction = 'up', className = '', threshold = 0.08, activeTheme, withGlow = false }) => {
+  const [viewState, setViewState] = useState('below'); // 'below' | 'visible' | 'above'
   const domRef = useRef();
 
   useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        // Toggle visibility to create both enter and exit animations on scroll
-        setIsVisible(entry.isIntersecting);
-      });
-    }, { threshold, rootMargin: '0px 0px -50px 0px' });
-    
-    if (domRef.current) observer.observe(domRef.current);
-    return () => {
-      if (domRef.current) observer.unobserve(domRef.current);
-    };
+    const el = domRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setViewState('visible');
+          } else {
+            const rect = entry.boundingClientRect;
+            if (rect.top < 0) {
+              setViewState('above');
+            } else {
+              setViewState('below');
+            }
+          }
+        });
+      },
+      {
+        threshold: [0, threshold, 0.25],
+        rootMargin: '0px 0px -40px 0px',
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [threshold]);
 
-  let transform = 'translateY(40px)';
-  if (direction === 'down') transform = 'translateY(-40px)';
-  if (direction === 'left') transform = 'translateX(40px)';
-  if (direction === 'right') transform = 'translateX(-40px)';
-  if (direction === 'scale') transform = 'scale(0.95) translateY(20px)';
-  if (direction === 'none') transform = 'translateY(0px)';
+  const isVisible = viewState === 'visible';
+
+  // Bi-directional 3D transforms:
+  // When scrolling DOWN: enters from below (upward glide + tilt), exits to above (upward float + tilt away)
+  // When scrolling UP: enters from above (downward glide + tilt), exits to below (downward float + tilt away)
+  let currentTransform = 'translate3d(0, 0, 0) scale(1) rotateX(0deg) rotateY(0deg)';
+  if (viewState === 'below') {
+    if (direction === 'scale') {
+      currentTransform = 'translate3d(0, 60px, 0) scale(0.86) rotateX(6deg)';
+    } else if (direction === 'left') {
+      currentTransform = 'translate3d(80px, 0, 0) scale(0.92) rotateY(-8deg)';
+    } else if (direction === 'right') {
+      currentTransform = 'translate3d(-80px, 0, 0) scale(0.92) rotateY(8deg)';
+    } else {
+      currentTransform = 'translate3d(0, 85px, 0) scale(0.92) rotateX(8deg)';
+    }
+  } else if (viewState === 'above') {
+    if (direction === 'scale') {
+      currentTransform = 'translate3d(0, -60px, 0) scale(0.86) rotateX(-6deg)';
+    } else if (direction === 'left') {
+      currentTransform = 'translate3d(-80px, 0, 0) scale(0.92) rotateY(8deg)';
+    } else if (direction === 'right') {
+      currentTransform = 'translate3d(80px, 0, 0) scale(0.92) rotateY(-8deg)';
+    } else {
+      currentTransform = 'translate3d(0, -85px, 0) scale(0.92) rotateX(-8deg)';
+    }
+  }
 
   return (
     <div
       ref={domRef}
-      className={className}
+      className={`relative ${className}`}
       style={{
+        perspective: '1400px',
+        transformStyle: 'preserve-3d',
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translate(0px, 0px) scale(1)' : transform,
-        transition: `opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
+        filter: isVisible ? 'blur(0px)' : 'blur(14px)',
+        transform: currentTransform,
+        transition: `opacity 0.95s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 1.05s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, filter 0.85s ease ${delay}ms`,
+        willChange: 'opacity, transform, filter',
       }}
     >
+      {withGlow && (
+        <div
+          className="absolute inset-0 -z-10 pointer-events-none transition-all duration-1000 ease-out"
+          style={{
+            opacity: isVisible ? 0.35 : 0,
+            transform: isVisible ? 'scale(1)' : 'scale(0.75)',
+            background: `radial-gradient(ellipse 65% 55% at 50% 50%, ${activeTheme?.primary || '#06b6d4'}26 0%, transparent 70%)`,
+          }}
+        />
+      )}
       {children}
     </div>
   );
@@ -278,13 +255,57 @@ const FadeIn = ({ children, delay = 0, direction = 'up', className = '', thresho
 
 export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lang, setLang] = useState('id'); // Language State
   const t = dict[lang];
+  const [activeTheme, setActiveTheme] = useState(() => {
+    try {
+      const savedTheme = localStorage.getItem('iot_theme');
+      const savedMode = localStorage.getItem('iot_mode') || 'dark';
+      if (savedTheme) {
+        const found = THEMES.find(t => t.id === `${savedMode}-${savedTheme}`);
+        if (found) return found;
+      }
+    } catch (e) {}
+    return THEMES[0];
+  });
+  const cycleTheme = () => {
+    setActiveTheme(prev => {
+      const currentMode = prev?.mode || 'dark';
+      const availableThemes = THEMES.filter(th => th.mode === currentMode);
+      const currentIndex = availableThemes.findIndex(th => th.id === prev?.id);
+      const nextIndex = (currentIndex + 1) % (availableThemes.length || 1);
+      const nextTheme = availableThemes[nextIndex] || THEMES[0];
+
+      try {
+        const colorName = nextTheme?.id ? nextTheme.id.replace('dark-', '').replace('light-', '') : 'cyan';
+        if (colorName === 'cyan') {
+          document.documentElement.removeAttribute('data-theme');
+        } else {
+          document.documentElement.setAttribute('data-theme', colorName);
+        }
+        window.dispatchEvent(new CustomEvent('theme-updated'));
+      } catch (e) {}
+
+      return nextTheme;
+    });
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
+    const handleGlobalClick = (e) => {
+      if (e?.target?.closest('button, a, input, select, textarea, [role="button"]')) {
+        return;
+      }
+      cycleTheme();
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('click', handleGlobalClick);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('click', handleGlobalClick);
+    };
   }, []);
 
   const toggleLanguage = () => {
@@ -294,36 +315,158 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-black text-[#f5f5f7] font-sans selection:bg-emerald-500/30 overflow-x-hidden">
       
-      {/* ── NAVBAR (MINIMAL) ── */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        scrollY > 20 ? 'bg-black/70 backdrop-blur-xl border-b border-white/10 py-3' : 'bg-transparent py-6'
-      }`}>
-        <div className="max-w-[1200px] mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <img src="/new_videa_link_logo.png" alt="Videa Link Logo" className="h-8 md:h-10 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform" />
+      {/* ── CAPSULE FLOATING NAVBAR (WITH DYNAMIC THEME ACCENTS) ── */}
+      <header className="fixed top-4 md:top-6 left-0 right-0 z-50 px-3 md:px-8 flex justify-center pointer-events-none transition-all duration-300">
+        <nav
+          className="w-full max-w-[1240px] pointer-events-auto rounded-full transition-all duration-500 backdrop-blur-xl"
+          style={{
+            backgroundColor: scrollY > 20 ? 'rgba(3, 19, 30, 0.92)' : 'rgba(3, 19, 30, 0.78)',
+            borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(6, 182, 212, 0.3)',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            boxShadow: activeTheme
+              ? `0 10px 35px rgba(0,0,0,0.7), 0 0 25px ${activeTheme.glow || `${activeTheme.primary}33`}`
+              : '0 10px 35px rgba(0,0,0,0.7), 0 0 25px rgba(6, 182, 212, 0.18)',
+          }}
+        >
+          <div className="px-5 sm:px-7 md:px-8 py-2 md:py-2.5 flex items-center justify-between">
+            {/* Left: Previous Brand Logo */}
+            <a href="#overview" className="flex items-center gap-2 group select-none">
+              <img
+                src="/new_videa_link_logo.png"
+                alt="Videa Link Logo"
+                className="h-7 sm:h-8 md:h-9 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform"
+              />
+            </a>
+
+            {/* Center: Navigation Links (Matching Actual Page Content) */}
+            <div className="hidden lg:flex items-center gap-7 xl:gap-9">
+              <a
+                href="#overview"
+                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
+                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
+              >
+                {t.overview}
+              </a>
+              <a
+                href="#features"
+                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
+                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
+              >
+                {t.features}
+              </a>
+              <a
+                href="#industri"
+                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
+                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
+              >
+                {t.industry}
+              </a>
+              <a
+                href="#pricing"
+                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
+                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
+              >
+                {t.pricing}
+              </a>
+              <a
+                href="#faq"
+                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
+                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
+              >
+                {t.faq}
+              </a>
+            </div>
+
+            {/* Right: Language Switcher & Dynamic Themed Login Button */}
+            <div className="flex items-center gap-2 sm:gap-3.5">
+              <button
+                onClick={toggleLanguage}
+                className="text-[11px] font-bold text-slate-400 hover:text-white transition-colors border border-white/10 hover:border-white/25 rounded-full px-2.5 py-1 select-none"
+                title="Ganti Bahasa / Change Language"
+              >
+                {lang === 'id' ? 'ID' : 'EN'}
+              </button>
+
+              <Link
+                to="/login"
+                className="px-6 sm:px-7 py-2 md:py-2.5 rounded-full font-bold text-xs sm:text-[13px] tracking-tight transition-all duration-300 hover:scale-[1.04] active:scale-[0.98] whitespace-nowrap"
+                style={{
+                  backgroundColor: activeTheme?.primary || '#06b6d4',
+                  color: activeTheme?.mode === 'light' ? '#ffffff' : '#000000',
+                  boxShadow: activeTheme
+                    ? `0 0 20px ${activeTheme.glow || `${activeTheme.primary}80`}`
+                    : '0 0 20px rgba(6, 182, 212, 0.5)',
+                }}
+              >
+                Login
+              </Link>
+
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 text-slate-300 hover:text-white rounded-full bg-white/5 border border-white/10"
+                aria-label="Toggle navigation menu"
+              >
+                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+            </div>
           </div>
-          <div className="hidden md:flex items-center gap-10">
-            <a href="#overview" className="text-[13px] font-medium text-[#f5f5f7] hover:opacity-70 transition-opacity">{t.overview}</a>
-            <a href="#performance" className="text-[13px] font-medium text-[#f5f5f7] hover:opacity-70 transition-opacity">{t.performance}</a>
-            <a href="#connectivity" className="text-[13px] font-medium text-[#f5f5f7] hover:opacity-70 transition-opacity">{t.connectivity}</a>
-            <a href="#pricing" className="text-[13px] font-medium text-[#f5f5f7] hover:opacity-70 transition-opacity">{t.pricing}</a>
-          </div>
-          <div className="flex items-center gap-4 md:gap-6">
-            <button 
-              onClick={toggleLanguage} 
-              className="text-[11px] font-bold text-[#86868b] hover:text-white transition-colors border border-[#333336] rounded-md px-2 py-1"
+
+          {/* Mobile Dropdown Menu */}
+          {mobileMenuOpen && (
+            <div
+              className="lg:hidden px-6 py-4 flex flex-col gap-3 rounded-b-[28px] backdrop-blur-2xl bg-[#03131e]/95"
+              style={{
+                borderTopWidth: '1px',
+                borderTopStyle: 'solid',
+                borderTopColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(6, 182, 212, 0.2)',
+              }}
             >
-              {lang === 'id' ? 'ID' : 'EN'}
-            </button>
-            <Link to="/login" className="hidden md:block text-[13px] font-medium text-[#86868b] hover:text-white transition-colors">
-              {t.signIn}
-            </Link>
-            <Link to="/login" className="text-[13px] font-medium bg-white text-black px-5 py-2 rounded-full hover:scale-105 transition-transform font-bold">
-              {t.buy}
-            </Link>
-          </div>
-        </div>
-      </nav>
+              <a
+                href="#overview"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
+              >
+                {t.overview}
+              </a>
+              <a
+                href="#features"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
+              >
+                {t.features}
+              </a>
+              <a
+                href="#industri"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
+              >
+                {t.industry}
+              </a>
+              <a
+                href="#pricing"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
+              >
+                {t.pricing}
+              </a>
+              <a
+                href="#faq"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
+              >
+                {t.faq}
+              </a>
+            </div>
+          )}
+        </nav>
+      </header>
 
       {/* ── HERO SECTION ── */}
       <section id="overview" className="relative pt-32 pb-20 px-6 min-h-screen flex flex-col justify-center overflow-hidden">
@@ -331,7 +474,10 @@ export default function LandingPage() {
         {/* Background Animation (Sticky to viewport while inside overview) */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           <div className="sticky top-0 w-full h-screen">
-            <ParticleTunnel />
+            <ParticleTunnel
+              color={activeTheme?.primary}
+              onCycleTheme={cycleTheme}
+            />
           </div>
         </div>
         
@@ -345,39 +491,317 @@ export default function LandingPage() {
             </h1>
           </FadeIn>
           
-          <FadeIn delay={200} className="mt-4 md:mt-6 drop-shadow-[0_4px_30px_rgba(0,0,0,1)]">
-            <h2 className="text-3xl md:text-5xl font-semibold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
+          <FadeIn delay={200} className="mt-4 md:mt-6 drop-shadow-[0_4px_30px_rgba(0,0,0,1)] flex flex-col items-center">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
               {t.heroSub}
             </h2>
-            <p className="mt-6 text-xl md:text-2xl font-medium text-[#e0e0e0] max-w-2xl mx-auto drop-shadow-[0_2px_10px_rgba(0,0,0,1)] font-bold">
+            <p className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg text-slate-300/85 max-w-xl mx-auto font-normal leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
               {t.heroDesc}
             </p>
-            <div className="mt-10 flex items-center justify-center gap-6">
-              <Link to="/login" className="text-lg font-medium bg-white text-black px-8 py-3 rounded-full hover:scale-105 transition-transform">
+            <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-5">
+              {/* Primary CTA Button (Dynamic Theme Cyber Pill with Glow) */}
+              <Link
+                to="/login"
+                className="px-7 sm:px-8 py-3 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-tight transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg select-none"
+                style={{
+                  backgroundColor: activeTheme?.primary || '#06b6d4',
+                  color: activeTheme?.mode === 'light' ? '#ffffff' : '#04121a',
+                  boxShadow: activeTheme
+                    ? `0 0 25px ${activeTheme.glow || `${activeTheme.primary}80`}, 0 4px 15px rgba(0,0,0,0.5)`
+                    : '0 0 25px rgba(6, 182, 212, 0.5), 0 4px 15px rgba(0,0,0,0.5)',
+                }}
+              >
                 {t.getStarted}
               </Link>
-              <a href="#performance" className="text-lg font-medium text-[#0071e3] hover:text-[#2997ff] flex items-center gap-1 group">
-                {t.learnMore} <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+
+              {/* Secondary Ghost Button (Translucent Capsule with Theme Border & Hover) */}
+              <a
+                href="#features"
+                className="px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-medium text-xs sm:text-sm tracking-tight transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2 select-none group"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.15)',
+                  color: activeTheme?.primary || '#38bdf8',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                }}
+                onMouseEnter={(e) => {
+                  if (activeTheme?.primary) {
+                    e.currentTarget.style.borderColor = activeTheme.primary;
+                    e.currentTarget.style.backgroundColor = `${activeTheme.primary}1A`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                }}
+              >
+                <span>{t.learnMore}</span>
+                <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
               </a>
+            </div>
+
+            {/* ── 4 STAT CARDS (SESUAI GAMBAR 2) ── */}
+            <div className="mt-14 sm:mt-16 w-full max-w-4xl px-2 sm:px-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {/* Card 1: <12ms */}
+                <div
+                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
+                  style={{
+                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
+                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+                  }}
+                >
+                  <div
+                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
+                    style={{ color: activeTheme?.primary || '#22d3ee' }}
+                  >
+                    &lt;12ms
+                  </div>
+                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
+                    {lang === 'id' ? 'LATENSI RATA-RATA' : 'AVG LATENCY'}
+                  </div>
+                </div>
+
+                {/* Card 2: 99.99% */}
+                <div
+                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
+                  style={{
+                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
+                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+                  }}
+                >
+                  <div
+                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
+                    style={{ color: activeTheme?.primary || '#22d3ee' }}
+                  >
+                    99.99%
+                  </div>
+                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
+                    {lang === 'id' ? 'UPTIME SLA' : 'UPTIME SLA'}
+                  </div>
+                </div>
+
+                {/* Card 3: 50K+ */}
+                <div
+                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
+                  style={{
+                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
+                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+                  }}
+                >
+                  <div
+                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
+                    style={{ color: activeTheme?.primary || '#22d3ee' }}
+                  >
+                    50K+
+                  </div>
+                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
+                    {lang === 'id' ? 'NODE AKTIF' : 'ACTIVE NODES'}
+                  </div>
+                </div>
+
+                {/* Card 4: 180+ */}
+                <div
+                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
+                  style={{
+                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
+                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
+                  }}
+                >
+                  <div
+                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
+                    style={{ color: activeTheme?.primary || '#22d3ee' }}
+                  >
+                    180+
+                  </div>
+                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
+                    {lang === 'id' ? 'PROTOKOL DIDUKUNG' : 'PROTOCOLS SUPPORTED'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Animated Cyber Scroll Indicator */}
+              <div className="mt-10 sm:mt-12 flex justify-center">
+                <a
+                  href="#connectivity"
+                  className="flex flex-col items-center gap-2 group cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95"
+                  aria-label="Scroll to next section"
+                >
+                  <span
+                    className="font-mono text-[9px] sm:text-[10px] tracking-[0.32em] uppercase text-slate-400 group-hover:text-white transition-colors"
+                  >
+                    SCROLL
+                  </span>
+
+                  {/* Cyber Mouse Capsule with dynamic glowing wheel */}
+                  <div
+                    className="w-[20px] h-[34px] rounded-full border-[1.5px] flex items-start justify-center p-1 transition-all duration-300"
+                    style={{
+                      borderColor: activeTheme?.primary ? `${activeTheme.primary}80` : 'rgba(56, 189, 248, 0.5)',
+                      boxShadow: `0 0 16px ${activeTheme?.glow ? activeTheme.glow.replace('0.45', '0.25') : 'rgba(6, 182, 212, 0.25)'}`,
+                      backgroundColor: 'rgba(3, 10, 20, 0.6)',
+                    }}
+                  >
+                    <div
+                      className="w-1.5 h-2 rounded-full animate-scroll-wheel"
+                      style={{
+                        backgroundColor: activeTheme?.primary || '#06b6d4',
+                        boxShadow: `0 0 8px ${activeTheme?.primary || '#06b6d4'}`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Pulsing subtle chevron */}
+                  <div className="animate-scroll-bounce -mt-0.5">
+                    <ChevronDown size={14} style={{ color: activeTheme?.primary || '#38bdf8' }} />
+                  </div>
+                </a>
+              </div>
             </div>
           </FadeIn>
         </div>
       </section>
 
-      {/* ── UNIVERSAL CONNECTIVITY (Features) ── */}
-      <section id="features" className="relative py-32 px-6 bg-black z-10">
+      {/* ── PROTOCOL & HARDWARE TICKER (LANGSUNG DI BAWAH HERO OVERVIEW) ── */}
+      <section id="connectivity" className="relative py-20 bg-black border-y border-white/5 overflow-hidden z-20">
+        {/* Subtle radial glow from active theme */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            background: `radial-gradient(ellipse 70% 50% at 50% 50%, ${activeTheme?.primary || '#06b6d4'}26, transparent 75%)`,
+          }}
+        />
+
+        <div className="w-full relative z-10 flex flex-col items-center">
+          {/* Cyber Pill Tag Header */}
+          <div className="text-center mb-8 px-4">
+            <div
+              className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest border"
+              style={{
+                backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
+                borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
+                color: activeTheme?.primary || '#38bdf8',
+              }}
+            >
+              {t.protoHwLabel}
+            </div>
+          </div>
+
+          {/* Infinite Seamless Marquee Ticker */}
+          <div className="w-full overflow-hidden select-none py-2 relative">
+            {/* Edge fade gradients for seamless look */}
+            <div className="absolute top-0 bottom-0 left-0 w-24 sm:w-36 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
+            <div className="absolute top-0 bottom-0 right-0 w-24 sm:w-36 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
+
+            <div className="animate-marquee items-center gap-10 sm:gap-14">
+              {[
+                'HTTP/2',
+                'LoRaWAN',
+                'Zigbee',
+                'REST API',
+                'MQTT v5.0',
+                'WebSocket',
+                'Arduino',
+                'ESP32',
+                'Raspberry Pi',
+                'Modbus TCP',
+                'OPC-UA',
+                'RTSP / ONVIF',
+                'WebRTC',
+                'CoAP',
+                // Repeated sequence for 100% infinite continuous loop
+                'HTTP/2',
+                'LoRaWAN',
+                'Zigbee',
+                'REST API',
+                'MQTT v5.0',
+                'WebSocket',
+                'Arduino',
+                'ESP32',
+                'Raspberry Pi',
+                'Modbus TCP',
+                'OPC-UA',
+                'RTSP / ONVIF',
+                'WebRTC',
+                'CoAP',
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-center gap-10 sm:gap-14 flex-shrink-0">
+                  <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#8e9bb0]/70 hover:text-white transition-colors duration-300">
+                    {item}
+                  </span>
+                  <span
+                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.8)]"
+                    style={{
+                      backgroundColor: activeTheme?.primary || '#06b6d4',
+                      boxShadow: `0 0 12px ${activeTheme?.primary || '#06b6d4'}`,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── UNIVERSAL CONNECTIVITY (Gateway) ── */}
+      <section id="gateway" className="relative py-32 px-6 bg-black z-10 scroll-mt-24">
         {/* Soft blur/gradient transition that overlays and fades out the hero section above */}
         <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-transparent to-black -translate-y-full pointer-events-none" />
 
         <div className="w-full max-w-[1300px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center text-left">
-          {/* Left Column: Animation */}
+          {/* Left Column: Animation with Dynamic Theme and New Logo */}
           <FadeIn delay={400} direction="right" className="relative w-full aspect-[16/11] flex items-center justify-center">
-            <IoTAnimation lang={lang} />
+            <IoTAnimation lang={lang} activeTheme={activeTheme} />
           </FadeIn>
 
           {/* Right Column: Explanatory Text */}
           <FadeIn delay={600} direction="left" className="text-left flex flex-col justify-center">
-            <div className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-[#86868b] uppercase tracking-widest mb-6 w-fit">
+            <div
+              className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6 w-fit border"
+              style={{
+                backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
+                borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
+                color: activeTheme?.primary || '#38bdf8',
+              }}
+            >
               {t.univConn}
             </div>
             <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-[#f5f5f7] mb-6">
@@ -390,8 +814,13 @@ export default function LandingPage() {
 
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-[#111111] border border-[#333336] flex items-center justify-center shadow-lg">
-                  <Zap className="text-[#0071e3]" size={24} />
+                <div
+                  className="w-14 h-14 rounded-2xl bg-[#111111] border flex items-center justify-center shadow-lg transition-colors"
+                  style={{
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : '#333336',
+                  }}
+                >
+                  <Zap size={24} style={{ color: activeTheme?.primary || '#0071e3' }} />
                 </div>
                 <div>
                   <h4 className="text-[#f5f5f7] font-semibold text-lg">{t.rtGate}</h4>
@@ -400,8 +829,13 @@ export default function LandingPage() {
               </div>
               
               <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-2xl bg-[#111111] border border-[#333336] flex items-center justify-center shadow-lg">
-                  <Database className="text-[#0071e3]" size={24} />
+                <div
+                  className="w-14 h-14 rounded-2xl bg-[#111111] border flex items-center justify-center shadow-lg transition-colors"
+                  style={{
+                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : '#333336',
+                  }}
+                >
+                  <Database size={24} style={{ color: activeTheme?.primary || '#0071e3' }} />
                 </div>
                 <div>
                   <h4 className="text-[#f5f5f7] font-semibold text-lg">{t.uniProto}</h4>
@@ -413,156 +847,53 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── METRICS (THE "CHIP" SECTION) ── */}
-      {/* Removed hard borders so it melts seamlessly into the overview section */}
-      <section id="performance" className="relative py-32 px-6 bg-black">
-        <div className="max-w-[1200px] mx-auto text-center">
-          <FadeIn>
-            <h2 className="text-4xl md:text-7xl font-bold tracking-tighter text-[#f5f5f7] mb-24">
-              {t.scaryFast} <br />
-              <span className="text-[#86868b]">{t.scaryCap}</span>
-            </h2>
-          </FadeIn>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-20 md:gap-10">
-            <FadeIn delay={100} direction="up" className="flex flex-col items-center">
-              <div className="text-[6rem] md:text-[8rem] font-bold tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-r from-[#0071e3] to-[#2997ff]">
-                12<span className="text-4xl md:text-6xl text-[#0071e3]">ms</span>
-              </div>
-              <h3 className="text-2xl md:text-3xl font-semibold mt-4 text-[#f5f5f7]">{t.globalLat}</h3>
-              <p className="mt-4 text-lg text-[#86868b] max-w-sm">{t.globalLatDesc}</p>
-            </FadeIn>
-
-            <FadeIn delay={200} direction="up" className="flex flex-col items-center">
-              <div className="text-[6rem] md:text-[8rem] font-bold tracking-tighter leading-none text-transparent bg-clip-text bg-gradient-to-r from-[#0071e3] to-[#2997ff]">
-                99.9<span className="text-4xl md:text-6xl text-[#0071e3]">%</span>
-              </div>
-              <h3 className="text-2xl md:text-3xl font-semibold mt-4 text-[#f5f5f7]">{t.uptimeGuar}</h3>
-              <p className="mt-4 text-lg text-[#86868b] max-w-sm">{t.uptimeGuarDesc}</p>
-            </FadeIn>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CONNECTIVITY (PORTS / HARDWARE) ── */}
-      <section id="connectivity" className="relative py-40 px-6 bg-[#1d1d1f]">
-        {/* Soft blur/gradient transition from the black performance section above */}
-        <div className="absolute top-0 left-0 w-full h-48 bg-gradient-to-b from-black to-transparent pointer-events-none" />
-        {/* Soft blur/gradient transition to the black features section below */}
-        <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-black to-transparent pointer-events-none" />
-        
-        <div className="max-w-[1000px] mx-auto text-center relative z-10">
-          <FadeIn>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-[#f5f5f7] mb-8">
-              {t.connEverything} <br />
-              <span className="text-[#86868b]">{t.compNothing}</span>
-            </h2>
-            <p className="text-xl md:text-2xl font-medium text-[#86868b] max-w-3xl mx-auto mb-20">
-              {t.connDesc}
-            </p>
-          </FadeIn>
-
-          <FadeIn delay={200} className="flex flex-wrap items-center justify-center gap-16 md:gap-24">
-            <div className="flex flex-col items-center gap-4 group cursor-default">
-              <div className="w-20 h-20 bg-[#111111] rounded-3xl flex items-center justify-center border border-[#333336] transition-transform duration-500 group-hover:scale-110 group-hover:border-[#00979D] shadow-lg">
-                <img src="https://cdn.simpleicons.org/arduino/white" alt="Arduino" className="w-10 h-10 opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-lg font-semibold text-[#86868b] group-hover:text-[#f5f5f7] transition-colors">Arduino</span>
-            </div>
-            
-            <div className="flex flex-col items-center gap-4 group cursor-default">
-              <div className="w-20 h-20 bg-[#111111] rounded-3xl flex items-center justify-center border border-[#333336] transition-transform duration-500 group-hover:scale-110 group-hover:border-[#E7352C] shadow-lg">
-                <img src="https://cdn.simpleicons.org/espressif/white" alt="Espressif" className="w-10 h-10 opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-lg font-semibold text-[#86868b] group-hover:text-[#f5f5f7] transition-colors">Espressif</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 group cursor-default">
-              <div className="w-20 h-20 bg-[#111111] rounded-3xl flex items-center justify-center border border-[#333336] transition-transform duration-500 group-hover:scale-110 group-hover:border-[#C51A4A] shadow-lg">
-                <img src="https://cdn.simpleicons.org/raspberrypi/white" alt="Raspberry Pi" className="w-10 h-10 opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-lg font-semibold text-[#86868b] group-hover:text-[#f5f5f7] transition-colors">Raspberry Pi</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 group cursor-default">
-              <div className="w-20 h-20 bg-[#111111] rounded-3xl flex items-center justify-center border border-[#333336] transition-transform duration-500 group-hover:scale-110 group-hover:border-[#660066] shadow-lg">
-                <img src="https://cdn.simpleicons.org/mqtt/white" alt="MQTT 5.0" className="w-10 h-10 opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-lg font-semibold text-[#86868b] group-hover:text-[#f5f5f7] transition-colors">MQTT 5.0</span>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
-
       {/* ── MACBOOK-STYLE FEATURE SHOWCASE ── */}
-      <FeatureShowcase t={t} lang={lang} />
+      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+        <FeatureShowcase
+          t={t}
+          lang={lang}
+          activeTheme={activeTheme}
+          onThemeChange={setActiveTheme}
+        />
+      </FadeIn>
 
-      {/* ── PRICING ── */}
-      <section id="pricing" className="relative py-40 px-6 bg-black">
-        {/* Soft blur/gradient transition from the gray connectivity section above */}
-        <div className="absolute top-0 left-0 w-full h-48 bg-gradient-to-b from-[#1d1d1f] to-transparent pointer-events-none" />
-        
-        <div className="max-w-[1000px] mx-auto relative z-10">
-          <FadeIn>
-            <div className="text-center mb-24">
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter text-[#f5f5f7] mb-6">{t.whichPlat}</h2>
-            </div>
-          </FadeIn>
+      {/* ── INDUSTRY SHOWCASE (SETELAH FITUR) ── */}
+      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+        <IndustryShowcase
+          lang={lang}
+          activeTheme={activeTheme}
+        />
+      </FadeIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* Developer */}
-            <FadeIn delay={100}>
-              <div className="flex flex-col items-center text-center p-10 bg-transparent border-t border-[#333336] hover:bg-[#111111] transition-colors rounded-3xl">
-                <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{t.dev}</h3>
-                <p className="text-[#86868b] mb-10 min-h-[48px]">{t.devDesc}</p>
-                <div className="text-4xl font-bold text-[#f5f5f7] mb-8">{t.free}</div>
-                
-                <Link to="/login" className="w-full sm:w-auto bg-[#0071e3] text-white px-8 py-3 rounded-full font-medium hover:bg-[#0077ed] transition-colors mb-12">
-                  {t.getStarted}
-                </Link>
+      {/* ── PRICING SECTION (DENGAN TOGGLE BULANAN/TAHUNAN & TEMA GLOW) ── */}
+      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+        <PricingSection
+          lang={lang}
+          activeTheme={activeTheme}
+        />
+      </FadeIn>
 
-                <ul className="space-y-4 text-left w-full max-w-xs mx-auto border-t border-[#333336] pt-10">
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.upTo5}</li>
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.msg10k}</li>
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.ret24h}</li>
-                </ul>
-              </div>
-            </FadeIn>
+      {/* ── FAQ SECTION (ACCORDION & TECHNICAL ARCHITECTURE REFERENCE) ── */}
+      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+        <FAQSection
+          lang={lang}
+          activeTheme={activeTheme}
+        />
+      </FadeIn>
 
-            {/* Enterprise */}
-            <FadeIn delay={200}>
-              <div className="flex flex-col items-center text-center p-10 bg-transparent border-t border-[#333336] hover:bg-[#111111] transition-colors rounded-3xl">
-                <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{t.ent}</h3>
-                <p className="text-[#86868b] mb-10 min-h-[48px]">{t.entDesc}</p>
-                <div className="text-4xl font-bold text-[#f5f5f7] mb-8">$49<span className="text-xl text-[#86868b] font-normal">{t.mo}</span></div>
-                
-                <Link to="/login" className="w-full sm:w-auto bg-[#f5f5f7] text-black px-8 py-3 rounded-full font-medium hover:bg-white transition-colors mb-12">
-                  {t.buy}
-                </Link>
+      {/* ── CTA BANNER (AKTIVASI NODE & UJI COBA 14 HARI) ── */}
+      <FadeIn delay={60} direction="scale" activeTheme={activeTheme} withGlow={true}>
+        <CTABanner
+          lang={lang}
+          activeTheme={activeTheme}
+        />
+      </FadeIn>
 
-                <ul className="space-y-4 text-left w-full max-w-xs mx-auto border-t border-[#333336] pt-10">
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.unlimitedDev}</li>
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.msg1m}</li>
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.ret1y}</li>
-                  <li className="flex items-center gap-3 text-sm text-[#f5f5f7]"><div className="w-1.5 h-1.5 rounded-full bg-[#86868b]" /> {t.custAnalyt}</li>
-                </ul>
-              </div>
-            </FadeIn>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FOOTER ── */}
-      <footer className="border-t border-[#333336] bg-black pt-10 pb-10">
-        <div className="max-w-[1200px] mx-auto px-6 text-center md:text-left text-xs text-[#86868b] font-medium flex flex-col md:flex-row justify-between items-center gap-4">
-          <p>{t.copy.replace('{year}', new Date().getFullYear())}</p>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-[#f5f5f7] transition-colors">{t.privPolicy}</a>
-            <span className="border-l border-[#333336]"></span>
-            <a href="#" className="hover:text-[#f5f5f7] transition-colors">{t.termsUse}</a>
-          </div>
-        </div>
-      </footer>
+      {/* ── FOOTER MULTI-KOLOM LENGKAP DENGAN BRAND LOGO & SYSTEM STATUS ── */}
+      <FooterSection
+        lang={lang}
+        activeTheme={activeTheme}
+      />
 
     </div>
   );

@@ -1,7 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function ParticleTunnel() {
+export default function ParticleTunnel({ color, onCycleTheme }) {
   const canvasRef = useRef(null);
+  const colorRef = useRef(color || '#06b6d4');
+  const onCycleThemeRef = useRef(onCycleTheme);
+  const updateParticlesColorRef = useRef(null);
+
+  useEffect(() => {
+    onCycleThemeRef.current = onCycleTheme;
+  }, [onCycleTheme]);
+
+  useEffect(() => {
+    colorRef.current = color || '#06b6d4';
+    if (updateParticlesColorRef.current) {
+      updateParticlesColorRef.current(colorRef.current);
+    }
+  }, [color]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -13,16 +27,11 @@ export default function ParticleTunnel() {
     let particles = [];
     let animationFrameId;
 
-    // One exact solid color per theme (Blue, Gold, Red, Green, Purple)
-    const PALETTES = [
-      ['#0071e3'], // Blue
-      ['#f5a623'], // Gold
-      ['#ff3b30'], // Red
-      ['#34c759'], // Green
-      ['#af52de']  // Purple
-    ];
-    let paletteIndex = 0;
-    let PALETTE = PALETTES[0];
+    let PALETTE = [colorRef.current || '#06b6d4'];
+    updateParticlesColorRef.current = (newColor) => {
+      PALETTE = [newColor];
+      for (const p of particles) p.color = newColor;
+    };
     function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
     // Helper to draw a true 3D isometric cube on the 2D canvas
@@ -220,14 +229,7 @@ export default function ParticleTunnel() {
       animationFrameId = requestAnimationFrame(frame);
     }
 
-    const onClick = () => {
-      paletteIndex = (paletteIndex + 1) % PALETTES.length;
-      PALETTE = PALETTES[paletteIndex];
-      for (const p of particles) p.color = pick(PALETTE);
-    };
-
     window.addEventListener('resize', resize);
-    window.addEventListener('click', onClick);
     window.addEventListener('mousemove', onInteract);
     window.addEventListener('touchstart', onInteract, { passive: true });
     window.addEventListener('touchmove', onInteract, { passive: true });
@@ -237,7 +239,6 @@ export default function ParticleTunnel() {
 
     return () => {
       window.removeEventListener('resize', resize);
-      window.removeEventListener('click', onClick);
       window.removeEventListener('mousemove', onInteract);
       window.removeEventListener('touchstart', onInteract);
       window.removeEventListener('touchmove', onInteract);
