@@ -279,6 +279,10 @@ export default function LandingPage() {
 
       try {
         const colorName = nextTheme?.id ? nextTheme.id.replace('dark-', '').replace('light-', '') : 'cyan';
+        localStorage.setItem('iot_theme', colorName);
+        localStorage.setItem('iot_theme_color', nextTheme.primary || '#06b6d4');
+        localStorage.setItem('iot_mode', nextTheme.mode || 'dark');
+
         if (colorName === 'cyan') {
           document.documentElement.removeAttribute('data-theme');
         } else {

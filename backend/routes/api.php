@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function () {
     });
     
     Route::get('/buckets/mqtt-map', [BucketController::class, 'mqttMap']);
+    Route::post('/buckets/{bucket}/telemetry', [BucketController::class, 'ingestMqttTelemetry']);
 });
 
 // Protected routes (require Sanctum token)

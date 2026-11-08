@@ -1,51 +1,46 @@
 import React, { useState } from 'react';
-import { Zap, Plus, Minus, Power } from 'lucide-react';
+import { Zap, Plus, Minus, Thermometer } from 'lucide-react';
 
 export default function ThermostatWidget({
-  title = "Living Room Temperature",
-  min = 5,
-  max = 40,
-  initialValue = 25,
-  unit = "°C",
-  subLabel = "Celcius"
+  title = 'Living Room AC',
+  min = 16,
+  max = 30,
+  initialValue = 22,
+  unit = '°C',
+  subLabel = 'Target Suhu',
 }) {
   const [value, setValue] = useState(initialValue);
   const [isOn, setIsOn] = useState(true);
 
-  // Math for SVG Dial
-  const radius = 80;
-  const strokeWidth = 8;
-  const normalizedRadius = radius - strokeWidth * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
+  // Semi-circular / 240-deg Dial Math (Matches Vision UI Satisfaction Rate + Tick Dial)
+  const radius = 64;
+  const circumference = Math.PI * radius; // Semi-circle arc length ~201
+  const percentage = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const strokeDashoffset = circumference * (1 - (isOn ? percentage : 0));
 
-  // Calculate percentage (0 to 1)
-  const percentage = (value - min) / (max - min);
-  const strokeDashoffset = circumference - percentage * circumference;
-
-  // Generate tick marks
-  const numTicks = 40;
+  // Radial tick marks along the upper semi-circle
+  const numTicks = 24;
   const ticks = [];
   for (let i = 0; i <= numTicks; i++) {
-    const angle = (i / numTicks) * Math.PI * 2 - Math.PI / 2; // start from top
-    // Only show ticks for the top 3/4 of the circle, or full circle?
-    // Let's do a full circle of ticks, but make them subtle
-    const x1 = 100 + Math.cos(angle) * (radius + 15);
-    const y1 = 100 + Math.sin(angle) * (radius + 15);
-    const x2 = 100 + Math.cos(angle) * (radius + 20);
-    const y2 = 100 + Math.sin(angle) * (radius + 20);
-    
-    // Highlight ticks up to the current value
-    const isPast = (i / numTicks) <= percentage;
-    
+    const ratio = i / numTicks;
+    const angle = Math.PI + ratio * Math.PI; // 180deg (left) to 360deg (right)
+    const x1 = 90 + Math.cos(angle) * (radius + 12);
+    const y1 = 88 + Math.sin(angle) * (radius + 12);
+    const x2 = 90 + Math.cos(angle) * (radius + 17);
+    const y2 = 88 + Math.sin(angle) * (radius + 17);
+    const isPast = isOn && ratio <= percentage;
+
     ticks.push(
       <line
         key={i}
-        x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={isPast ? 'rgb(var(--primary-400))' : 'currentColor'}
-        strokeWidth="1.5"
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={isPast ? 'rgb(var(--primary-400))' : 'rgb(var(--surface-600))'}
+        strokeWidth="1.75"
         strokeLinecap="round"
-        className={isPast ? '' : 'text-slate-300 dark:text-slate-700'}
-        opacity={isPast ? 1 : 0.5}
+        opacity={isPast ? 0.95 : 0.4}
       />
     );
   }
@@ -59,121 +54,148 @@ export default function ThermostatWidget({
   };
 
   return (
-    <div className="glass-card p-6 w-full max-w-md mx-auto relative overflow-hidden transition-all duration-300">
-      
-      {/* Background glow when ON */}
+    <div
+      className="vision-card p-6 w-full relative overflow-hidden flex flex-col justify-between min-h-[260px] transition-all duration-300"
+      style={
+        isOn
+          ? {
+              borderColor: 'rgb(var(--primary-500) / 0.35)',
+              boxShadow: '0 20px 32px rgb(var(--primary-500) / 0.16)',
+            }
+          : {}
+      }
+    >
+      {/* Ambient glow when ON */}
       {isOn && (
-        <div 
-          className="absolute inset-0 opacity-10 pointer-events-none transition-opacity duration-500" 
-          style={{ background: 'radial-gradient(circle at center, rgb(var(--primary-500)) 0%, transparent 70%)' }} 
+        <div
+          className="absolute -top-12 right-1/4 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-25"
+          style={{ background: 'rgb(var(--primary-500))' }}
         />
       )}
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-8 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: isOn ? 'rgb(var(--primary-500)/0.15)' : 'rgba(100,116,139,0.1)' }}>
-            <Zap size={14} style={{ color: isOn ? 'rgb(var(--primary-500))' : '#64748b' }} />
-          </div>
-          <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">{title}</h3>
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between relative z-10">
+        <div>
+          <h3 className="font-extrabold text-[16px] text-slate-100 leading-tight">{title}</h3>
+          <p className="text-[12px] text-slate-400 mt-0.5">{subLabel}</p>
         </div>
-        
+
+        {/* ON/OFF Toggle Pill */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500">{isOn ? 'ON' : 'OFF'}</span>
+          <span className={`text-[11px] font-extrabold ${isOn ? 'text-emerald-400' : 'text-slate-500'}`}>
+            {isOn ? 'ON' : 'OFF'}
+          </span>
           <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" className="sr-only peer" checked={isOn} onChange={() => setIsOn(!isOn)} />
-            <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"
-                 style={isOn ? { backgroundColor: 'rgb(var(--primary-500))' } : {}}></div>
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={isOn}
+              onChange={() => setIsOn(!isOn)}
+            />
+            <div
+              className="w-10 h-5 bg-slate-800 border border-slate-700 rounded-full peer peer-checked:after:translate-x-5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"
+              style={isOn ? { backgroundColor: 'rgb(var(--primary-500))', borderColor: 'transparent' } : {}}
+            />
           </label>
         </div>
       </div>
 
-      {/* DIAL AREA */}
-      <div className="flex justify-between items-center relative z-10">
-        
-        {/* Minus Button */}
-        <div className="flex flex-col items-center gap-2">
-          <button 
-            onClick={handleDecrease}
-            disabled={!isOn || value <= min}
-            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-95"
-          >
-            <Minus size={20} />
-          </button>
-          <span className="text-xs font-bold text-slate-500">{min}{unit}</span>
-        </div>
+      {/* ── Center Vision UI Semi-Circular Gauge + Tick Dial ── */}
+      <div className="relative flex flex-col items-center justify-center my-1 z-10">
+        <svg width="180" height="102" viewBox="0 0 180 102" className="overflow-visible">
+          <defs>
+            <linearGradient id="thermostatArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgb(var(--primary-600))" stopOpacity="0.3" />
+              <stop offset="50%" stopColor="rgb(var(--primary-500))" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="rgb(var(--primary-300))" stopOpacity="1" />
+            </linearGradient>
+          </defs>
 
-        {/* Center Dial */}
-        <div className="relative w-[200px] h-[200px] flex items-center justify-center">
-          <svg height="200" width="200" className="absolute inset-0 transform -rotate-90">
-            {/* Ticks */}
-            {ticks}
-            
-            {/* Track arc */}
-            <circle
-              stroke="currentColor"
-              fill="transparent"
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              className="text-slate-200 dark:text-slate-800"
-              r={normalizedRadius}
-              cx="100"
-              cy="100"
-            />
-            
-            {/* Progress arc */}
-            <circle
-              stroke="rgb(var(--primary-500))"
-              fill="transparent"
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference + ' ' + circumference}
-              style={{ strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out', opacity: isOn ? 1 : 0.2 }}
-              strokeLinecap="round"
-              r={normalizedRadius}
-              cx="100"
-              cy="100"
-            />
-            
-            {/* Knob / Indicator dot */}
-            {isOn && (
-              <circle
-                cx={100 + Math.cos((percentage * Math.PI * 2) - Math.PI / 2) * normalizedRadius}
-                cy={100 + Math.sin((percentage * Math.PI * 2) - Math.PI / 2) * normalizedRadius}
-                r="6"
-                fill="white"
-                stroke="rgb(var(--primary-500))"
-                strokeWidth="2"
-                style={{ transition: 'all 0.5s ease-in-out' }}
-              />
-            )}
-          </svg>
+          {/* Outer Radial Tick Marks */}
+          {ticks}
 
-          {/* Center Text */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full m-8 bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800 z-10"
-               style={isOn ? { boxShadow: '0 4px 20px rgb(var(--primary-500)/0.15)' } : {}}>
-            <p className={`text-4xl font-black tracking-tighter ${isOn ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 dark:text-slate-600'} transition-colors`}>
-              {value}<span className="text-xl font-bold">{unit}</span>
-            </p>
-            <p className={`text-[10px] uppercase tracking-widest font-bold mt-1 ${isOn ? 'text-slate-400' : 'text-slate-500/50'}`}>
-              {subLabel}
-            </p>
-          </div>
-        </div>
+          {/* Track Arc */}
+          <path
+            d="M 26 88 A 64 64 0 0 1 154 88"
+            fill="none"
+            stroke="rgb(var(--surface-700))"
+            strokeWidth="10"
+            strokeLinecap="round"
+          />
 
-        {/* Plus Button */}
-        <div className="flex flex-col items-center gap-2">
-          <button 
-            onClick={handleIncrease}
-            disabled={!isOn || value >= max}
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95"
-            style={isOn ? { background: 'linear-gradient(135deg, rgb(var(--primary-400)), rgb(var(--primary-600)))', boxShadow: '0 4px 14px rgb(var(--primary-500)/0.4)' } : { background: 'var(--surface-300)' }}
-          >
-            <Plus size={20} />
-          </button>
-          <span className="text-xs font-bold text-slate-500">{max}{unit}</span>
+          {/* Active Progress Arc */}
+          <path
+            d="M 26 88 A 64 64 0 0 1 154 88"
+            fill="none"
+            stroke="url(#thermostatArcGrad)"
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            style={{ transition: 'stroke-dashoffset 0.4s ease-out', opacity: isOn ? 1 : 0.25 }}
+          />
+        </svg>
+
+        {/* Center Glowing Thermometer Badge */}
+        <div
+          className="absolute bottom-1.5 w-10 h-10 rounded-full flex items-center justify-center text-white transition-all duration-300"
+          style={
+            isOn
+              ? {
+                  background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                  boxShadow: '0 0 18px rgb(var(--primary-500) / 0.6)',
+                }
+              : { background: 'rgb(var(--surface-700))', color: 'rgb(var(--surface-400))' }
+          }
+        >
+          <Thermometer size={18} />
         </div>
       </div>
-      
+
+      {/* ── Bottom Vision Inner Pill Box (Minus | Value | Plus) ── */}
+      <div className="vision-inner-box px-4 py-3 flex items-center justify-between relative z-10">
+        <button
+          type="button"
+          onClick={handleDecrease}
+          disabled={!isOn || value <= min}
+          aria-label="Decrease temperature"
+          className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+        >
+          <Minus size={16} />
+        </button>
+
+        <div className="text-center">
+          <div className="flex items-baseline justify-center gap-1">
+            <span className="text-[10px] font-medium text-slate-500 mr-1">{min}{unit}</span>
+            <p className={`text-[22px] font-extrabold leading-none ${isOn ? 'text-slate-100' : 'text-slate-500'}`}>
+              {value}
+              <span className="text-[14px] font-bold text-primary-400 ml-0.5">{unit}</span>
+            </p>
+            <span className="text-[10px] font-medium text-slate-500 ml-1">{max}{unit}</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {isOn ? 'Cooling Active' : 'Standby Mode'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleIncrease}
+          disabled={!isOn || value >= max}
+          aria-label="Increase temperature"
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+          style={
+            isOn
+              ? {
+                  background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                  boxShadow: '0 4px 12px rgb(var(--primary-500) / 0.45)',
+                }
+              : { background: 'rgb(var(--surface-700))', color: 'rgb(var(--surface-400))' }
+          }
+        >
+          <Plus size={16} />
+        </button>
+      </div>
     </div>
   );
 }

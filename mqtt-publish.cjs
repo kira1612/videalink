@@ -8,9 +8,18 @@ if (args.length < 2) {
 
 const topic = args[0];
 const message = args[1];
-const brokerUrl = 'mqtt://test.mosquitto.org:1883';
+const brokerUrl = process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org:1883';
 
-const client = mqtt.connect(brokerUrl);
+const client = mqtt.connect(brokerUrl, {
+    connectTimeout: 5000,
+});
+
+// Guard against hanging forever
+setTimeout(() => {
+    console.error('MQTT publish timed out after 5s');
+    client.end(true);
+    process.exit(1);
+}, 5000);
 
 client.on('connect', () => {
     client.publish(topic, message, { qos: 0 }, (err) => {

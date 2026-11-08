@@ -1,41 +1,23 @@
-import { useState, useEffect, useId } from 'react';
-import {
-  LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { AreaChart, Area, Grid, XAxis, ChartTooltip } from './bklit';
 import { generateChartData } from '../../data/mockData';
 
-/* ── Custom Tooltip ──────────────────────────────────────────────────────── */
-const CustomTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 shadow-xl text-xs">
-      <p className="text-slate-500 mb-1.5">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.name} className="font-semibold" style={{ color: entry.color }}>
-          {entry.name}: <span className="text-slate-300">{entry.value}{entry.unit || ''}</span>
-        </p>
-      ))}
-    </div>
-  );
-};
-
-/* shared axis / grid props */
-const axisStyle = { fontSize: 10, fill: 'rgb(100,116,139)' };
-const gridStyle = { strokeDasharray: '3 3', stroke: 'rgba(148,163,184,0.08)' };
-
-/* ── Realtime Area Chart ─────────────────────────────────────────────────── */
-export function RealtimeLineChart({ title, color = 'rgb(6,182,212)', unit = '', baseValue = 25, variance = 5 }) {
-  // Generate a stable, valid SVG element ID (no special chars)
-  const uid = useId().replace(/:/g, '');
-  const gradientId = `rta-${uid}`;
-
-  const [data, setData] = useState(() => generateChartData(20, baseValue, variance));
+/* ── Realtime Area Chart (Bklit UI) ───────────────────────────────────────── */
+export function RealtimeLineChart({ title, color = 'rgb(var(--primary-500))', unit = '', baseValue = 25, variance = 5 }) {
+  const [data, setData] = useState(() => {
+    const raw = generateChartData(20, baseValue, variance);
+    const now = Date.now();
+    return raw.map((d, i) => ({
+      ...d,
+      date: new Date(now - (raw.length - 1 - i) * 2000),
+    }));
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
       setData(prev => {
         const newPoint = {
+          date: new Date(),
           time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           value: parseFloat((baseValue + (Math.random() - 0.5) * variance * 2).toFixed(1)),
         };
@@ -45,113 +27,146 @@ export function RealtimeLineChart({ title, color = 'rgb(6,182,212)', unit = '', 
     return () => clearInterval(interval);
   }, [baseValue, variance]);
 
-  // Resolve actual computed color from CSS variable if needed
-  const resolvedColor = color.startsWith('rgb(var(') ? `rgb(var(--primary-500))` : color;
+  const resolvedColor = color.startsWith('rgb(var(') ? 'rgb(var(--primary-500))' : color;
 
   return (
-    <div className="glass-card p-5">
+    <div className="vision-card p-5">
       {title && (
         <h3 className="text-[13px] font-semibold text-slate-400 mb-4">{title}</h3>
       )}
-      <ResponsiveContainer width="100%" height={180}>
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              {/* Use primary CSS var for stops so it follows the theme */}
-              <stop offset="0%"  stopColor="rgb(var(--primary-500))" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="rgb(var(--primary-500))" stopOpacity={0.03} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid {...gridStyle} />
-          <XAxis dataKey="time" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-          <Tooltip content={<CustomTooltip />} />
+      <div className="w-full" style={{ height: 180 }}>
+        <AreaChart
+          data={data}
+          xDataKey="date"
+          className="w-full h-[180px]"
+          margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+        >
+          <Grid stroke="rgba(148,163,184,0.08)" strokeDasharray="3,3" />
           <Area
-            type="monotone"
             dataKey="value"
-            name={title || 'Value'}
-            unit={unit}
-            stroke="rgb(var(--primary-500))"
+            stroke={resolvedColor}
+            fill={resolvedColor}
+            fillOpacity={0.35}
             strokeWidth={2.5}
-            fill={`url(#${gradientId})`}
-            dot={false}
-            activeDot={{ r: 4, fill: 'rgb(var(--primary-400))', strokeWidth: 0 }}
           />
+          <XAxis />
+          <ChartTooltip />
         </AreaChart>
-      </ResponsiveContainer>
+      </div>
     </div>
   );
 }
 
-/* ── Multi Line Chart ────────────────────────────────────────────────────── */
-export function MultiLineChart({ title, series = [] }) {
-  // Curated colors that work in both light and dark
+/* ── Multi Line Chart (Bklit UI) ─────────────────────────────────────────── */
+export function MultiLineChart({ title, series = [], initialData = null, isOnline = true, height = 220 }) {
   const lineColors = [
-    'rgb(var(--primary-500))',
+    'rgb(var(--primary-400))',
     '#10b981',
     '#f59e0b',
     '#8b5cf6',
   ];
 
-  const [data, setData] = useState(() => {
-    const points = 20;
+  const generateFallbackPoints = (online) => {
+    const points = 10;
     const now = Date.now();
     return Array.from({ length: points }, (_, i) => {
+      const pointDate = new Date(now - (points - i) * 60000);
       const obj = {
-        time: new Date(now - (points - i) * 60000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        date: pointDate,
+        time: pointDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
       series.forEach(s => {
-        obj[s.key] = parseFloat((s.base + (Math.random() - 0.5) * s.variance * 2).toFixed(1));
+        obj[s.key] = online ? parseFloat((s.base || 0).toFixed(1)) : 0;
       });
       return obj;
     });
+  };
+
+  const [data, setData] = useState(() => {
+    if (initialData && initialData.length > 0) {
+      const now = Date.now();
+      return initialData.map((d, i) => ({
+        ...d,
+        date: d.date instanceof Date ? d.date : (d.time && !isNaN(new Date(d.time).getTime()) ? new Date(d.time) : new Date(now - (initialData.length - 1 - i) * 60000)),
+      }));
+    }
+    return generateFallbackPoints(isOnline);
   });
 
+  const initialDataRef = useRef(JSON.stringify(initialData));
+
   useEffect(() => {
+    const serialized = JSON.stringify(initialData);
+    if (serialized !== initialDataRef.current) {
+      initialDataRef.current = serialized;
+      if (initialData && initialData.length > 0) {
+        const now = Date.now();
+        setData(initialData.map((d, i) => ({
+          ...d,
+          date: d.date instanceof Date ? d.date : (d.time && !isNaN(new Date(d.time).getTime()) ? new Date(d.time) : new Date(now - (initialData.length - 1 - i) * 60000)),
+        })));
+      } else {
+        setData(generateFallbackPoints(isOnline));
+      }
+    }
+  }, [initialData, isOnline]);
+
+  useEffect(() => {
+    if (initialData && initialData.length > 0) return;
+    if (!isOnline) {
+      setData(generateFallbackPoints(false));
+      return;
+    }
+
     const interval = setInterval(() => {
       setData(prev => {
+        const pointDate = new Date();
         const obj = {
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          date: pointDate,
+          time: pointDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
         };
         series.forEach(s => {
-          obj[s.key] = parseFloat((s.base + (Math.random() - 0.5) * s.variance * 2).toFixed(1));
+          const base = s.base ?? 10;
+          const variance = s.variance ?? 5;
+          obj[s.key] = parseFloat((base + (Math.random() - 0.5) * variance * 2).toFixed(1));
         });
-        return [...prev.slice(-19), obj];
+        return [...prev.slice(-14), obj];
       });
     }, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
-  return (
-    <div className="glass-card p-5">
+    return () => clearInterval(interval);
+  }, [isOnline, initialData, series]);
+
+  const content = (
+    <div className="w-full relative" style={{ height }}>
       {title && (
         <h3 className="text-[13px] font-semibold text-slate-400 mb-4">{title}</h3>
       )}
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-          <CartesianGrid {...gridStyle} />
-          <XAxis dataKey="time" tick={axisStyle} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            wrapperStyle={{ fontSize: '11px', paddingTop: '12px', color: 'rgb(100,116,139)' }}
-            iconType="circle"
-            iconSize={8}
-          />
+      <div className="w-full" style={{ height: height - (title ? 40 : 0) }}>
+        <AreaChart
+          data={data}
+          xDataKey="date"
+          className="w-full"
+          style={{ height: height - (title ? 40 : 0) }}
+          margin={{ top: 10, right: 15, left: 15, bottom: 20 }}
+        >
+          <Grid stroke="rgba(148,163,184,0.08)" strokeDasharray="3,3" />
           {series.map((s, idx) => (
-            <Line
+            <Area
               key={s.key}
-              type="monotone"
               dataKey={s.key}
-              name={s.label}
               stroke={lineColors[idx % lineColors.length]}
+              fill={lineColors[idx % lineColors.length]}
+              fillOpacity={0.3}
               strokeWidth={2.5}
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
             />
           ))}
-        </LineChart>
-      </ResponsiveContainer>
+          <XAxis />
+          <ChartTooltip />
+        </AreaChart>
+      </div>
     </div>
   );
+
+  return title ? <div className="vision-card p-5">{content}</div> : content;
 }

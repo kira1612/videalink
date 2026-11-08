@@ -4,7 +4,7 @@ import {
   Plus, Search, Cpu, MoreVertical, X, Shuffle, Check,
   Settings2, Info, RefreshCw, LayoutGrid, List,
   MapPin, Clock, Zap, Signal, ChevronRight, ArrowUpRight,
-  Activity, WifiOff, AlertTriangle, Home,
+  Activity, Wifi, WifiOff, AlertTriangle, Home,
 } from 'lucide-react';
 import { devicesApi, roomsApi } from '../services/api';
 import Swal from 'sweetalert2';
@@ -39,14 +39,11 @@ function DeviceCard({ device, onDelete, activeDropdown, setActiveDropdown }) {
 
   return (
     <div
-      className="group relative flex flex-col rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 transition-all duration-200 hover:-translate-y-0.5"
+      className="group relative flex flex-col vision-card overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
       style={{
         borderTopColor: st.topBorder,
         borderTopWidth: '2px',
-        boxShadow: `0 0 0 0 transparent`,
       }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = `0 8px 32px ${st.glow}, 0 1px 0 rgba(255,255,255,0.04) inset`}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
     >
       {/* ── Header ── */}
       <div className="p-5">
@@ -220,27 +217,36 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
 
   const genCreds = () => {
     const ch = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    setCreds(Array.from({ length: 24 }, () => ch[Math.floor(Math.random() * ch.length)]).join(''));
+    setCreds(Array.from({ length: 32 }, () => ch[Math.floor(Math.random() * ch.length)]).join(''));
   };
 
   const submit = async (e) => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.target));
-    if (!d.id)   return Swal.fire({ title: 'Required', text: 'Enter a Device ID.', icon: 'warning', background: '#1e293b', color: '#f8fafc' });
-    if (!d.type) return Swal.fire({ title: 'Required', text: 'Select a type.', icon: 'warning', background: '#1e293b', color: '#f8fafc' });
+    if (!d.name?.trim()) {
+      return Swal.fire({ title: 'Required', text: 'Enter a Device Name / Identifier.', icon: 'warning', background: '#1e293b', color: '#f8fafc' });
+    }
+    if (!d.type) {
+      return Swal.fire({ title: 'Required', text: 'Select a device hardware type.', icon: 'warning', background: '#1e293b', color: '#f8fafc' });
+    }
+    const selectedRoom = rooms.find(r => String(r.id) === String(d.room_id));
     setBusy(true);
     try {
       await devicesApi.create({ 
-        name: d.name || d.id, 
+        name: d.name.trim(), 
         type: d.type, 
         room_id: d.room_id || null,
         protocol: d.protocol || 'http', 
-        broker_config: d.protocol === 'mqtt' ? { host: d.broker_host, port: d.broker_port, topic: d.broker_topic } : null, 
-        credentials: d.credentials, 
-        location: 'N/A' 
+        broker_config: d.protocol === 'mqtt' ? { 
+          host: d.broker_host || 'test.mosquitto.org', 
+          port: parseInt(d.broker_port || 1883, 10), 
+          topic: d.broker_topic || `videalink/devices/${d.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}` 
+        } : null, 
+        credentials: d.credentials?.trim() || undefined, // Backend will auto-generate secure 32-char token if omitted
+        location: selectedRoom?.name || 'Unassigned',
       });
       onSuccess(); onClose();
-      Swal.fire({ title: 'Device added!', icon: 'success', background: '#1e293b', color: '#f8fafc' });
+      Swal.fire({ title: 'Device added!', text: 'Device successfully registered to platform.', icon: 'success', background: '#1e293b', color: '#f8fafc' });
     } catch (err) {
       Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' });
     } finally { setBusy(false); }
@@ -257,38 +263,42 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
             </div>
             <div>
               <h2 className="text-[15px] font-extrabold text-slate-100">Add New Device</h2>
-              <p className="text-[11px] text-slate-500">Register a device to this platform</p>
+              <p className="text-[11px] text-slate-500">Register hardware or gateway node to platform</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all"><X size={16} /></button>
         </div>
 
         <form id="modal-form" onSubmit={submit} className="overflow-y-auto flex-1 p-6 space-y-5">
-          <FieldSection icon={Cpu} title="Device Configuration" accent>
-            <Field label="Device ID" required hint="Unique identifier, e.g. esp32-lab-01">
-              <input name="id" type="text" placeholder="esp32-lab-01" className="input-field" />
-            </Field>
-            <Field label="Device Type" required>
-              <select name="type" className="input-field" defaultValue="Generic IoT">
-                <option value="Generic IoT">Generic IoT Device</option>
-                <option value="ESP32">ESP32</option>
-                <option value="ESP8266">ESP8266</option>
-                <option value="Arduino Uno">Arduino Uno</option>
-                <option value="Raspberry Pi 4">Raspberry Pi 4</option>
-                <option value="NodeMCU">NodeMCU</option>
-              </select>
-            </Field>
-            
-            <Field label="Room (Optional)">
-              <select name="room_id" className="input-field" defaultValue="">
-                <option value="">No Room (Unassigned)</option>
-                {rooms.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
+          <FieldSection icon={Cpu} title="Hardware & Identity" accent>
+            <Field label="Device Name" required hint="e.g. ESP32 Sensor Ruang Tamu / Node-01">
+              <input name="name" type="text" placeholder="e.g. ESP32-Lab-01" className="input-field" autoFocus required />
             </Field>
 
-            <Field label="Protocol">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Device Type" required>
+                <select name="type" className="input-field" defaultValue="ESP32">
+                  <option value="ESP32">ESP32 (Wi-Fi / BLE)</option>
+                  <option value="ESP8266">ESP8266 / NodeMCU</option>
+                  <option value="Raspberry Pi 4">Raspberry Pi (Edge Gateway)</option>
+                  <option value="Arduino Uno">Arduino / Modbus</option>
+                  <option value="Generic IoT">Generic IoT Device</option>
+                </select>
+              </Field>
+              
+              <Field label="Room (Ruangan)" hint="Optional">
+                <select name="room_id" className="input-field" defaultValue="">
+                  <option value="">No Room (Unassigned)</option>
+                  {rooms.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </FieldSection>
+
+          <FieldSection icon={Wifi} title="Telemetry & Communication Protocol" accent>
+            <Field label="Primary Protocol">
               <div className="grid grid-cols-2 gap-2">
                 {['http', 'mqtt'].map(p => (
                   <button key={p} type="button" onClick={() => setProtocol(p)}
@@ -299,7 +309,7 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
                     }
                   >
                     {protocol === p && <Check size={13} />}
-                    {p === 'http' ? 'HTTP / REST' : 'MQTT'}
+                    {p === 'http' ? 'HTTP / REST Ingest' : 'MQTT Broker'}
                   </button>
                 ))}
               </div>
@@ -308,31 +318,35 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
 
             {protocol === 'mqtt' && (
               <div className="rounded-xl border border-slate-800 p-4 space-y-3 bg-slate-800/30">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">MQTT Broker</p>
-                <Field label="Host"><input name="broker_host" type="text" placeholder="mqtt.example.com" className="input-field" required /></Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Port"><input name="broker_port" type="number" defaultValue="1883" className="input-field" required /></Field>
-                  <Field label="Topic (opt.)"><input name="broker_topic" type="text" placeholder="home/sensor" className="input-field" /></Field>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">MQTT Broker Parameters</p>
+                  <span className="text-[10px] text-emerald-400 font-mono">Default Live</span>
+                </div>
+                <Field label="Broker Host">
+                  <input name="broker_host" type="text" defaultValue="test.mosquitto.org" placeholder="e.g. test.mosquitto.org / broker.hivemq.com" className="input-field font-mono text-[12px]" required />
+                </Field>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <Field label="Port">
+                      <input name="broker_port" type="number" defaultValue="1883" className="input-field font-mono text-[12px]" required />
+                    </Field>
+                  </div>
+                  <div className="col-span-2">
+                    <Field label="MQTT Topic (Optional)">
+                      <input name="broker_topic" type="text" placeholder="videalink/devices/node-01" className="input-field font-mono text-[12px]" />
+                    </Field>
+                  </div>
                 </div>
               </div>
             )}
 
-            <Field label="Credentials">
+            <Field label="Device Access Token (Credentials)" hint="Leave blank to auto-generate 32-char token">
               <div className="relative">
-                <input name="credentials" type="text" placeholder="Token or API key" className="input-field font-mono text-[12px] pr-28" value={creds} onChange={e => setCreds(e.target.value)} />
+                <input name="credentials" type="text" placeholder="Auto-generated if empty..." className="input-field font-mono text-[12px] pr-28" value={creds} onChange={e => setCreds(e.target.value)} />
                 <button type="button" onClick={genCreds} className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
                   <Shuffle size={11} /> Generate
                 </button>
               </div>
-            </Field>
-          </FieldSection>
-
-          <FieldSection icon={Info} title="Device Information">
-            <Field label="Display Name" hint="Optional, defaults to Device ID">
-              <input name="name" type="text" placeholder="My Sensor Node" className="input-field" />
-            </Field>
-            <Field label="Description">
-              <textarea name="description" rows={2} placeholder="What does this device monitor?" className="input-field resize-none" />
             </Field>
           </FieldSection>
         </form>
@@ -458,23 +472,30 @@ export default function Devices() {
         </button>
       </div>
 
-      {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── STAT CARDS (Vision UI Style) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total',   count: counts.all,     dot: 'rgb(var(--primary-400))', bg: 'rgb(var(--primary-500)/0.08)', border: 'rgb(var(--primary-500)/0.18)' },
-          { label: 'Online',  count: counts.online,  dot: '#34d399',               bg: 'rgba(52,211,153,0.08)',         border: 'rgba(52,211,153,0.2)' },
-          { label: 'Warning', count: counts.warning, dot: '#fbbf24',               bg: 'rgba(251,191,36,0.08)',         border: 'rgba(251,191,36,0.2)' },
-          { label: 'Offline', count: counts.offline, dot: '#64748b',               bg: 'rgba(100,116,139,0.06)',        border: 'rgba(100,116,139,0.15)' },
+          { label: 'Total Devices', count: counts.all,     dot: 'rgb(var(--primary-400))', icon: Cpu },
+          { label: 'Online Now',    count: counts.online,  dot: '#34d399',                 icon: Wifi },
+          { label: 'Warning',       count: counts.warning, dot: '#fbbf24',                 icon: AlertTriangle },
+          { label: 'Offline',       count: counts.offline, dot: '#64748b',                 icon: WifiOff },
         ].map(s => (
-          <div key={s.label} className="relative rounded-2xl px-4 py-4 overflow-hidden" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-            <div className="absolute right-3 top-3 w-5 h-5 rounded-full opacity-20" style={{ background: s.dot }} />
-            {loading
-              ? <div className="h-8 w-10 bg-slate-800 rounded-lg animate-pulse mb-1" />
-              : <p className="text-[26px] font-black text-slate-100 leading-none mb-1.5">{s.count}</p>
-            }
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.dot }} />
-              <p className="text-[12px] font-bold text-slate-400">{s.label}</p>
+          <div key={s.label} className="vision-card px-5 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] font-medium text-slate-400">{s.label}</p>
+              {loading
+                ? <div className="h-7 w-12 bg-slate-800 rounded-lg animate-pulse mt-1" />
+                : <p className="text-[22px] font-extrabold text-slate-100 leading-tight mt-1">{s.count}</p>
+              }
+            </div>
+            <div
+              className="w-[42px] h-[42px] rounded-xl flex items-center justify-center text-white flex-shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                boxShadow: '0 4px 14px rgb(var(--primary-500) / 0.4)',
+              }}
+            >
+              <s.icon size={18} />
             </div>
           </div>
         ))}
@@ -550,8 +571,8 @@ export default function Devices() {
           {filtered.map(d => <DeviceCard key={d.id} device={d} onDelete={handleDelete} activeDropdown={activeDropdown} setActiveDropdown={setActiveDropdown} />)}
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="flex items-center gap-4 px-5 py-2.5 bg-slate-800/40 border-b border-slate-800">
+        <div className="vision-card overflow-hidden">
+          <div className="flex items-center gap-4 px-5 py-3 bg-slate-800/40 border-b border-slate-700/60">
             <div className="w-9 flex-shrink-0" />
             {['Device', 'Status', 'IP Address', 'Location', 'Protocol', 'Last Seen', ''].map((h, i) => (
               <span key={i} className={`text-[10px] font-black uppercase tracking-widest text-slate-600 ${[,'flex-1 sm:w-48 sm:flex-none','hidden sm:flex flex-1','hidden md:block w-32','hidden lg:block w-28','hidden lg:block w-16','hidden xl:block w-16','w-7 ml-auto'][i+1] || ''}`}>{h}</span>

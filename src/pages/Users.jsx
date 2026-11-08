@@ -375,25 +375,32 @@ export default function Users() {
         </button>
       </div>
 
-      {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ── STAT CARDS (Vision UI Style) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         {[
-          { label: 'Total Users',    count: users.length,  dot: 'rgb(var(--primary-400))', bg: 'rgb(var(--primary-500)/0.08)', border: 'rgb(var(--primary-500)/0.18)' },
-          { label: 'Administrators', count: adminCount,    dot: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)' },
-          { label: 'Standard Users', count: users.length - adminCount, dot: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)' },
-        ].map(s => (
-          <div key={s.label} className="relative rounded-2xl px-4 py-4 overflow-hidden" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-            <div className="absolute right-3 top-3 w-5 h-5 rounded-full opacity-20" style={{ background: s.dot }} />
-            {loading
-              ? <div className="h-8 w-12 bg-slate-800 rounded-lg animate-pulse mb-1.5" />
-              : <p className="text-[26px] font-black text-slate-100 leading-none mb-1.5">{s.count}</p>
-            }
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.dot }} />
-              <p className="text-[12px] font-bold text-slate-400">{s.label}</p>
+          { label: 'Total Users',    count: users.length,  sub: 'Accounts', icon: UsersIcon, subColor: 'text-primary-400' },
+          { label: 'Administrators', count: adminCount,    sub: 'Full Access', icon: Crown, subColor: 'text-rose-400' },
+          { label: 'Standard Users', count: users.length - adminCount, sub: 'Operators', icon: Shield, subColor: 'text-emerald-400' },
+        ].map(s => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="vision-card px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-semibold text-slate-400 mb-1">{s.label}</p>
+                <div className="flex items-baseline gap-2">
+                  {loading
+                    ? <div className="h-7 w-12 bg-slate-800 rounded-lg animate-pulse" />
+                    : <span className="text-[22px] font-extrabold text-slate-100 tracking-tight leading-none">{s.count}</span>
+                  }
+                  <span className={`text-[12px] font-bold ${s.subColor}`}>{s.sub}</span>
+                </div>
+              </div>
+              <div className="vision-icon-box w-11 h-11 rounded-xl">
+                <Icon size={20} strokeWidth={2.2} />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {error && (
@@ -421,13 +428,13 @@ export default function Users() {
       </div>
 
       {/* ── TABLE ── */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800" style={{ contain: 'layout' }}>
+      <div className="vision-card overflow-hidden" style={{ contain: 'layout' }}>
         {/* Table Column Headers */}
-        <div className="hidden sm:grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-5 py-3 border-b border-slate-800/80 bg-slate-900/80">
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">User</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-600 hidden md:block">Email</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">Role</p>
-          <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-600 text-right">Actions</p>
+        <div className="hidden sm:grid grid-cols-[1fr_2fr_auto_auto] gap-4 px-5 py-3.5 border-b border-slate-800/80">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">User</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 hidden md:block">Email</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400">Role</p>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-slate-400 text-right">Actions</p>
         </div>
 
         {loading ? (

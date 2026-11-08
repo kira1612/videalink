@@ -1,12 +1,15 @@
 const mqtt = require('mqtt');
 const axios = require('axios');
 
-// Connect to Mosquitto Broker
-const brokerUrl = 'mqtt://test.mosquitto.org:1883';
-const client = mqtt.connect(brokerUrl);
+// Configuration via environment or defaults
+const brokerUrl = process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org:1883';
+const client = mqtt.connect(brokerUrl, {
+    reconnectPeriod: 3000,
+    connectTimeout: 10000,
+});
 
 // Laravel Backend API URLs
-const apiBaseUrl = 'http://127.0.0.1:8000/api/v1';
+const apiBaseUrl = process.env.API_BASE_URL || 'http://127.0.0.1/videalink/backend/public/api/v1';
 const mqttMapUrl = `${apiBaseUrl}/buckets/mqtt-map`;
 
 let topicMap = {}; // Maps topic to bucketId
@@ -86,15 +89,15 @@ client.on('message', async (topic, message) => {
 
     console.log(`[Listener] [Bucket ${bucketId}] Received telemetry on '${topic}':`, payload);
 
-    // Forward to Laravel API
+    // Forward to Laravel API Telemetry Ingestion endpoint
     try {
-        const response = await axios.post(`${apiBaseUrl}/buckets/${bucketId}/records`, payload, {
+        const response = await axios.post(`${apiBaseUrl}/buckets/${bucketId}/telemetry`, payload, {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             }
         });
-        console.log(`[Listener] [Bucket ${bucketId}] Forwarded to API successfully.`);
+        console.log(`[Listener] [Bucket ${bucketId}] Telemetry recorded successfully:`, response.data.recorded_at || 'OK');
     } catch (error) {
         if (error.response) {
             console.error(`[Listener] [Bucket ${bucketId}] API Error (${error.response.status}):`, error.response.data);

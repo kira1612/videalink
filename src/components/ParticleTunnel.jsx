@@ -1,10 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function ParticleTunnel({ color, onCycleTheme }) {
+export default function ParticleTunnel({ color, onCycleTheme, isWarping = false, warpIntensity = 1 }) {
   const canvasRef = useRef(null);
   const colorRef = useRef(color || '#06b6d4');
   const onCycleThemeRef = useRef(onCycleTheme);
+  const isWarpingRef = useRef(isWarping);
+  const warpIntensityRef = useRef(warpIntensity);
   const updateParticlesColorRef = useRef(null);
+
+  useEffect(() => {
+    isWarpingRef.current = isWarping;
+  }, [isWarping]);
+
+  useEffect(() => {
+    warpIntensityRef.current = warpIntensity;
+  }, [warpIntensity]);
 
   useEffect(() => {
     onCycleThemeRef.current = onCycleTheme;
@@ -88,6 +98,7 @@ export default function ParticleTunnel({ color, onCycleTheme }) {
     let idleTimer = null;
 
     function onInteract() {
+      if (isWarpingRef.current) return;
       targetSpeed = FAST_SPEED;
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => { targetSpeed = SLOW_SPEED; }, 1000);
@@ -167,29 +178,32 @@ export default function ParticleTunnel({ color, onCycleTheme }) {
       const dt = Math.min((ts - lastTs) / 1000, 0.05);
       lastTs = ts;
 
-      currentSpeed += (targetSpeed - currentSpeed) * Math.min(1, dt * 1.5);
-      const speed = reduceMotion ? SLOW_SPEED * 0.2 : currentSpeed;
+      if (isWarpingRef.current) {
+        targetSpeed = Math.min(480, 260 * (warpIntensityRef.current || 1));
+      } else if (targetSpeed > FAST_SPEED) {
+        targetSpeed = SLOW_SPEED;
+      }
+
+      currentSpeed += (targetSpeed - currentSpeed) * Math.min(1, dt * (isWarpingRef.current ? 3.0 : 1.5));
+      const speed = reduceMotion ? (isWarpingRef.current ? SLOW_SPEED * 1.5 : SLOW_SPEED * 0.2) : currentSpeed;
+      const warpFactor = Math.min(1, Math.max(0, (currentSpeed - SLOW_SPEED) / 120));
 
       // Solid black background
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, w, h);
 
-      // Fast Ambient Glow Effect (Efek Cahaya)
+      // Fast Ambient Glow Effect (Efek Cahaya) with dynamic warp bloom
       const currentColor = PALETTE[0];
       const r = parseInt(currentColor.slice(1, 3), 16);
       const g = parseInt(currentColor.slice(3, 5), 16);
       const b = parseInt(currentColor.slice(5, 7), 16);
-      const glow = ctx.createRadialGradient(cx, cy, INNER_RADIUS * 0.5, cx, cy, INNER_RADIUS * 2.5);
-      glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.15)`);
+      const glowScale = 1 + warpFactor * 1.4;
+      const glow = ctx.createRadialGradient(cx, cy, INNER_RADIUS * 0.5, cx, cy, INNER_RADIUS * 2.5 * glowScale);
+      glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.15 + warpFactor * 0.35})`);
+      glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${0.08 * warpFactor})`);
       glow.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, w, h);
-
-      // Add a slow, elegant rotation to the entire nebula
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(ts * 0.00005);
-      ctx.translate(-cx, -cy);
 
       for (const p of particles) {
         p.z -= speed * dt;
@@ -213,9 +227,21 @@ export default function ParticleTunnel({ color, onCycleTheme }) {
         // Combine base particle alpha with Z depth alpha
         const finalAlpha = Math.max(0, Math.min(1, p.alpha * zAlpha));
 
+        // When warping, render hyperspace motion streaks / light trails connecting previous and current points
+        if (warpFactor > 0.05 && !reduceMotion) {
+          const prevZ = Math.min(MAX_Z, p.z + speed * dt * 2.2);
+          const prev = project(p.ox, p.oy, prevZ);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = Math.max(1, size * 0.8);
+          ctx.globalAlpha = Math.min(1, finalAlpha * (0.4 + warpFactor * 0.6));
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(cur.x, cur.y);
+          ctx.stroke();
+        }
+
         // If the particle is large enough, render it as a true 3D isometric cube.
-        // Raised the threshold to 4.5 to minimize expensive 3D draws and ensure smooth FPS.
-        if (size > 4.5) {
+        if (size > 4.5 && warpFactor < 0.6) {
           drawCube(ctx, cur.x, cur.y, size, p.color, finalAlpha);
         } else {
           ctx.fillStyle = p.color;
@@ -224,10 +250,20 @@ export default function ParticleTunnel({ color, onCycleTheme }) {
         }
       }
 
-      ctx.restore();
-
       animationFrameId = requestAnimationFrame(frame);
     }
+
+    // Pause animation loop when scrolled out of view to save battery/GPU
+    let isVisibleOnScreen = true;
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisibleOnScreen = entry.isIntersecting;
+      if (isVisibleOnScreen && !animationFrameId) {
+        lastTs = 0;
+        animationFrameId = requestAnimationFrame(frame);
+      }
+    }, { threshold: 0.05 });
+
+    observer.observe(canvas);
 
     window.addEventListener('resize', resize);
     window.addEventListener('mousemove', onInteract);
@@ -238,6 +274,7 @@ export default function ParticleTunnel({ color, onCycleTheme }) {
     animationFrameId = requestAnimationFrame(frame);
 
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onInteract);
       window.removeEventListener('touchstart', onInteract);

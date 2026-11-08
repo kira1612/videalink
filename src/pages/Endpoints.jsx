@@ -62,60 +62,113 @@ export default function Endpoints() {
     }
   };
 
+  const activeCount = endpoints.filter(e => e.enabled).length;
+  const totalTriggers = endpoints.reduce((acc, e) => acc + (e.trigger_count || 0), 0);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100">Endpoints</h2>
-          <p className="text-slate-400 text-sm mt-1">Configure actions and webhooks to trigger external services</p>
+          <h2 className="text-[22px] font-black text-slate-100 tracking-tight">Endpoints & Webhooks</h2>
+          <p className="text-slate-400 text-[13px] mt-0.5">Configure actions and webhooks to trigger external services</p>
         </div>
         <button className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
           <Plus size={16} /> Create Endpoint
         </button>
       </div>
 
+      {/* Vision UI Stat Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="vision-card px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[12px] font-semibold text-slate-400 mb-1">Total Endpoints</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[22px] font-extrabold text-slate-100 tracking-tight leading-none">{endpoints.length}</span>
+              <span className="text-[12px] font-bold text-primary-400">Configured</span>
+            </div>
+          </div>
+          <div className="vision-icon-box w-11 h-11 rounded-xl">
+            <Webhook size={20} strokeWidth={2.2} />
+          </div>
+        </div>
+
+        <div className="vision-card px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[12px] font-semibold text-slate-400 mb-1">Active Hooks</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[22px] font-extrabold text-slate-100 tracking-tight leading-none">{activeCount}</span>
+              <span className="text-[12px] font-bold text-emerald-400">Listening</span>
+            </div>
+          </div>
+          <div className="vision-icon-box w-11 h-11 rounded-xl">
+            <Globe size={20} strokeWidth={2.2} />
+          </div>
+        </div>
+
+        <div className="vision-card px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[12px] font-semibold text-slate-400 mb-1">Total Triggers</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[22px] font-extrabold text-slate-100 tracking-tight leading-none">{totalTriggers.toLocaleString()}</span>
+              <span className="text-[12px] font-bold text-amber-400">Events</span>
+            </div>
+          </div>
+          <div className="vision-icon-box w-11 h-11 rounded-xl">
+            <Hash size={20} strokeWidth={2.2} />
+          </div>
+        </div>
+      </div>
+
       {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="h-40 glass-card animate-pulse" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {[1,2,3,4].map(i => <div key={i} className="h-44 vision-card animate-pulse" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {endpoints.map(endpoint => {
             const Icon = typeIcons[endpoint.type] || Webhook;
             return (
-              <div key={endpoint.id} className={`glass-card p-5 transition-all duration-300 ${!endpoint.enabled ? 'opacity-75 grayscale-[0.3]' : 'hover:border-slate-600/50'}`}>
+              <div key={endpoint.id} className={`vision-card p-6 transition-all duration-300 ${!endpoint.enabled ? 'opacity-75' : 'hover:-translate-y-0.5'}`}>
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 ${endpoint.enabled ? 'bg-gradient-to-br from-amber-500/20 to-orange-600/20 border-amber-500/30' : 'bg-slate-800 border-slate-700'}`}>
-                      <Icon size={24} className={endpoint.enabled ? 'text-amber-400' : 'text-slate-500'} />
+                    <div className={endpoint.enabled ? 'vision-icon-box w-12 h-12 rounded-2xl flex-shrink-0' : 'vision-inner-box w-12 h-12 rounded-2xl flex items-center justify-center text-slate-500 flex-shrink-0'}>
+                      <Icon size={22} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-slate-200">{endpoint.name}</h3>
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-[16px] font-bold text-slate-100">{endpoint.name}</h3>
                         <StatusBadge status={endpoint.enabled ? 'online' : 'offline'} />
                       </div>
-                      <p className="text-sm text-slate-400 mt-1">{endpoint.description}</p>
+                      <p className="text-[12px] text-slate-400 mt-1">{endpoint.description}</p>
                     </div>
                   </div>
                   
                   <div className="flex flex-col gap-2 items-end">
-                    <button onClick={() => handleToggle(endpoint)} className={`transition-colors ${endpoint.enabled ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-400'}`}>
+                    <button onClick={() => handleToggle(endpoint)} className={`transition-colors ${endpoint.enabled ? 'text-primary-400' : 'text-slate-500 hover:text-slate-400'}`}>
                       {endpoint.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                     </button>
-                    <button onClick={() => handleTrigger(endpoint)} disabled={!endpoint.enabled} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${endpoint.enabled ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20' : 'bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed'}`}>
-                      <Play size={10} className={endpoint.enabled ? 'fill-amber-400' : 'fill-slate-600'} /> Test Run
+                    <button
+                      onClick={() => handleTrigger(endpoint)}
+                      disabled={!endpoint.enabled}
+                      className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-xl transition-all ${
+                        endpoint.enabled
+                          ? 'bg-primary-500/15 text-primary-400 border border-primary-500/30 hover:bg-primary-500 hover:text-white'
+                          : 'vision-inner-box text-slate-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <Play size={10} className="fill-current" /> Test Run
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/50 mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                <div className="vision-inner-box p-3.5 rounded-2xl mb-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-primary-500/15 text-primary-400 border border-primary-500/25">
                       {endpoint.type}
                     </span>
-                    <span className="text-xs text-slate-500">Source: <span className="text-primary-400">{endpoint.device}</span></span>
+                    <span className="text-xs text-slate-400">Source: <span className="text-slate-200 font-semibold">{endpoint.device}</span></span>
                   </div>
-                  <div className="text-xs font-mono text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <div className="text-xs font-mono text-slate-300 overflow-hidden text-ellipsis whitespace-nowrap">
                     {endpoint.type === 'EMAIL' && `To: ${endpoint.config?.email}`}
                     {endpoint.type === 'HTTP' && `${endpoint.config?.method} ${endpoint.config?.url}`}
                     {endpoint.type === 'SLACK' && `Channel: ${endpoint.config?.channel}`}
@@ -123,9 +176,9 @@ export default function Endpoints() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 text-xs text-slate-500 border-t border-slate-800/50 pt-3">
-                  <span className="flex items-center gap-1.5"><Hash size={14} className="text-slate-400"/> {endpoint.trigger_count?.toLocaleString() || 0} triggers</span>
-                  <span className="flex items-center gap-1.5"><Clock size={14} className="text-slate-400"/> Last: {formatDate(endpoint.last_triggered)}</span>
+                <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/60 pt-3">
+                  <span className="flex items-center gap-1.5 font-semibold"><Hash size={14} className="text-primary-400"/> {endpoint.trigger_count?.toLocaleString() || 0} triggers</span>
+                  <span className="flex items-center gap-1.5"><Clock size={14} className="text-slate-500"/> Last: {formatDate(endpoint.last_triggered)}</span>
                 </div>
               </div>
             );

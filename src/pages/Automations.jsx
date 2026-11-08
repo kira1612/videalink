@@ -128,11 +128,11 @@ export default function Automations() {
   const renderConditionText = (cond) => {
     if (!cond) return 'Kondisi tidak valid';
     if (cond.type === 'time') {
-      return <span>Waktu menunjukkan pukul <strong className="text-white">{cond.value}</strong></span>;
+      return <span>Waktu menunjukkan pukul <strong className="text-slate-100">{cond.value}</strong></span>;
     }
     if (cond.type === 'sensor') {
       const dev = devices.find(d => d.id == cond.device_id);
-      return <span>Data <strong className="text-white">{dev ? dev.name : `Device #${cond.device_id}`}</strong> adalah <strong className="text-white">{cond.operator} {cond.value}</strong></span>;
+      return <span>Data <strong className="text-slate-100">{dev ? dev.name : `Device #${cond.device_id}`}</strong> adalah <strong className="text-slate-100">{cond.operator} {cond.value}</strong></span>;
     }
     return 'Kondisi tidak diketahui';
   };
@@ -142,81 +142,91 @@ export default function Automations() {
     if (!act) return 'Aksi tidak valid';
     const dev = devices.find(d => d.id == act.device_id);
     const cmd = act.command === 'turn_on' ? 'Nyalakan' : 'Matikan';
-    return <span><strong className="text-white">{cmd}</strong> {dev ? dev.name : `Device #${act.device_id}`}</span>;
+    return <span><strong className="text-slate-100">{cmd}</strong> {dev ? dev.name : `Device #${act.device_id}`}</span>;
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-            <Zap className="text-amber-400" /> Skenario Cerdas
+          <h1 className="text-[22px] font-black text-slate-100 flex items-center gap-2.5 tracking-tight">
+            <Zap className="text-primary-400" size={22} /> Skenario Cerdas (Automations)
           </h1>
-          <p className="text-slate-400 text-sm mt-1">Otomatisasi rutinitas perangkat rumah Anda.</p>
+          <p className="text-slate-400 text-[13px] mt-0.5">Otomatisasi rutinitas perangkat IoT rumah Anda secara mandiri.</p>
         </div>
         <button 
           onClick={() => openModal()}
-          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-lg font-bold transition-colors shadow-lg shadow-amber-500/20"
+          className="btn-primary flex items-center gap-2 text-xs self-start"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           <span>Buat Skenario</span>
         </button>
       </div>
 
       {loading ? (
-        <div className="text-center text-slate-500 py-10">Memuat data...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[1, 2].map(i => <div key={i} className="vision-card h-56 animate-pulse" />)}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {automations.map(auto => (
-            <div key={auto.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden group">
+            <div key={auto.id} className="vision-card p-6 relative overflow-hidden group">
               {/* Dekorasi Glow */}
-              <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-20 pointer-events-none transition-all ${auto.is_active ? 'bg-amber-500' : 'bg-slate-600'}`} />
+              <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-20 pointer-events-none transition-all ${auto.is_active ? 'bg-primary-500' : 'bg-slate-600'}`} />
               
-              <div className="relative z-10 flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
+              <div className="relative z-10 flex justify-between items-start mb-5">
+                <div className="flex items-center gap-3.5">
                   <button 
                     onClick={() => toggleStatus(auto)}
-                    className={`w-12 h-8 rounded-full flex items-center px-1 transition-colors ${auto.is_active ? 'bg-amber-500' : 'bg-slate-700'}`}
+                    className={`w-12 h-7 rounded-full flex items-center px-1 transition-all ${auto.is_active ? 'bg-primary-500 shadow-[0_0_14px_rgb(var(--primary-500)/0.45)]' : 'bg-slate-700'}`}
                   >
-                    <div className={`w-6 h-6 rounded-full bg-white transition-transform ${auto.is_active ? 'translate-x-4 shadow-sm' : ''}`} />
+                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${auto.is_active ? 'translate-x-5 shadow-sm' : ''}`} />
                   </button>
                   <div>
-                    <h3 className="font-bold text-slate-100 text-lg leading-tight">{auto.name}</h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{auto.is_active ? 'Skenario Aktif' : 'Sedang Dijeda'}</p>
+                    <h3 className="font-bold text-slate-100 text-[16px] leading-tight">{auto.name}</h3>
+                    <p className={`text-[11px] font-bold mt-0.5 ${auto.is_active ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      {auto.is_active ? '● Skenario Aktif' : '○ Sedang Dijeda'}
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => openModal(auto)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"><Edit2 size={14} /></button>
-                  <button onClick={() => handleDelete(auto.id)} className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                <div className="flex gap-1.5">
+                  <button onClick={() => openModal(auto)} className="p-2 vision-inner-box text-slate-400 hover:text-primary-400 rounded-xl transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => handleDelete(auto.id)} className="p-2 vision-inner-box text-slate-400 hover:text-rose-400 rounded-xl transition-colors"><Trash2 size={14} /></button>
                 </div>
               </div>
               
               <div className="relative z-10 flex flex-col gap-2">
                 {/* Blok JIKA */}
-                <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-                    {auto.condition?.type === 'time' ? <Clock size={16} className="text-indigo-400" /> : <Activity size={16} className="text-indigo-400" />}
+                <div className="vision-inner-box rounded-2xl p-4 flex items-center gap-3.5">
+                  <div className="vision-icon-box w-9 h-9 rounded-xl flex-shrink-0">
+                    {auto.condition?.type === 'time' ? <Clock size={16} /> : <Activity size={16} />}
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">JIKA (Trigger)</p>
+                    <p className="text-[10px] font-extrabold text-primary-400 uppercase tracking-wider mb-0.5">JIKA (Trigger)</p>
                     <p className="text-[13px] text-slate-300">{renderConditionText(auto.condition)}</p>
                   </div>
                 </div>
                 
                 {/* Garis Panah */}
-                <div className="flex justify-center -my-2 relative z-20">
-                  <div className="w-8 h-8 bg-slate-800 border-4 border-slate-900 rounded-full flex items-center justify-center">
-                    <ArrowRight size={14} className="text-slate-400 rotate-90" />
+                <div className="flex justify-center -my-2.5 relative z-20">
+                  <div className="w-7 h-7 bg-slate-800 border-2 border-slate-700 rounded-full flex items-center justify-center shadow-md">
+                    <ArrowRight size={13} className="text-primary-400 rotate-90" />
                   </div>
                 </div>
 
                 {/* Blok MAKA */}
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <Play size={16} className="text-amber-500 ml-0.5" />
+                <div className="vision-inner-box rounded-2xl p-4 flex items-center gap-3.5 border border-emerald-500/20">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
+                    }}
+                  >
+                    <Play size={15} className="ml-0.5 fill-current" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider mb-0.5">MAKA (Action)</p>
+                    <p className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider mb-0.5">MAKA (Action)</p>
                     <p className="text-[13px] text-slate-300">{renderActionText(auto.action)}</p>
                   </div>
                 </div>
@@ -225,13 +235,13 @@ export default function Automations() {
           ))}
           
           {automations.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-24 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-                <Zap size={28} className="text-amber-500" />
+            <div className="col-span-full flex flex-col items-center justify-center py-20 vision-card">
+              <div className="vision-icon-box w-14 h-14 rounded-2xl mb-4">
+                <Zap size={26} />
               </div>
-              <p className="text-slate-200 font-bold mb-1">Belum ada skenario pintar.</p>
-              <p className="text-slate-500 text-sm max-w-sm text-center">Buat rumah Anda hidup secara mandiri. Tambahkan skenario untuk mengotomatisasi lampu, AC, dan perangkat lainnya.</p>
-              <button onClick={() => openModal()} className="mt-6 text-sm bg-amber-500 text-slate-900 px-5 py-2.5 font-bold rounded-lg hover:bg-amber-400 transition-colors">
+              <p className="text-slate-100 font-bold mb-1">Belum ada skenario pintar.</p>
+              <p className="text-slate-400 text-sm max-w-sm text-center">Buat rumah Anda hidup secara mandiri. Tambahkan skenario untuk mengotomatisasi lampu, AC, dan perangkat lainnya.</p>
+              <button onClick={() => openModal()} className="mt-6 btn-primary text-xs">
                 Buat Skenario Pertama
               </button>
             </div>

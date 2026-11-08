@@ -5,7 +5,7 @@ const args = process.argv.slice(2);
 const topic = args.length > 0 ? args[0] : 'viki/home/sensor/temp';
 
 // Connect to Mosquitto Broker
-const brokerUrl = 'mqtt://test.mosquitto.org:1883';
+const brokerUrl = process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org:1883';
 const client = mqtt.connect(brokerUrl);
 
 console.log(`[Dummy Device] Connecting to broker at ${brokerUrl}...`);

@@ -21,6 +21,25 @@ class Device extends Model
         'last_seen_at' => 'datetime',
     ];
 
+    /**
+     * Heartbeat Timeout (Default: 60 detik).
+     * Jika perangkat tidak mengirim telemetri/ping lebih dari 60 detik,
+     * statusnya otomatis dianggap offline.
+     */
+    public function getStatusAttribute($value)
+    {
+        if (!$this->last_seen_at) {
+            return 'offline';
+        }
+
+        // Heartbeat timeout threshold: 60 seconds
+        if ($this->last_seen_at->diffInSeconds(now()) > 60) {
+            return 'offline';
+        }
+
+        return $value ?? 'online';
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

@@ -14,6 +14,7 @@ import LandingPage from './pages/LandingPage';
 import Rooms from './pages/Rooms';
 import Automations from './pages/Automations';
 import FloorPlan from './pages/FloorPlan';
+import Guide from './pages/Guide';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('iot_token');
@@ -81,12 +82,39 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+export function applyCustomPrimaryHex(hex) {
+  const root = document.documentElement;
+  if (!hex || !/^#?[0-9A-Fa-f]{6}$/.test(hex)) {
+    ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'].forEach(k => {
+      root.style.removeProperty(`--primary-${k}`);
+    });
+    return;
+  }
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const mix = (c, target, w) => Math.round(c + (target - c) * w);
+
+  root.style.setProperty('--primary-50', `${mix(r, 255, 0.9)} ${mix(g, 255, 0.9)} ${mix(b, 255, 0.9)}`);
+  root.style.setProperty('--primary-100', `${mix(r, 255, 0.8)} ${mix(g, 255, 0.8)} ${mix(b, 255, 0.8)}`);
+  root.style.setProperty('--primary-200', `${mix(r, 255, 0.6)} ${mix(g, 255, 0.6)} ${mix(b, 255, 0.6)}`);
+  root.style.setProperty('--primary-300', `${mix(r, 255, 0.4)} ${mix(g, 255, 0.4)} ${mix(b, 255, 0.4)}`);
+  root.style.setProperty('--primary-400', `${mix(r, 255, 0.2)} ${mix(g, 255, 0.2)} ${mix(b, 255, 0.2)}`);
+  root.style.setProperty('--primary-500', `${r} ${g} ${b}`);
+  root.style.setProperty('--primary-600', `${mix(r, 0, 0.16)} ${mix(g, 0, 0.16)} ${mix(b, 0, 0.16)}`);
+  root.style.setProperty('--primary-700', `${mix(r, 0, 0.32)} ${mix(g, 0, 0.32)} ${mix(b, 0, 0.32)}`);
+  root.style.setProperty('--primary-800', `${mix(r, 0, 0.48)} ${mix(g, 0, 0.48)} ${mix(b, 0, 0.48)}`);
+  root.style.setProperty('--primary-900', `${mix(r, 0, 0.62)} ${mix(g, 0, 0.62)} ${mix(b, 0, 0.62)}`);
+}
+
 export default function App() {
   useEffect(() => {
     const applyTheme = () => {
       const userStr = localStorage.getItem('iot_user');
       let savedTheme = localStorage.getItem('iot_theme');
       let savedMode = localStorage.getItem('iot_mode');
+      const customHex = localStorage.getItem('iot_custom_primary');
 
       if (userStr) {
         try {
@@ -96,11 +124,13 @@ export default function App() {
         } catch (e) {}
       }
 
-      if (savedTheme && savedTheme !== 'cyan') {
+      if (savedTheme && savedTheme !== 'blue') {
         document.documentElement.setAttribute('data-theme', savedTheme);
       } else {
         document.documentElement.removeAttribute('data-theme');
       }
+
+      applyCustomPrimaryHex(customHex);
       
       if (savedMode && savedMode === 'light') {
         document.documentElement.setAttribute('data-mode', 'light');
@@ -111,7 +141,11 @@ export default function App() {
 
     applyTheme();
     window.addEventListener('user-updated', applyTheme);
-    return () => window.removeEventListener('user-updated', applyTheme);
+    window.addEventListener('theme-updated', applyTheme);
+    return () => {
+      window.removeEventListener('user-updated', applyTheme);
+      window.removeEventListener('theme-updated', applyTheme);
+    };
   }, []);
 
   return (
@@ -132,6 +166,7 @@ export default function App() {
           <Route path="floorplan" element={<FloorPlan />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="guide" element={<Guide />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

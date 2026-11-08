@@ -1,6 +1,6 @@
 <?php
 
-$ch = curl_init('http://127.0.0.1:8080/api/v1/auth/login');
+$ch = curl_init('http://127.0.0.1/videalink/backend/public/api/v1/auth/login');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([

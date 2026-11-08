@@ -127,44 +127,46 @@ export default function Rooms() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-            <Home className="text-primary-400" /> Manajemen Ruangan
+          <h1 className="text-[22px] font-black text-slate-100 flex items-center gap-2.5 tracking-tight">
+            <Home className="text-primary-400" size={22} /> Manajemen Ruangan
           </h1>
-          <p className="text-slate-400 text-sm mt-1">Kelola daftar ruangan dan rancang tata letak 3D rumah Anda.</p>
+          <p className="text-slate-400 text-[13px] mt-0.5">Kelola daftar ruangan dan rancang tata letak 3D rumah Anda.</p>
         </div>
         
-        <div className="flex bg-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-1 shadow-inner">
+        <div className="vision-inner-box flex rounded-2xl p-1">
           <button 
             onClick={() => { setActiveTab('list'); fetchRooms(); }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'list' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'list' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' : 'text-slate-400 hover:text-slate-200'}`}
           >
-            <LayoutGrid size={16} /> Data Ruangan
+            <LayoutGrid size={15} /> Data Ruangan
           </button>
           <button 
             onClick={() => setActiveTab('3d')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === '3d' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === '3d' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' : 'text-slate-400 hover:text-slate-200'}`}
           >
-            <Box size={16} /> 3D Floor Plan
+            <Box size={15} /> 3D Floor Plan
           </button>
         </div>
       </div>
 
       {activeTab === '3d' ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative" style={{ height: 'calc(100vh - 180px)' }}>
+        <div className="vision-card overflow-hidden relative" style={{ height: 'calc(100vh - 180px)' }}>
           {selectedRoomId ? (
             <div className="absolute inset-0 overflow-y-auto">
               <FloorPlan hideHeader={true} roomId={selectedRoomId} roomName={rooms.find(r => r.id === selectedRoomId)?.name} key={selectedRoomId} />
             </div>
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
-              <Box size={48} className="mb-4 text-slate-700" />
-              <p>Silakan pilih ruangan dari tab <strong>Data Ruangan</strong> terlebih dahulu.</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+              <div className="vision-icon-box w-14 h-14 rounded-2xl mb-4">
+                <Box size={28} />
+              </div>
+              <p className="text-sm">Silakan pilih ruangan dari tab <strong className="text-slate-100">Data Ruangan</strong> terlebih dahulu.</p>
               <button 
                 onClick={() => setActiveTab('list')}
-                className="mt-4 bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg transition-colors"
+                className="mt-4 btn-primary text-xs"
               >
                 Kembali ke Data Ruangan
               </button>
@@ -173,56 +175,46 @@ export default function Rooms() {
         </div>
       ) : (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end">
             <button 
               onClick={() => handleOpenModal()}
-              className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-primary-500/20"
+              className="btn-primary flex items-center gap-2 text-xs"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               <span>Tambah Ruangan</span>
             </button>
           </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="bg-slate-900 border border-slate-800 rounded-xl p-5 animate-pulse">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3 w-full">
-                  <div className="w-12 h-12 rounded-lg bg-slate-800/50"></div>
-                  <div className="flex-1 space-y-3">
-                    <div className="h-5 bg-slate-800/50 rounded-md w-1/2"></div>
-                    <div className="h-4 bg-slate-800/50 rounded-md w-3/4"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div key={n} className="vision-card p-6 animate-pulse h-32" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {rooms.map(room => (
-            <div key={room.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-primary-500/50 transition-colors">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-primary-500/10 text-primary-400 flex items-center justify-center">
-                    <Home size={24} />
+            <div key={room.id} className="vision-card p-6 hover:-translate-y-0.5 transition-all duration-300">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="vision-icon-box w-12 h-12 rounded-2xl flex-shrink-0">
+                    <Home size={22} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-100 text-lg">{room.name}</h3>
-                    <p className="text-sm text-slate-400">{room.devices_count} Perangkat terhubung</p>
+                    <h3 className="font-bold text-slate-100 text-[16px]">{room.name}</h3>
+                    <p className="text-xs font-medium text-slate-400 mt-0.5">{room.devices_count} Perangkat terhubung</p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
                   <button 
                     onClick={() => { setSelectedRoomId(room.id); setActiveTab('3d'); }} 
-                    className="flex items-center justify-center gap-2 bg-primary-500/10 text-primary-400 hover:bg-primary-500 hover:text-slate-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                    className="flex items-center justify-center gap-1.5 bg-primary-500/15 text-primary-400 border border-primary-500/30 hover:bg-primary-500 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
                   >
-                    <Box size={14} /> Desain 3D
+                    <Box size={13} /> Desain 3D
                   </button>
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => handleOpenModal(room)} className="p-2 bg-slate-800 text-slate-400 hover:text-primary-400 rounded-lg transition-colors"><Edit2 size={14} /></button>
-                    <button onClick={() => handleDelete(room.id)} className="p-2 bg-slate-800 text-slate-400 hover:text-rose-400 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                  <div className="flex gap-1.5 justify-end">
+                    <button onClick={() => handleOpenModal(room)} className="p-2 vision-inner-box text-slate-400 hover:text-primary-400 rounded-xl transition-colors"><Edit2 size={13} /></button>
+                    <button onClick={() => handleDelete(room.id)} className="p-2 vision-inner-box text-slate-400 hover:text-rose-400 rounded-xl transition-colors"><Trash2 size={13} /></button>
                   </div>
                 </div>
               </div>
@@ -230,9 +222,11 @@ export default function Rooms() {
           ))}
           
           {rooms.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-20 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
-              <Home size={48} className="text-slate-700 mb-4" />
-              <p className="text-slate-400">Belum ada ruangan yang dibuat.</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-20 vision-card">
+              <div className="vision-icon-box w-14 h-14 rounded-2xl mb-4">
+                <Home size={28} />
+              </div>
+              <p className="text-slate-300 font-bold">Belum ada ruangan yang dibuat.</p>
             </div>
           )}
         </div>

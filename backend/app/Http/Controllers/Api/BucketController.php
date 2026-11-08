@@ -113,32 +113,21 @@ class BucketController extends Controller
 
         try {
             $validated = $request->validate([
-            'widgets'           => 'nullable|array',
-            'widgets.*.id'      => 'required|string',
-            'widgets.*.type'    => 'required|string',
-            'widgets.*.field'   => 'required|string',
-            'widgets.*.title'   => 'nullable|string',
-            'widgets.*.w'       => 'nullable|string',
-            'widgets.*.h'       => 'nullable|string',
-            'widgets.*.unit'    => 'nullable|string',
-            'widgets.*.config'  => 'nullable|array',
-            'widgets.*.config.min' => 'nullable',
-            'widgets.*.config.max' => 'nullable',
-            'widgets.*.config.onLabel' => 'nullable|string',
-            'widgets.*.config.offLabel' => 'nullable|string',
-            'widgets.*.config.topic' => 'nullable|string',
-            'widgets.*.config.color' => 'nullable|string',
-        ]);
+                'widgets'               => 'nullable|array',
+                'widgets.*.id'          => 'required|string',
+                'widgets.*.type'        => 'required|string',
+                'widgets.*.field'       => 'nullable|string',
+                'widgets.*.title'       => 'nullable|string',
+                'widgets.*.w'           => 'nullable|string',
+                'widgets.*.h'           => 'nullable|string',
+                'widgets.*.unit'        => 'nullable|string',
+                'widgets.*.containerId' => 'nullable|string',
+                'widgets.*.config'      => 'nullable|array',
+            ]);
 
-        // In Laravel, if we just use $validated['widgets'], it might still strip nested keys if not fully specified.
-        // But since we specified them above, it should keep them. However, to be absolutely safe and allow
-        // any config to be saved (since widgets are dynamic), we can just take the raw widgets array
-        // but ensure it passes the structural validation above.
-        
-        $widgetsToSave = $request->input('widgets', []);
-
-        $bucket->update(['widgets' => $widgetsToSave]);
-        return response()->json($bucket);
+            $widgetsToSave = $request->input('widgets', []);
+            $bucket->update(['widgets' => $widgetsToSave]);
+            return response()->json($bucket);
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Widget Validation Failed:', $e->errors());
             throw $e;
@@ -202,16 +191,122 @@ class BucketController extends Controller
 
     public function mqttMap()
     {
-        $buckets = DataBucket::whereNotNull('mqtt_topic')->where('enabled', true)->get();
-
         $map = [];
+        $registeredTopics = [];
+
+        // 1. Ambil dari Data Bucket yang sudah memiliki mqtt_topic
+        $buckets = DataBucket::whereNotNull('mqtt_topic')
+            ->where('mqtt_topic', '!=', '')
+            ->where('enabled', true)
+            ->get();
+
         foreach ($buckets as $bucket) {
-            $map[] = [
-                'id'    => $bucket->id,
-                'topic' => $bucket->mqtt_topic,
-            ];
+            $topic = trim($bucket->mqtt_topic);
+            if ($topic !== '') {
+                $map[] = [
+                    'id'    => $bucket->id,
+                    'topic' => $topic,
+                ];
+                $registeredTopics[$topic] = true;
+            }
+        }
+
+        // 2. Ambil dari Device bertipe MQTT yang memiliki broker_config['topic']
+        $mqttDevices = Device::where('protocol', 'mqtt')->get();
+        foreach ($mqttDevices as $device) {
+            $configTopic = trim($device->broker_config['topic'] ?? '');
+            if ($configTopic === '') {
+                $configTopic = 'videalink/devices/' . \Illuminate\Support\Str::slug($device->name);
+            }
+
+            if (!isset($registeredTopics[$configTopic])) {
+                // Cari atau buatkan bucket otomatis untuk device ini
+                $autoBucket = DataBucket::firstOrCreate(
+                    ['device_id' => $device->id],
+                    [
+                        'name'        => "{$device->name} Telemetry Stream",
+                        'description' => "Auto-linked bucket for {$device->name}",
+                        'enabled'     => true,
+                        'mqtt_topic'  => $configTopic,
+                        'fields'      => ['temperature', 'humidity', 'rssi'],
+                    ]
+                );
+
+                if (!$autoBucket->mqtt_topic) {
+                    $autoBucket->update(['mqtt_topic' => $configTopic]);
+                }
+
+                $map[] = [
+                    'id'    => $autoBucket->id,
+                    'topic' => $configTopic,
+                ];
+                $registeredTopics[$configTopic] = true;
+            }
         }
 
         return response()->json($map);
+    }
+
+    /**
+     * Ingest MQTT telemetry forwarded by the internal MQTT listener/daemon.
+     */
+    public function ingestMqttTelemetry(Request $request, DataBucket $bucket)
+    {
+        if (!$bucket->enabled) {
+            return response()->json(['message' => 'Bucket is disabled'], 403);
+        }
+
+        // Support both { payload: { ... }, timestamp?: int } AND direct flat sensor json { temperature: 25.5, ... }
+        $raw = $request->all();
+        $payload = [];
+        $timestamp = null;
+
+        if (isset($raw['payload']) && is_array($raw['payload'])) {
+            $payload = $raw['payload'];
+            $timestamp = $raw['timestamp'] ?? null;
+        } else {
+            $payload = $raw;
+            if (isset($payload['timestamp'])) {
+                $timestamp = $payload['timestamp'];
+                unset($payload['timestamp']);
+            }
+        }
+
+        if (empty($payload)) {
+            return response()->json(['message' => 'Payload cannot be empty'], 422);
+        }
+
+        $recordedAt = (isset($timestamp) && is_numeric($timestamp))
+            ? \Carbon\Carbon::createFromTimestamp($timestamp)
+            : now();
+
+        // Auto-Discovery: Gabungkan field baru ke dalam bucket->fields
+        $existingFields = is_array($bucket->fields) ? $bucket->fields : [];
+        $newFields = array_keys($payload);
+        $mergedFields = array_values(array_unique(array_merge($existingFields, $newFields)));
+
+        if ($mergedFields !== $existingFields) {
+            $bucket->update(['fields' => $mergedFields]);
+        }
+
+        $record = BucketRecord::create([
+            'data_bucket_id' => $bucket->id,
+            'data'           => $payload,
+            'recorded_at'    => $recordedAt,
+        ]);
+
+        // Update associated device status if available
+        if ($bucket->device) {
+            $bucket->device->update([
+                'last_seen_at' => now(),
+                'status'       => 'online',
+            ]);
+        }
+
+        return response()->json([
+            'message'     => 'MQTT telemetry recorded successfully',
+            'record_id'   => $record->id,
+            'recorded_at' => $record->recorded_at,
+        ], 201);
     }
 }

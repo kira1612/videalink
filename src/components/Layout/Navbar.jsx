@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Bell, Search, RefreshCw, Check, Activity, AlertCircle, CheckCircle2, XCircle, Cpu, Database, Webhook, Settings, LayoutDashboard, Users } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Bell, Search, RefreshCw, Check, Activity, AlertCircle,
+  CheckCircle2, XCircle, Settings, User
+} from 'lucide-react';
 
 const mockNotifications = [
-  { id: 1, type: 'warning', title: 'Device offline',   body: 'ESP32-Lab-02 has been offline for 5m', time: '5m ago',  read: false },
-  { id: 2, type: 'success', title: 'Data synced',      body: 'Bucket "sensors-prod" synced 1.2k rows',  time: '18m ago', read: false },
+  { id: 1, type: 'warning', title: 'Device offline',     body: 'ESP32-Lab-02 has been offline for 5m', time: '5m ago',  read: false },
+  { id: 2, type: 'success', title: 'Data synced',        body: 'Bucket "sensors-prod" synced 1.2k rows', time: '18m ago', read: false },
   { id: 3, type: 'info',    title: 'Endpoint triggered', body: 'Webhook /api/alert was triggered',     time: '1h ago',  read: true },
 ];
 
@@ -15,123 +18,153 @@ const notifType = {
   error:   { Icon: XCircle,      bg: 'bg-rose-500/10',    text: 'text-rose-400',    dot: 'bg-rose-400'   },
 };
 
-const pageIcons = {
-  '/app/dashboard': LayoutDashboard,
-  '/app/devices':   Cpu,
-  '/app/buckets':   Database,
-  '/app/endpoints': Webhook,
-  '/app/users':     Users,
-  '/app/settings':  Settings,
-};
-
-export default function Navbar({ title, subtitle }) {
-  const location = useLocation();
+export default function Navbar({ title }) {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => {
     const s = localStorage.getItem('iot_user');
-    return s ? JSON.parse(s) : { name: 'Admin', email: 'admin@platform.io' };
+    return s ? JSON.parse(s) : { name: 'Administrator', email: 'admin@platform.io' };
   });
   const [notifOpen, setNotifOpen]     = useState(false);
   const [notifs, setNotifs]           = useState(mockNotifications);
-  const [searchFocus, setSearchFocus] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing]   = useState(false);
   const notifRef = useRef(null);
 
   const unread = notifs.filter(n => !n.read).length;
-  const PageIcon = Object.entries(pageIcons).find(([k]) => location.pathname.startsWith(k))?.[1];
 
   useEffect(() => {
-    const h = () => { const s = localStorage.getItem('iot_user'); if (s) setCurrentUser(JSON.parse(s)); };
+    const h = () => {
+      const s = localStorage.getItem('iot_user');
+      if (s) setCurrentUser(JSON.parse(s));
+    };
     window.addEventListener('user-updated', h);
     return () => window.removeEventListener('user-updated', h);
   }, []);
 
   useEffect(() => {
-    const h = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false); };
+    const h = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
     if (notifOpen) document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, [notifOpen]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => { setRefreshing(false); window.location.reload(); }, 600);
+    setTimeout(() => {
+      setRefreshing(false);
+      window.location.reload();
+    }, 600);
   };
 
-  const userInitials = currentUser.name
-    ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-    : 'U';
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return;
+    if (q.includes('dev')) navigate('/app/devices');
+    else if (q.includes('buck') || q.includes('data')) navigate('/app/buckets');
+    else if (q.includes('end') || q.includes('hook')) navigate('/app/endpoints');
+    else if (q.includes('room')) navigate('/app/rooms');
+    else if (q.includes('auto')) navigate('/app/automations');
+    else if (q.includes('set') || q.includes('prof')) navigate('/app/settings');
+    else if (q.includes('doc') || q.includes('guide') || q.includes('panduan')) navigate('/app/guide');
+  };
 
   return (
-    <header className="sticky top-0 z-30 h-[60px] flex items-center px-5 gap-4 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/70">
-      {/* Top accent line — theme reactive */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, rgb(var(--primary-500) / 0.85) 0%, rgb(var(--primary-400) / 0.35) 40%, transparent 100%)' }}
-      />
-
-      {/* ── Page identity ── */}
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        {PageIcon && (
-          <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border"
-            style={{
-              background: 'rgb(var(--primary-500) / 0.1)',
-              borderColor: 'rgb(var(--primary-500) / 0.2)',
-            }}
-          >
-            <PageIcon size={14} style={{ color: 'rgb(var(--primary-400))' }} />
-          </div>
-        )}
-        <div className="min-w-0">
-          <h1 className="text-[14px] font-extrabold text-slate-100 leading-tight truncate tracking-tight">{title}</h1>
-          {subtitle && <p className="text-[11px] text-slate-500 leading-tight truncate">{subtitle}</p>}
+    <header className="sticky top-0 z-30 pt-5 pb-3 px-6 flex items-center justify-between gap-4 bg-slate-950/75 backdrop-blur-xl transition-colors duration-300">
+      {/* ── Left: Vision UI Breadcrumb & Page Title ── */}
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 text-[12px]">
+          <span className="text-slate-400 font-normal">Pages</span>
+          <span className="text-slate-500">/</span>
+          <span className="text-slate-100 font-medium truncate">{title}</span>
         </div>
+        <h1 className="text-[15px] font-extrabold text-slate-100 tracking-tight mt-0.5 truncate">
+          {title}
+        </h1>
       </div>
 
-      {/* ── Controls ── */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      {/* ── Right: Search Pill + User + Settings + Bell ── */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Search Input ("Type here...") */}
+        <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
+          <Search
+            size={14}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Type here..."
+            className="w-[190px] lg:w-[220px] pl-9 pr-3.5 py-2 rounded-2xl text-[12px] text-slate-100 placeholder-slate-500 bg-slate-800/90 border border-slate-700/70 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all duration-200"
+          />
+        </form>
 
-        {/* Refresh */}
+        {/* User / Profile Button */}
+        <Link
+          to="/app/settings"
+          className="flex items-center gap-1.5 text-[12px] font-bold text-slate-300 hover:text-primary-400 transition-colors px-1.5 py-1"
+          title="Profile & Account"
+        >
+          <User size={14} style={{ color: 'rgb(var(--primary-400))' }} />
+          <span className="hidden md:inline truncate max-w-[120px]">
+            {currentUser?.name || 'Sign In'}
+          </span>
+        </Link>
+
+        {/* Settings Icon */}
+        <Link
+          to="/app/settings"
+          className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
+          title="Settings"
+          aria-label="Settings"
+        >
+          <Settings size={15} />
+        </Link>
+
+        {/* Refresh Icon */}
         <button
           id="navbar-refresh"
           onClick={handleRefresh}
-          className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800/60 border border-slate-700/60 text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all duration-200"
+          className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
           title="Refresh"
           aria-label="Refresh data"
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
         </button>
 
-        {/* Notifications */}
+        {/* Notifications Bell */}
         <div className="relative" ref={notifRef}>
           <button
             id="navbar-notifications"
             onClick={() => setNotifOpen(v => !v)}
-            className="relative w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800/60 border border-slate-700/60 text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all duration-200"
+            className="relative w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
             aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ''}`}
           >
-            <Bell size={14} />
+            <Bell size={15} />
             {unread > 0 && (
               <span
                 className="absolute top-1.5 right-1.5 w-[6px] h-[6px] rounded-full ring-[1.5px] ring-slate-950"
-                style={{ background: 'rgb(var(--primary-400))' }}
+                style={{ background: 'rgb(var(--primary-500))' }}
               />
             )}
           </button>
 
           {notifOpen && (
             <div
-              className="absolute right-0 top-11 w-[310px] rounded-2xl overflow-hidden shadow-2xl bg-slate-900 border border-slate-800"
+              className="absolute right-0 top-11 w-[310px] rounded-2xl overflow-hidden shadow-2xl vision-card"
               style={{ animation: 'fadeInDown 0.15s ease-out' }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50">
                 <div className="flex items-center gap-2">
                   <Bell size={13} style={{ color: 'rgb(var(--primary-400))' }} />
-                  <span className="text-[13px] font-bold text-slate-200">Notifications</span>
+                  <span className="text-[13px] font-bold text-slate-100">Notifications</span>
                   {unread > 0 && (
                     <span
                       className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
-                      style={{ background: 'rgb(var(--primary-500) / 0.15)', color: 'rgb(var(--primary-300))' }}
+                      style={{ background: 'rgb(var(--primary-500) / 0.2)', color: 'rgb(var(--primary-300))' }}
                     >
                       {unread}
                     </span>
@@ -156,15 +189,15 @@ export default function Navbar({ title, subtitle }) {
                     <button
                       key={n.id}
                       onClick={() => setNotifs(p => p.map(x => x.id === n.id ? { ...x, read: true } : x))}
-                      className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-800/60 transition-colors ${n.read ? 'opacity-50' : ''}`}
+                      className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-800/50 transition-colors ${n.read ? 'opacity-50' : ''}`}
                     >
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${t.bg}`}>
                         <t.Icon size={13} className={t.text} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-bold text-slate-300 leading-tight">{n.title}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{n.body}</p>
-                        <p className="text-[10px] text-slate-600 mt-1">{n.time}</p>
+                        <p className="text-[12px] font-bold text-slate-200 leading-tight">{n.title}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{n.body}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">{n.time}</p>
                       </div>
                       {!n.read && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5 ${t.dot}`} />}
                     </button>
@@ -173,15 +206,18 @@ export default function Navbar({ title, subtitle }) {
               </div>
 
               {/* Footer */}
-              <div className="px-4 py-2.5 text-center border-t border-slate-800">
-                <button className="text-[11px] font-semibold" style={{ color: 'rgb(var(--primary-400))' }}>
-                  View all notifications →
+              <div className="px-4 py-2.5 text-center border-t border-slate-700/50">
+                <button
+                  onClick={() => setNotifOpen(false)}
+                  className="text-[11px] font-semibold"
+                  style={{ color: 'rgb(var(--primary-400))' }}
+                >
+                  Close notifications
                 </button>
               </div>
             </div>
           )}
         </div>
-
       </div>
     </header>
   );

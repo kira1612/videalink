@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, ChevronLeft, Cpu } from 'lucide-react';
+import { Shield, ChevronLeft, Cpu, Sparkles } from 'lucide-react';
 import { authApi } from '../services/api';
 import ParticleTunnel from '../components/ParticleTunnel';
+import GameLoginTransition from '../components/GameLoginTransition';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -13,11 +14,57 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isVisible, setIsVisible] = useState(false);
+  const [isWarping, setIsWarping] = useState(false);
+  const [showGameTransition, setShowGameTransition] = useState(false);
+  const [transitionUser, setTransitionUser] = useState(null);
+
+  const [themeColor, setThemeColor] = useState(() => {
+    try {
+      const savedColor = localStorage.getItem('iot_theme_color');
+      if (savedColor) return savedColor;
+      const savedTheme = localStorage.getItem('iot_theme');
+      const themeColors = {
+        blue: '#0075ff',
+        cyan: '#06b6d4',
+        emerald: '#10b981',
+        violet: '#8b5cf6',
+        rose: '#f43f5e',
+        amber: '#f59e0b',
+      };
+      if (savedTheme && themeColors[savedTheme]) return themeColors[savedTheme];
+    } catch (e) {}
+    return '#0075ff';
+  });
+
+  useEffect(() => {
+    const updateColor = () => {
+      const savedColor = localStorage.getItem('iot_theme_color');
+      if (savedColor) setThemeColor(savedColor);
+    };
+    window.addEventListener('theme-updated', updateColor);
+    return () => window.removeEventListener('theme-updated', updateColor);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleTransitionComplete = () => {
+    window.dispatchEvent(new Event('user-updated'));
+    navigate('/app/dashboard');
+  };
+
+  const handlePreviewGameTransition = () => {
+    const demoUser = {
+      name: name || 'Videa Edge Operator',
+      email: email || 'admin@iot-platform.io',
+      role: 'admin',
+    };
+    setTransitionUser(demoUser);
+    setIsWarping(true);
+    setShowGameTransition(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,8 +79,11 @@ export default function Login() {
       }
       localStorage.setItem('iot_token', res.data.token);
       localStorage.setItem('iot_user', JSON.stringify(res.data.user));
-      window.dispatchEvent(new Event('user-updated'));
-      navigate('/app/dashboard');
+
+      // Trigger AAA Game-style Hyperdrive Launch Transition
+      setTransitionUser(res.data.user);
+      setIsWarping(true);
+      setShowGameTransition(true);
     } catch (err) {
       console.error('Auth error:', err);
       setError(err.response?.data?.message || err.message || 'Authentication failed. Please try again.');
@@ -43,35 +93,51 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-black relative overflow-hidden font-sans selection:bg-[#0071e3]/30 selection:text-white">
+    <div className="min-h-screen w-full flex items-center justify-center bg-black relative overflow-hidden font-sans selection:bg-primary-500/30 selection:text-white">
       
-      {/* ── STUNNING DYNAMIC BACKGROUND ── */}
-      {/* Reusing the ParticleTunnel from Landing Page for perfect consistency but massive wow factor */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40">
-        <ParticleTunnel />
+      {/* ── STUNNING DYNAMIC BACKGROUND DENGAN WARNA LANDING ── */}
+      <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-700 ${isWarping ? 'opacity-100' : 'opacity-40'}`}>
+        <ParticleTunnel color={themeColor} isWarping={isWarping} warpIntensity={1.8} />
       </div>
       
       {/* Vignette & Gradients to ensure the form remains readable */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#000000_100%)] pointer-events-none z-0" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none z-0" />
       
-      {/* Subtle blue accent glows in the background */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#0071e3]/20 rounded-full blur-[120px] pointer-events-none z-0 animate-pulse-slow" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#0071e3]/10 rounded-full blur-[100px] pointer-events-none z-0" />
+      {/* Dynamic theme accent glows in the background */}
+      <div 
+        className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none z-0 animate-pulse-slow transition-colors duration-700 opacity-25"
+        style={{ backgroundColor: themeColor }}
+      />
+      <div 
+        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-[100px] pointer-events-none z-0 transition-colors duration-700 opacity-15"
+        style={{ backgroundColor: themeColor }}
+      />
 
-      {/* Back Navigation */}
-      <div className="absolute top-6 left-6 md:top-8 md:left-8 z-50">
-        <Link 
-          to="/" 
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 text-[#86868b] hover:text-[#f5f5f7] hover:bg-black/80 backdrop-blur-md transition-all text-sm font-medium group border border-white/5 hover:border-white/20 shadow-lg"
-        >
-          <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Kembali ke Beranda
-        </Link>
-      </div>
+      {/* Back Navigation (Hidden during hyperdrive warp transition) */}
+      {!showGameTransition && (
+        <div className="absolute top-6 left-6 md:top-8 md:left-8 z-50 animate-fade-in">
+          <Link 
+            to="/" 
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 text-[#86868b] hover:text-[#f5f5f7] hover:bg-black/80 backdrop-blur-md transition-all text-sm font-medium group border border-white/5 hover:border-white/20 shadow-lg"
+          >
+            <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            Kembali ke Beranda
+          </Link>
+        </div>
+      )}
+
+      {/* ── GAME-STYLE POST-LOGIN HYPERDRIVE TRANSITION OVERLAY ── */}
+      {showGameTransition && (
+        <GameLoginTransition 
+          user={transitionUser} 
+          color={themeColor}
+          onComplete={handleTransitionComplete} 
+        />
+      )}
 
       {/* ── PREMIUM GLASSMORPHIC FORM CONTAINER ── */}
-      <div className="relative z-10 w-full max-w-[420px] px-6">
+      <div className={`relative z-10 w-full max-w-[420px] px-6 transition-all duration-700 ${showGameTransition ? 'opacity-0 scale-90 blur-md pointer-events-none' : 'opacity-100 scale-100'}`}>
         <div 
           className={`w-full transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-95'
@@ -175,14 +241,26 @@ export default function Login() {
             </button>
           </div>
 
-          {/* Demo Account Note */}
+          {/* Demo Account Note & Interactive Preview Button */}
           {isLogin && (
-            <div className="mt-12 text-center opacity-60 hover:opacity-100 transition-opacity">
-              <p className="text-[10px] text-[#86868b] uppercase tracking-widest mb-3 font-semibold">Kredensial Demo</p>
-              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 backdrop-blur-sm shadow-inner">
+            <div className="mt-10 text-center">
+              <p className="text-[10px] text-[#86868b] uppercase tracking-widest mb-2.5 font-semibold">Kredensial Demo</p>
+              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/5 backdrop-blur-sm shadow-inner mb-3">
                 <span className="text-[12px] font-mono text-[#f5f5f7]">admin@iot-platform.io</span>
                 <span className="text-[#86868b] text-xs">|</span>
                 <span className="text-[12px] font-mono text-[#f5f5f7]">password123</span>
+              </div>
+              
+              {/* Game Animation Preview Trigger */}
+              <div className="flex justify-center mt-1">
+                <button
+                  type="button"
+                  onClick={handlePreviewGameTransition}
+                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] hover:bg-[#0071e3]/20 border border-white/10 hover:border-[#0071e3]/40 text-[#86868b] hover:text-[#2997ff] text-xs font-medium transition-all group backdrop-blur-sm shadow-sm"
+                >
+                  <Sparkles size={13} className="text-[#0071e3] group-hover:rotate-12 transition-transform" />
+                  <span>Pratinjau Animasi Game</span>
+                </button>
               </div>
             </div>
           )}

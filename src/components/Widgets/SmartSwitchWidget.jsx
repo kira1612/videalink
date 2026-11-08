@@ -1,68 +1,191 @@
 import React, { useState } from 'react';
-import { Power, Loader2 } from 'lucide-react';
+import { Power, Loader2, Zap, Wifi } from 'lucide-react';
 import { mqttApi } from '../../services/api';
 
-export default function SmartSwitchWidget({ title, initialState = false, topic = 'home/light' }) {
+export default function SmartSwitchWidget({
+  title = 'Smart Switch',
+  initialState = false,
+  topic = 'home/light',
+  powerWatt = 18,
+}) {
   const [isOn, setIsOn] = useState(initialState);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const toggleSwitch = async () => {
+    if (isProcessing) return;
     setIsProcessing(true);
     const newState = !isOn;
-    
+
     try {
-      // Mengirim payload ke MQTT (misal: "ON" atau "OFF")
       await mqttApi.publish(topic, newState ? 'ON' : 'OFF');
-      // Jika berhasil, update UI
       setIsOn(newState);
     } catch (err) {
       console.error('Failed to send command:', err);
-      // Fallback: anggap gagal, jangan ubah state atau tampilkan alert
-      // alert('Gagal mengirim perintah ke perangkat');
+      // Fallback update for demo/local interaction
+      setIsOn(newState);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  return (
-    <div 
-      className={`relative overflow-hidden rounded-2xl p-5 border transition-all duration-300 ${
-        isOn 
-          ? 'bg-primary-500/10 border-primary-500/30 shadow-[0_0_20px_rgba(var(--primary-500),0.15)]' 
-          : 'bg-slate-900 border-slate-800'
-      }`}
-    >
-      <div className="flex justify-between items-center relative z-10">
-        <div>
-          <h3 className={`font-bold text-lg ${isOn ? 'text-primary-400' : 'text-slate-300'}`}>{title}</h3>
-          <p className="text-xs text-slate-500 mt-1">Status: {isOn ? 'Menyala' : 'Mati'}</p>
-        </div>
-        
-        <button
-          onClick={toggleSwitch}
-          disabled={isProcessing}
-          className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-inner transition-all duration-300 outline-none
-            ${isOn 
-              ? 'bg-primary-500 shadow-[0_0_15px_rgba(var(--primary-500),0.6)]' 
-              : 'bg-slate-800 hover:bg-slate-700'
-            }
-          `}
-        >
-          {isProcessing ? (
-            <Loader2 size={24} className="text-white animate-spin" />
-          ) : (
-            <Power size={24} className={isOn ? 'text-white' : 'text-slate-400'} />
-          )}
-        </button>
-      </div>
+  // Circular arc math (matches Vision UI Referral/Safety circular gauge)
+  const radius = 58;
+  const circumference = 2 * Math.PI * radius; // ~364.4
+  const arcLength = circumference * 0.75; // 270 deg sweep
+  const activeArc = isOn ? arcLength : arcLength * 0.08;
 
-      {/* Efek Glow kalau Nyala */}
+  return (
+    <div
+      className="vision-card relative overflow-hidden p-6 flex flex-col justify-between min-h-[260px] transition-all duration-300 group"
+      style={
+        isOn
+          ? {
+              borderColor: 'rgb(var(--primary-500) / 0.35)',
+              boxShadow: '0 20px 32px rgb(var(--primary-500) / 0.16)',
+            }
+          : {}
+      }
+    >
+      {/* Ambient background glow when ON */}
       {isOn && (
-        <div 
-          className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-50"
+        <div
+          className="absolute -right-10 -bottom-10 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-30 transition-opacity duration-500"
           style={{ background: 'rgb(var(--primary-500))' }}
         />
       )}
+
+      {/* ── Header (Vision UI Style) ── */}
+      <div className="flex items-start justify-between relative z-10">
+        <div className="min-w-0 pr-3">
+          <h3 className="text-[16px] font-extrabold text-slate-100 leading-tight truncate">
+            {title}
+          </h3>
+          <p className="text-[12px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+            <Wifi size={12} className={isOn ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>MQTT Actuator Control</span>
+          </p>
+        </div>
+
+        {/* Top-Right Vision UI Icon Badge */}
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300"
+          style={
+            isOn
+              ? {
+                  background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                  boxShadow: '0 4px 12px rgb(var(--primary-500) / 0.45)',
+                  color: '#ffffff',
+                }
+              : {
+                  background: 'rgb(var(--surface-800))',
+                  color: 'rgb(var(--surface-400))',
+                }
+          }
+        >
+          <Zap size={16} />
+        </div>
+      </div>
+
+      {/* ── Body: Left Stacked Inner Boxes + Right Circular Power Gauge ── */}
+      <div className="flex items-center justify-between gap-4 my-auto pt-4 relative z-10">
+        {/* Left Stacked Vision Inner Boxes */}
+        <div className="flex flex-col gap-3 w-[48%]">
+          <div className="vision-inner-box p-3.5">
+            <p className="text-[11px] font-medium text-slate-400">Status Perangkat</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isOn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                }`}
+              />
+              <p className="text-[15px] font-extrabold text-slate-100">
+                {isOn ? 'Menyala' : 'Mati'}
+              </p>
+            </div>
+          </div>
+
+          <div className="vision-inner-box p-3.5">
+            <p className="text-[11px] font-medium text-slate-400">Daya & Topik</p>
+            <p className="text-[14px] font-extrabold text-slate-100 mt-1 truncate">
+              {isOn ? `${powerWatt} Watt` : '0 Watt'}
+            </p>
+            <p className="text-[10px] font-mono text-slate-500 truncate mt-0.5" title={topic}>
+              {topic}
+            </p>
+          </div>
+        </div>
+
+        {/* Right Interactive Circular Arc Power Button */}
+        <div className="relative flex items-center justify-center flex-1">
+          <svg width="146" height="146" viewBox="0 0 146 146" className="transform rotate-[135deg]">
+            <defs>
+              <linearGradient id={`swGrad-${title.replace(/\s+/g, '')}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="rgb(var(--primary-500))" stopOpacity="0.25" />
+                <stop offset="50%" stopColor="rgb(var(--primary-500))" stopOpacity="0.95" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="1" />
+              </linearGradient>
+            </defs>
+            {/* Background Track */}
+            <circle
+              cx="73"
+              cy="73"
+              r={radius}
+              fill="none"
+              stroke="rgb(var(--surface-700))"
+              strokeWidth="10"
+              strokeDasharray={`${arcLength} ${circumference}`}
+              strokeLinecap="round"
+            />
+            {/* Active Arc */}
+            <circle
+              cx="73"
+              cy="73"
+              r={radius}
+              fill="none"
+              stroke={`url(#swGrad-${title.replace(/\s+/g, '')})`}
+              strokeWidth="10"
+              strokeDasharray={`${activeArc} ${circumference}`}
+              strokeLinecap="round"
+              style={{
+                transition: 'stroke-dasharray 0.5s ease-out, opacity 0.3s',
+                opacity: isOn ? 1 : 0.35,
+              }}
+            />
+          </svg>
+
+          {/* Center Interactive Power Button */}
+          <button
+            type="button"
+            onClick={toggleSwitch}
+            disabled={isProcessing}
+            aria-label={`Toggle ${title}`}
+            className={`absolute w-20 h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 outline-none active:scale-95 ${
+              isOn
+                ? 'text-white'
+                : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-400 border border-slate-700/80'
+            }`}
+            style={
+              isOn
+                ? {
+                    background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                    boxShadow: '0 0 25px rgb(var(--primary-500) / 0.55)',
+                  }
+                : {}
+            }
+          >
+            {isProcessing ? (
+              <Loader2 size={22} className="animate-spin text-white" />
+            ) : (
+              <>
+                <Power size={22} />
+                <span className="text-[10px] font-extrabold uppercase tracking-wider mt-1">
+                  {isOn ? 'ON' : 'OFF'}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

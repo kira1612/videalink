@@ -36,14 +36,11 @@ function BucketCard({ bucket, onToggle, onDelete, activeDropdown, setActiveDropd
 
   return (
     <div
-      className="group relative flex flex-col rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 transition-all duration-200 hover:-translate-y-0.5"
+      className="group relative flex flex-col vision-card overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
       style={{
         borderTopColor: st.topBorder,
         borderTopWidth: '2px',
-        boxShadow: `0 0 0 0 transparent`,
       }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = `0 8px 32px ${st.glow}, 0 1px 0 rgba(255,255,255,0.04) inset`}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
     >
       <div className="p-5">
         <div className="flex items-start gap-3">
@@ -369,22 +366,29 @@ export default function Buckets() {
         </button>
       </div>
 
-      {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ── STAT CARDS (Vision UI Style) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Total Buckets', count: buckets.length, dot: 'rgb(var(--primary-400))', bg: 'rgb(var(--primary-500)/0.08)', border: 'rgb(var(--primary-500)/0.18)' },
-          { label: 'Active',        count: activeCount,    dot: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.2)' },
-          { label: 'Total Records', count: totalRecords.toLocaleString(), dot: '#38bdf8', bg: 'rgba(56,189,248,0.08)', border: 'rgba(56,189,248,0.2)' },
+          { label: 'Total Buckets', count: buckets.length,                icon: Database },
+          { label: 'Active',        count: activeCount,                   icon: Activity },
+          { label: 'Total Records', count: totalRecords.toLocaleString(), icon: HardDrive },
         ].map(s => (
-          <div key={s.label} className="relative rounded-2xl px-4 py-4 overflow-hidden" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-            <div className="absolute right-3 top-3 w-5 h-5 rounded-full opacity-20" style={{ background: s.dot }} />
-            {loading
-              ? <div className="h-8 w-12 bg-slate-800 rounded-lg animate-pulse mb-1.5" />
-              : <p className="text-[26px] font-black text-slate-100 leading-none mb-1.5">{s.count}</p>
-            }
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.dot }} />
-              <p className="text-[12px] font-bold text-slate-400">{s.label}</p>
+          <div key={s.label} className="vision-card px-5 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] font-medium text-slate-400">{s.label}</p>
+              {loading
+                ? <div className="h-7 w-12 bg-slate-800 rounded-lg animate-pulse mt-1" />
+                : <p className="text-[22px] font-extrabold text-slate-100 leading-tight mt-1">{s.count}</p>
+              }
+            </div>
+            <div
+              className="w-[42px] h-[42px] rounded-xl flex items-center justify-center text-white flex-shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
+                boxShadow: '0 4px 14px rgb(var(--primary-500) / 0.4)',
+              }}
+            >
+              <s.icon size={18} />
             </div>
           </div>
         ))}
@@ -443,8 +447,8 @@ export default function Buckets() {
           {filtered.map(b => <BucketCard key={b.id} bucket={b} onToggle={handleToggle} onDelete={handleDelete} activeDropdown={activeDropdown} setActiveDropdown={setActiveDropdown} />)}
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="flex items-center gap-4 px-5 py-2.5 bg-slate-800/40 border-b border-slate-800">
+        <div className="vision-card overflow-hidden">
+          <div className="flex items-center gap-4 px-5 py-3 bg-slate-800/40 border-b border-slate-700/60">
             <div className="w-9 flex-shrink-0" />
             {['Bucket', 'Status', 'Records', 'Size', 'Last Write', ''].map((h, i) => (
               <span key={i} className={`text-[10px] font-black uppercase tracking-widest text-slate-600 ${[,'flex-1 sm:w-48 sm:flex-none','hidden sm:block flex-1','hidden md:block w-24','hidden lg:block w-24','hidden xl:block w-32','w-7 ml-auto'][i+1] || ''}`}>{h}</span>
