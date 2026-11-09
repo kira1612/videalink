@@ -3444,7 +3444,7 @@ export default function BucketDetail() {
 
       {/* ─── Add/Edit Widget Modal (Vision UI Studio Style) ─── */}
       {showWidgetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
           <div className="relative w-full max-w-6xl my-auto bg-gradient-to-b from-slate-900/98 via-slate-900 to-slate-950 border border-slate-700/60 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] flex flex-col lg:flex-row max-h-[92vh] overflow-hidden">
             
             {/* Top Laser Accent Glow */}

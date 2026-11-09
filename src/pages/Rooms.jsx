@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { roomsApi } from '../services/api';
-import { Home, Plus, Edit2, Trash2, X, Loader2, LayoutGrid, Box } from 'lucide-react';
+import { Home, Plus, Edit2, Trash2, X, Loader2, LayoutGrid, Box, Pin } from 'lucide-react';
 import Swal from 'sweetalert2';
 import FloorPlan from './FloorPlan';
 
@@ -9,6 +9,117 @@ export default function Rooms() {
   const [selectedRoomId, setSelectedRoomId] = useState(null); // ID ruangan yang sedang di-edit 3D-nya
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pinnedRoomIds, setPinnedRoomIds] = useState(() => {
+    try {
+      const set = new Set();
+      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
+      if (rawPinned) {
+        JSON.parse(rawPinned).forEach((r) => set.add(String(r.id)));
+      }
+      const rawLayout = localStorage.getItem('iot_dashboard_layout');
+      if (rawLayout) {
+        JSON.parse(rawLayout).forEach((w) => {
+          if (w.type === 'room_widget' && w.visible !== false && w.roomId != null) {
+            set.add(String(w.roomId));
+          }
+        });
+      }
+      return set;
+    } catch {
+      return new Set();
+    }
+  });
+
+  const syncPinnedRooms = useCallback(() => {
+    try {
+      const set = new Set();
+      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
+      if (rawPinned) {
+        JSON.parse(rawPinned).forEach((r) => set.add(String(r.id)));
+      }
+      const rawLayout = localStorage.getItem('iot_dashboard_layout');
+      if (rawLayout) {
+        JSON.parse(rawLayout).forEach((w) => {
+          if (w.type === 'room_widget' && w.visible !== false && w.roomId != null) {
+            set.add(String(w.roomId));
+          }
+        });
+      }
+      setPinnedRoomIds(set);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('rooms-widgets-updated', syncPinnedRooms);
+    window.addEventListener('storage', syncPinnedRooms);
+    return () => {
+      window.removeEventListener('rooms-widgets-updated', syncPinnedRooms);
+      window.removeEventListener('storage', syncPinnedRooms);
+    };
+  }, [syncPinnedRooms]);
+
+  const handleTogglePinRoom = (room) => {
+    const rId = String(room.id);
+    const cardId = `room_widget_${rId}`;
+    const isCurrentlyPinned = pinnedRoomIds.has(rId);
+
+    try {
+      // 1. Update iot_dashboard_pinned_rooms
+      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
+      let pinnedList = rawPinned ? JSON.parse(rawPinned) : [];
+      if (isCurrentlyPinned) {
+        pinnedList = pinnedList.filter((r) => String(r.id) !== rId);
+      } else if (!pinnedList.some((r) => String(r.id) === rId)) {
+        pinnedList.push({
+          id: room.id,
+          name: room.name,
+          icon: room.icon || 'home',
+          devices_count: room.devices_count || 0,
+        });
+      }
+      localStorage.setItem('iot_dashboard_pinned_rooms', JSON.stringify(pinnedList));
+
+      // 2. Update iot_dashboard_layout so it directly appears/disappears on Dashboard
+      const rawLayout = localStorage.getItem('iot_dashboard_layout');
+      let layoutList = rawLayout ? JSON.parse(rawLayout) : [];
+      if (isCurrentlyPinned) {
+        layoutList = layoutList.filter(
+          (w) => w.id !== cardId && String(w.roomId) !== rId
+        );
+      } else if (!layoutList.some((w) => w.id === cardId || String(w.roomId) === rId)) {
+        layoutList.push({
+          id: cardId,
+          type: 'room_widget',
+          roomId: room.id,
+          roomName: room.name,
+          roomIcon: room.icon || 'home',
+          title: `Ruangan: ${room.name}`,
+          cols: 4,
+          height: 'normal',
+          visible: true,
+        });
+      }
+      localStorage.setItem('iot_dashboard_layout', JSON.stringify(layoutList));
+    } catch (e) {
+      console.error(e);
+    }
+
+    syncPinnedRooms();
+    window.dispatchEvent(new CustomEvent('rooms-widgets-updated'));
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: isCurrentlyPinned ? 'info' : 'success',
+      title: isCurrentlyPinned
+        ? `Ruangan "${room.name}" dilepas dari Dashboard`
+        : `Ruangan "${room.name}" disematkan ke Dashboard!`,
+      showConfirmButton: false,
+      timer: 2000,
+      background: '#0f172a',
+      color: '#f1f5f9',
+    });
+  };
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -193,33 +304,55 @@ export default function Rooms() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {rooms.map(room => (
-            <div key={room.id} className="vision-card p-6 hover:-translate-y-0.5 transition-all duration-300">
-              <div className="flex justify-between items-start gap-3">
-                <div className="flex items-center gap-3.5">
-                  <div className="vision-icon-box w-12 h-12 rounded-2xl flex-shrink-0">
-                    <Home size={22} />
+          {rooms.map(room => {
+            const isPinned = pinnedRoomIds.has(String(room.id));
+            return (
+              <div key={room.id} className="vision-card p-6 hover:-translate-y-0.5 transition-all duration-300">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="vision-icon-box w-12 h-12 rounded-2xl flex-shrink-0">
+                      <Home size={22} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-slate-100 text-[16px]">{room.name}</h3>
+                        {isPinned && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            Pinned Dashboard
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium text-slate-400 mt-0.5">{room.devices_count || 0} Perangkat terhubung</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-100 text-[16px]">{room.name}</h3>
-                    <p className="text-xs font-medium text-slate-400 mt-0.5">{room.devices_count} Perangkat terhubung</p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <button 
-                    onClick={() => { setSelectedRoomId(room.id); setActiveTab('3d'); }} 
-                    className="flex items-center justify-center gap-1.5 bg-primary-500/15 text-primary-400 border border-primary-500/30 hover:bg-primary-500 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-                  >
-                    <Box size={13} /> Desain 3D
-                  </button>
-                  <div className="flex gap-1.5 justify-end">
-                    <button onClick={() => handleOpenModal(room)} className="p-2 vision-inner-box text-slate-400 hover:text-primary-400 rounded-xl transition-colors"><Edit2 size={13} /></button>
-                    <button onClick={() => handleDelete(room.id)} className="p-2 vision-inner-box text-slate-400 hover:text-rose-400 rounded-xl transition-colors"><Trash2 size={13} /></button>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => { setSelectedRoomId(room.id); setActiveTab('3d'); }} 
+                      className="flex items-center justify-center gap-1.5 bg-primary-500/15 text-primary-400 border border-primary-500/30 hover:bg-primary-500 hover:text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                    >
+                      <Box size={13} /> Desain 3D
+                    </button>
+                    <div className="flex gap-1.5 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePinRoom(room)}
+                        title={isPinned ? 'Lepas Ruangan dari Dashboard' : 'Pin Ruangan ke Dashboard'}
+                        className={`p-2 rounded-xl border transition-all ${
+                          isPinned
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20 hover:bg-amber-500/30'
+                            : 'vision-inner-box text-slate-400 hover:text-amber-300 border-transparent'
+                        }`}
+                      >
+                        <Pin size={13} className={isPinned ? 'fill-amber-400 text-amber-400' : ''} />
+                      </button>
+                      <button onClick={() => handleOpenModal(room)} className="p-2 vision-inner-box text-slate-400 hover:text-primary-400 rounded-xl transition-colors" title="Edit Ruangan"><Edit2 size={13} /></button>
+                      <button onClick={() => handleDelete(room.id)} className="p-2 vision-inner-box text-slate-400 hover:text-rose-400 rounded-xl transition-colors" title="Hapus Ruangan"><Trash2 size={13} /></button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           
           {rooms.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-20 vision-card">

@@ -7,6 +7,7 @@ export default function SmartSwitchWidget({
   initialState = false,
   topic = 'home/light',
   powerWatt = 18,
+  className = 'min-h-[260px]',
 }) {
   const [isOn, setIsOn] = useState(initialState);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,7 +37,7 @@ export default function SmartSwitchWidget({
 
   return (
     <div
-      className="vision-card relative overflow-hidden p-6 flex flex-col justify-between min-h-[260px] transition-all duration-300 group"
+      className={`vision-card relative overflow-hidden p-6 flex flex-col justify-between transition-all duration-300 group w-full ${className}`}
       style={
         isOn
           ? {

@@ -1783,7 +1783,7 @@ function RoomLayout({
 /* ─────────────────────────────────────────────────────────────────────────
    Main Page
 ───────────────────────────────────────────────────────────────────────── */
-export default function FloorPlan({ hideHeader = false, roomId = 'default', roomName = '' }) {
+export default function FloorPlan({ hideHeader = false, isWidget = false, roomId = 'default', roomName = '' }) {
   const [devices, setDevices] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState('walls'); // 'walls' | 'devices'
@@ -1792,6 +1792,25 @@ export default function FloorPlan({ hideHeader = false, roomId = 'default', room
   const [walls, setWalls] = useState(() => {
     const saved = localStorage.getItem(`iot_layout_walls_${roomId}`);
     let parsed = saved ? JSON.parse(saved) : [];
+    // Jika mode widget dan belum pernah disimpan layout 3D-nya, tampilkan struktur ruangan 3D default
+    if ((!saved || parsed.length === 0) && isWidget) {
+      parsed = [
+        {
+          id: 'default_room_group',
+          type: 'custom_group',
+          name: roomName || 'Ruangan 3D',
+          position: [0, 2, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+          children: [
+            { id: 'w_n_def', type: 'wall', position: [0, 0, -5], scale: [10.5, 4, 0.5], rotation: [0, 0, 0] },
+            { id: 'w_s_def', type: 'door_wall', position: [0, 0, 5], scale: [10.5, 4, 0.5], rotation: [0, 0, 0] },
+            { id: 'w_e_def', type: 'wall', position: [5, 0, 0], scale: [0.5, 4, 10], rotation: [0, 0, 0] },
+            { id: 'w_w_def', type: 'wall', position: [-5, 0, 0], scale: [0.5, 4, 10], rotation: [0, 0, 0] },
+          ],
+        },
+      ];
+    }
     // Otomatis inject teks label jika belum ada di layout ruangan ini
     if (!parsed.some(w => w.type === 'text_label')) {
       parsed.push({
@@ -2366,7 +2385,7 @@ export default function FloorPlan({ hideHeader = false, roomId = 'default', room
   }, []);
 
   return (
-    <div ref={containerRef} className={`flex flex-col bg-slate-950 max-w-[1600px] mx-auto ${hideHeader ? (isFullscreen ? 'p-0 w-screen h-screen' : 'p-0 h-full') : 'p-6 h-[calc(100vh-2rem)]'}`}>
+    <div ref={containerRef} className={`flex flex-col bg-slate-950 w-full max-w-[1600px] mx-auto ${hideHeader ? (isFullscreen ? 'p-0 w-screen h-screen' : 'p-0 h-full') : 'p-6 h-[calc(100vh-2rem)]'}`}>
       
       {!hideHeader && !isFullscreen ? (
         <div className="mb-6 flex justify-between items-end flex-shrink-0">
@@ -2397,8 +2416,8 @@ export default function FloorPlan({ hideHeader = false, roomId = 'default', room
       ) : null}
 
       <div className="flex-1 flex gap-4 h-full min-h-0 relative">
-        <div className={`flex-1 bg-slate-950 border ${editMode ? 'border-amber-500/30' : 'border-slate-800 shadow-2xl'} rounded-3xl overflow-hidden relative`}>
-          {!editMode && (
+        <div className={`flex-1 bg-slate-950 ${isWidget && !isFullscreen ? 'border border-slate-800/80 rounded-2xl' : `border ${editMode ? 'border-amber-500/30' : 'border-slate-800 shadow-2xl'} rounded-3xl`} overflow-hidden relative`}>
+          {!editMode && (!isWidget || isFullscreen) && (
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 px-3 py-2 rounded-lg shadow-lg">
               <Info size={16} className="text-primary-400" />
               <span className="text-[11px] font-bold text-slate-300">Tarik: Putar kamera. Scroll: Zoom.</span>
@@ -2407,7 +2426,7 @@ export default function FloorPlan({ hideHeader = false, roomId = 'default', room
 
           {/* Floating Actions (Top Right) untuk Embedded Mode / Fullscreen */}
           {(hideHeader || isFullscreen) && (
-            <div className="absolute top-4 right-4 z-20 flex gap-2">
+            <div className={`absolute ${isWidget && !isFullscreen ? 'top-2.5 right-2.5' : 'top-4 right-4'} z-20 flex gap-2`}>
               {editMode && (
                 <>
                   <input type="file" accept=".json" id="import-json" className="hidden" onChange={handleImportJSON} />
@@ -2429,13 +2448,13 @@ export default function FloorPlan({ hideHeader = false, roomId = 'default', room
               )}
               <button 
                 onClick={toggleFullscreen} 
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800/90 text-slate-200 hover:bg-slate-700 border border-slate-700/50 shadow-lg backdrop-blur-md transition-all"
-                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                className={`flex items-center justify-center ${isWidget && !isFullscreen ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-slate-900/85 text-slate-200 hover:bg-slate-800 border border-slate-700/60 shadow-lg backdrop-blur-md transition-all`}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Layar Penuh 3D'}
               >
-                {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={isWidget ? 14 : 18} />}
               </button>
               
-              {!editMode && (
+              {!editMode && (!isWidget || isFullscreen) && (
                 <>
                   <button 
                     onClick={handleDownloadImage} 

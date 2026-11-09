@@ -8,6 +8,7 @@ export default function ThermostatWidget({
   initialValue = 22,
   unit = '°C',
   subLabel = 'Target Suhu',
+  className = 'min-h-[260px]',
 }) {
   const [value, setValue] = useState(initialValue);
   const [isOn, setIsOn] = useState(true);
@@ -55,7 +56,7 @@ export default function ThermostatWidget({
 
   return (
     <div
-      className="vision-card p-6 w-full relative overflow-hidden flex flex-col justify-between min-h-[260px] transition-all duration-300"
+      className={`vision-card p-6 w-full relative overflow-hidden flex flex-col justify-between transition-all duration-300 ${className}`}
       style={
         isOn
           ? {

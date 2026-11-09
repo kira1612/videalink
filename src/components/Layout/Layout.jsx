@@ -35,7 +35,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex bg-slate-950 relative overflow-x-hidden transition-colors duration-300">
       {/* ── Ambient Vision UI Theme-Reactive Glow Backdrop ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
         <div
           className="absolute -top-[15%] left-[20%] w-[620px] h-[620px] rounded-full blur-[150px] opacity-25 transition-all duration-500"
           style={{ background: 'radial-gradient(circle, rgb(var(--primary-500)) 0%, transparent 70%)' }}
@@ -53,7 +53,7 @@ export default function Layout() {
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <div
-        className={`relative z-10 flex-1 flex flex-col min-h-screen transition-all duration-300 ${
+        className={`relative flex-1 flex flex-col min-h-screen transition-all duration-300 ${
           collapsed ? 'ml-[78px]' : 'ml-[256px]'
         }`}
       >

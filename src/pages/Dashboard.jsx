@@ -6,14 +6,18 @@ import {
   Smile, Activity, Zap, Server, Clock,
   AlertCircle, XCircle, Layers, Sparkles, TrendingUp,
   Pencil, Check, RotateCcw, Eye, EyeOff, GripVertical, SlidersHorizontal, Plus,
-  PanelRight, PanelRightClose, ExternalLink
+  PanelRight, PanelRightClose, ExternalLink, Home, Box, Power, Loader2,
+  LayoutGrid, ChevronLeft, ChevronRight, Maximize2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import BucketWidgetsSidebar from '../components/Widgets/BucketWidgetsSidebar';
 import { WidgetChart, CHART_TYPES, CHART_VARIANTS } from './BucketDetail';
+import FloorPlan from './FloorPlan';
 import {
   DndContext,
   closestCorners,
+  closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -43,7 +47,7 @@ import {
   curveNatural,
   curveStep,
 } from '../components/Charts/bklit';
-import { dashboardApi, devicesApi, bucketsApi } from '../services/api';
+import { dashboardApi, devicesApi, bucketsApi, mqttApi } from '../services/api';
 import { StatusBadge } from '../components/UI/Badge';
 import ThermostatWidget from '../components/Widgets/ThermostatWidget';
 import SmartSwitchWidget from '../components/Widgets/SmartSwitchWidget';
@@ -670,26 +674,32 @@ function HeroArtwork({ variant = 'iot-core' }) {
 ───────────────────────────────────────────────────────────────────────── */
 const DEFAULT_DASHBOARD_WIDGETS = [
   { id: 'metrik', title: 'Metrik Telemetri IoT', cols: 12, height: 'normal', visible: true },
-  { id: 'hero', title: 'Welcome Hero Banner', cols: 5, height: 'normal', visible: true },
-  { id: 'health', title: 'Device Health Rate', cols: 3, height: 'normal', visible: true },
-  { id: 'tracking', title: 'Telemetry Tracking', cols: 4, height: 'normal', visible: true },
-  { id: 'telemetry_chart', title: 'Live Telemetry Overview', cols: 7, height: 'normal', visible: true },
-  { id: 'infrastructure_chart', title: 'Active Infrastructure', cols: 5, height: 'normal', visible: true },
+  { id: 'hero', title: 'Welcome Hero Banner', cols: 12, height: 'normal', visible: true },
   { id: 'devices_table', title: 'Connected IoT Devices', cols: 8, height: 'normal', visible: true },
   { id: 'recent_activity', title: 'Recent Activity', cols: 4, height: 'normal', visible: true },
-  { id: 'quick_controls', title: 'Smart Home Controls', cols: 12, height: 'normal', visible: true },
+  { id: 'switch_living', title: 'Lampu Ruang Tamu', cols: 4, height: 'normal', visible: true },
+  { id: 'switch_porch', title: 'Lampu Teras', cols: 4, height: 'normal', visible: true },
+  { id: 'thermostat_ac', title: 'Living Room AC', cols: 4, height: 'normal', visible: true },
 ];
 
+const REMOVED_LEGACY_WIDGET_IDS = new Set([
+  'health',
+  'tracking',
+  'telemetry_chart',
+  'infrastructure_chart',
+  'quick_controls',
+]);
+
+const STANDARD_ALLOWED_COLS = [3, 4, 6, 8, 9, 12];
+
 const ALLOWED_COLS = {
-  metrik: [6, 12],
-  hero: [4, 5, 6, 7, 8, 12],
-  health: [3, 4, 6, 12],
-  tracking: [3, 4, 6, 12],
-  telemetry_chart: [6, 7, 8, 12],
-  infrastructure_chart: [4, 5, 6, 12],
-  devices_table: [6, 8, 12],
-  recent_activity: [4, 6, 12],
-  quick_controls: [6, 12],
+  metrik: [6, 8, 12],
+  hero: [3, 4, 6, 8, 9, 12],
+  devices_table: [3, 4, 6, 8, 9, 12],
+  recent_activity: [3, 4, 6, 8, 9, 12],
+  switch_living: [3, 4, 6, 8, 9, 12],
+  switch_porch: [3, 4, 6, 8, 9, 12],
+  thermostat_ac: [3, 4, 6, 8, 9, 12],
 };
 
 const COL_SPAN_CLASSES = {
@@ -699,6 +709,7 @@ const COL_SPAN_CLASSES = {
   6: 'lg:col-span-6',
   7: 'lg:col-span-7',
   8: 'lg:col-span-8',
+  9: 'lg:col-span-9',
   12: 'lg:col-span-12',
 };
 
@@ -709,6 +720,7 @@ const COL_LABELS = {
   6: '1/2',
   7: '7/12',
   8: '2/3',
+  9: '3/4',
   12: 'Full',
 };
 
@@ -727,7 +739,7 @@ const DEFAULT_STYLES = {
 };
 
 function computeDashboardResize(mode, dx, dy, startCols, startHeight, allowedCols) {
-  const allowed = allowedCols && allowedCols.length > 0 ? allowedCols : [12];
+  const allowed = allowedCols && allowedCols.length > 0 ? allowedCols : STANDARD_ALLOWED_COLS;
   let targetCols = startCols;
   let targetH = startHeight || 'normal';
   let activeAxis = mode;
@@ -844,37 +856,286 @@ class CardErrorBoundary extends Component {
   }
 }
 
+function RoomDashboardCardContent({ widget, devices = [] }) {
+  const [viewMode, setViewMode] = useState('3d'); // Default directly to 3D Floor Plan view
+  const [deviceStates, setDeviceStates] = useState({});
+  const [togglingId, setTogglingId] = useState(null);
+
+  const roomDevices = useMemo(
+    () => (devices || []).filter((d) => Number(d.room_id) === Number(widget.roomId)),
+    [devices, widget.roomId]
+  );
+
+  const onlineCount = useMemo(
+    () => roomDevices.filter((d) => d.status === 'online').length,
+    [roomDevices]
+  );
+
+  const cardHeightClass =
+    widget.height === 'compact'
+      ? 'h-[240px] min-h-[240px]'
+      : widget.height === 'tall'
+      ? 'h-[420px] min-h-[420px]'
+      : 'h-[320px] min-h-[320px]';
+
+  const handleQuickToggleDevice = async (dev) => {
+    if (togglingId === dev.id) return;
+    setTogglingId(dev.id);
+    const currentOn =
+      deviceStates[dev.id] !== undefined ? deviceStates[dev.id] : dev.status === 'online';
+    const nextOn = !currentOn;
+    const topic = dev.topic || dev.broker_config?.topic || `videalink/devices/${dev.id}/cmd`;
+
+    try {
+      await mqttApi.publish(topic, nextOn ? 'ON' : 'OFF');
+      setDeviceStates((prev) => ({ ...prev, [dev.id]: nextOn }));
+    } catch {
+      setDeviceStates((prev) => ({ ...prev, [dev.id]: nextOn }));
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  return (
+    <div
+      className={`vision-card p-6 relative group flex flex-col justify-between transition-all duration-300 ease-out overflow-hidden min-w-0 max-w-full ${cardHeightClass}`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 shrink-0">
+        <div className="min-w-0">
+          <h4 className="text-[15px] font-extrabold text-slate-100 leading-tight truncate">
+            {widget.roomName || widget.title || 'Ruangan IoT'}
+          </h4>
+          <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+            Ruangan IoT •{' '}
+            <span className="font-mono text-amber-400">{roomDevices.length} Perangkat</span>
+            <span className="text-slate-500"> • {onlineCount} Aktif</span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode((v) => (v === '3d' ? 'devices' : '3d'))}
+            className={`px-2.5 py-1 rounded-xl border text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer ${
+              viewMode === '3d'
+                ? 'bg-primary-500 text-white border-primary-400 shadow-sm shadow-primary-500/30'
+                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700/60'
+            }`}
+            title={viewMode === '3d' ? 'Tampilkan Daftar Perangkat' : 'Tampilkan Denah 3D Interaktif'}
+          >
+            {viewMode === '3d' ? <Cpu size={12} /> : <Box size={12} />}
+            <span>{viewMode === '3d' ? 'List' : '3D'}</span>
+          </button>
+
+          <Link
+            to="/app/rooms"
+            className="p-1.5 rounded-xl border bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border-slate-700/60 transition-all"
+            title="Buka Manajemen Ruangan"
+          >
+            <ExternalLink size={14} />
+          </Link>
+
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-950 shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.35)',
+            }}
+          >
+            <Home size={14} />
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col justify-between mt-3">
+        {viewMode === '3d' ? (
+          <div className="w-full h-full rounded-2xl overflow-hidden relative bg-slate-950">
+            <FloorPlan
+              hideHeader={true}
+              isWidget={true}
+              roomId={widget.roomId}
+              roomName={widget.roomName || widget.title}
+            />
+          </div>
+        ) : roomDevices.length > 0 ? (
+          <>
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 no-scrollbar">
+              {roomDevices.map((dev) => {
+                const isOn =
+                  deviceStates[dev.id] !== undefined
+                    ? deviceStates[dev.id]
+                    : dev.status === 'online';
+                return (
+                  <div
+                    key={dev.id}
+                    className="vision-inner-box px-3.5 py-2.5 rounded-xl flex items-center justify-between gap-3 border border-slate-800/60 hover:border-slate-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          isOn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold text-slate-100 truncate">
+                          {dev.name}
+                        </p>
+                        <p className="text-[10px] font-mono text-slate-400 truncate">
+                          {dev.ip || dev.protocol || 'MQTT Node'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickToggleDevice(dev)}
+                      disabled={togglingId === dev.id}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1 transition-all cursor-pointer flex-shrink-0 ${
+                        isOn
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      {togglingId === dev.id ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Power size={11} />
+                      )}
+                      <span>{isOn ? 'ON' : 'OFF'}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="vision-inner-box px-3.5 py-2 flex items-center justify-between shrink-0 mt-2">
+              <span className="text-[11px] font-medium text-slate-400">
+                Status: <strong className="text-emerald-400">{onlineCount} Online</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewMode('3d')}
+                className="text-[11px] font-extrabold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+              >
+                <Box size={12} />
+                <span>Buka Denah 3D</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-3 vision-inner-box rounded-2xl">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mb-2.5">
+              <Box size={20} />
+            </div>
+            <p className="text-xs font-extrabold text-slate-200">
+              Ruangan Siap Dipantau
+            </p>
+            <p className="text-[11px] text-slate-400 max-w-[220px] mt-0.5 mb-3">
+              Lihat visualisasi denah 3D ruangan atau alokasikan perangkat IoT ke ruangan ini.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode('3d')}
+                className="px-3 py-1.5 rounded-xl text-[11px] font-extrabold bg-primary-500 hover:bg-primary-600 text-white shadow-md shadow-primary-500/25 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Box size={12} />
+                <span>Tampilkan 3D</span>
+              </button>
+              <Link
+                to="/app/rooms"
+                className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+              >
+                Atur Perangkat
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function loadDashboardWidgets() {
   try {
     const raw = localStorage.getItem('iot_dashboard_layout');
-    if (!raw) return DEFAULT_DASHBOARD_WIDGETS;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_DASHBOARD_WIDGETS;
+    const parsed = raw ? JSON.parse(raw) : [];
     const merged = [];
-    for (const w of parsed) {
-      const def = DEFAULT_DASHBOARD_WIDGETS.find((d) => d.id === w.id);
-      if (def) {
-        merged.push({
-          ...def,
-          ...w,
-          cols: w.cols || def.cols,
-          height: w.height || def.height || 'normal',
-          visible: w.visible !== false,
-        });
-      } else if (w.type === 'bucket_widget') {
-        merged.push({
-          ...w,
-          cols: w.cols || 4,
-          height: w.height || 'normal',
-          visible: w.visible !== false,
-        });
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      for (const w of parsed) {
+        if (!w || REMOVED_LEGACY_WIDGET_IDS.has(w.id)) continue;
+
+        const def = DEFAULT_DASHBOARD_WIDGETS.find((d) => d.id === w.id);
+        if (def) {
+          // Migrate legacy 5/12 or 7/12 widths to clean 12-col multiples so no awkward gaps remain
+          let cleanCols = w.cols || def.cols;
+          if (w.id === 'hero' && (cleanCols === 5 || cleanCols === 7)) {
+            cleanCols = 12;
+          } else if (cleanCols === 5) {
+            cleanCols = 6;
+          } else if (cleanCols === 7) {
+            cleanCols = 8;
+          }
+          merged.push({
+            ...def,
+            ...w,
+            cols: cleanCols,
+            height: w.height || def.height || 'normal',
+            visible: w.visible !== false,
+          });
+        } else if (w.type === 'bucket_widget') {
+          merged.push({
+            ...w,
+            cols: w.cols || 4,
+            height: w.height || 'normal',
+            visible: w.visible !== false,
+          });
+        } else if (w.type === 'room_widget') {
+          merged.push({
+            ...w,
+            cols: w.cols || 4,
+            height: w.height || 'normal',
+            visible: w.visible !== false,
+          });
+        }
       }
     }
+
     for (const def of DEFAULT_DASHBOARD_WIDGETS) {
       if (!merged.some((m) => m.id === def.id)) {
         merged.push(def);
       }
     }
+
+    // Also ensure any room pinned in iot_dashboard_pinned_rooms is represented
+    try {
+      const rawPinnedRooms = localStorage.getItem('iot_dashboard_pinned_rooms');
+      if (rawPinnedRooms) {
+        const pinnedRooms = JSON.parse(rawPinnedRooms);
+        if (Array.isArray(pinnedRooms)) {
+          for (const r of pinnedRooms) {
+            const cardId = `room_widget_${r.id}`;
+            if (!merged.some((m) => m.id === cardId || (m.type === 'room_widget' && String(m.roomId) === String(r.id)))) {
+              merged.push({
+                id: cardId,
+                type: 'room_widget',
+                roomId: r.id,
+                roomName: r.name,
+                roomIcon: r.icon || 'home',
+                title: `Ruangan: ${r.name}`,
+                cols: 4,
+                height: 'normal',
+                visible: true,
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+
     return merged;
   } catch {
     return DEFAULT_DASHBOARD_WIDGETS;
@@ -901,8 +1162,9 @@ function SortableDashboardCard({
   title,
   cols,
   height = 'normal',
-  allowedCols = [12],
+  allowedCols = STANDARD_ALLOWED_COLS,
   onResize,
+  onMoveOrder,
   onToggleVisibility,
   editMode,
   children,
@@ -1079,18 +1341,38 @@ function SortableDashboardCard({
       {/* Edit Mode Floating Card Header */}
       {editMode && (
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 mb-2.5 bg-slate-900/90 backdrop-blur-md border border-slate-700/70 rounded-2xl shadow-xl animate-fade-in text-xs select-none">
-          {/* Drag Handle & Label */}
-          <div className="flex items-center gap-2 min-w-0">
+          {/* Drag Handle, Quick Position Arrows & Label */}
+          <div className="flex items-center gap-1.5 min-w-0">
             <button
               type="button"
               {...attributes}
               {...listeners}
               className="p-1 rounded-lg text-slate-400 hover:text-primary-400 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-colors"
-              title="Tahan & geser untuk memindahkan urutan card"
+              title="Tahan & geser untuk memindahkan posisi card ke mana saja"
             >
               <GripVertical size={14} />
             </button>
-            <span className="font-extrabold text-slate-200 truncate text-[11px] tracking-wide">
+            {onMoveOrder && (
+              <div className="flex items-center bg-slate-950/70 rounded-lg border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => onMoveOrder(id, -1)}
+                  className="p-1 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-l-lg transition-colors cursor-pointer"
+                  title="Geser posisi ke kiri / atas"
+                >
+                  <ChevronLeft size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveOrder(id, 1)}
+                  className="p-1 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-r-lg transition-colors cursor-pointer"
+                  title="Geser posisi ke kanan / bawah"
+                >
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            )}
+            <span className="font-extrabold text-slate-200 truncate text-[11px] tracking-wide ml-0.5">
               {title}
             </span>
           </div>
@@ -1105,7 +1387,7 @@ function SortableDashboardCard({
                     key={c}
                     type="button"
                     onClick={() => onResize(id, { cols: c })}
-                    className={`px-2 py-0.5 text-[10px] font-extrabold rounded-lg transition-all ${
+                    className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded-lg transition-all cursor-pointer ${
                       cols === c
                         ? 'bg-primary-500 text-white shadow-[0_2px_8px_rgba(var(--primary-500),0.4)]'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -1129,7 +1411,7 @@ function SortableDashboardCard({
                   key={h.id}
                   type="button"
                   onClick={() => onResize(id, { height: h.id })}
-                  className={`px-2 py-0.5 text-[10px] font-extrabold rounded-lg transition-all ${
+                  className={`px-2 py-0.5 text-[10px] font-extrabold rounded-lg transition-all cursor-pointer ${
                     height === h.id
                       ? 'bg-amber-500 text-slate-950 font-black shadow-[0_2px_8px_rgba(245,158,11,0.4)]'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -1144,8 +1426,8 @@ function SortableDashboardCard({
             <button
               type="button"
               onClick={() => onToggleVisibility(id, false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-              title="Sembunyikan card ini dari dashboard"
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              title="Sembunyikan / lepas card ini dari dashboard"
             >
               <EyeOff size={14} />
             </button>
@@ -1235,7 +1517,7 @@ export default function Dashboard() {
   const [dashboardWidgets, setDashboardWidgets] = useState(loadDashboardWidgets);
   const [dashboardStyles, setDashboardStyles]   = useState(loadDashboardStyles);
 
-  // Right Sidebar: Pinned Bucket Widgets State (Only opened inside Kustomisasi Dashboard)
+  // Right Sidebar: Widget Catalog State (Only opened inside Kustomisasi Dashboard)
   const [bucketSidebarOpen, setBucketSidebarOpen] = useState(false);
 
   const [pinnedCount, setPinnedCount] = useState(() => {
@@ -1254,10 +1536,15 @@ export default function Dashboard() {
         setPinnedCount(raw ? JSON.parse(raw).length : 0);
       } catch {}
     };
+    const syncRooms = () => {
+      setDashboardWidgets(loadDashboardWidgets());
+    };
     window.addEventListener('bucket-widgets-updated', syncCount);
+    window.addEventListener('rooms-widgets-updated', syncRooms);
     window.addEventListener('storage', syncCount);
     return () => {
       window.removeEventListener('bucket-widgets-updated', syncCount);
+      window.removeEventListener('rooms-widgets-updated', syncRooms);
       window.removeEventListener('storage', syncCount);
     };
   }, []);
@@ -1276,11 +1563,19 @@ export default function Dashboard() {
     });
   };
 
-  // DnD Sensors
+  // DnD Sensors & Smart Pointer Collision Detection (so differently-sized cards swap effortlessly)
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  const smartCollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    return closestCenter(args);
+  }, []);
 
   const updateDashboardStyle = useCallback((key, value) => {
     setDashboardStyles((prev) => {
@@ -1309,11 +1604,113 @@ export default function Dashboard() {
     setDashboardWidgets((items) => {
       const oldIndex = items.findIndex((i) => i.id === active.id);
       const newIndex = items.findIndex((i) => i.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return items;
       const reordered = arrayMove(items, oldIndex, newIndex);
       try {
         localStorage.setItem('iot_dashboard_layout', JSON.stringify(reordered));
       } catch {}
       return reordered;
+    });
+  }, []);
+
+  const handleMoveWidgetOrder = useCallback((id, direction) => {
+    setDashboardWidgets((items) => {
+      const visibleIndices = items
+        .map((w, idx) => (w.visible !== false ? idx : -1))
+        .filter((idx) => idx !== -1);
+      const currentPosInVisible = visibleIndices.findIndex((idx) => items[idx].id === id);
+      if (currentPosInVisible === -1) return items;
+      const targetPosInVisible = currentPosInVisible + direction;
+      if (targetPosInVisible < 0 || targetPosInVisible >= visibleIndices.length) return items;
+
+      const fromIdx = visibleIndices[currentPosInVisible];
+      const toIdx = visibleIndices[targetPosInVisible];
+      const reordered = arrayMove(items, fromIdx, toIdx);
+      try {
+        localStorage.setItem('iot_dashboard_layout', JSON.stringify(reordered));
+      } catch {}
+      return reordered;
+    });
+  }, []);
+
+  // Auto-Fit / Pack rows so there is zero empty space on any row
+  const handleAutoPackGrid = useCallback(() => {
+    setDashboardWidgets((items) => {
+      const visible = items.filter((w) => w.visible !== false);
+      const hidden = items.filter((w) => w.visible === false);
+
+      // Group into rows of max 12 columns and expand any partial row so sum === 12
+      const rows = [];
+      let currentRow = [];
+      let currentSum = 0;
+
+      for (const w of visible) {
+        const c = Number(w.cols) || 4;
+        if (currentSum + c <= 12) {
+          currentRow.push({ ...w, cols: c });
+          currentSum += c;
+          if (currentSum === 12) {
+            rows.push(currentRow);
+            currentRow = [];
+            currentSum = 0;
+          }
+        } else {
+          if (currentRow.length > 0) rows.push(currentRow);
+          currentRow = [{ ...w, cols: c }];
+          currentSum = c;
+        }
+      }
+      if (currentRow.length > 0) rows.push(currentRow);
+
+      const packedVisible = [];
+      for (const row of rows) {
+        const sum = row.reduce((acc, item) => acc + item.cols, 0);
+        if (sum < 12 && row.length > 0) {
+          if (row.length === 1) {
+            row[0].cols = 12;
+          } else if (row.length === 2) {
+            if (row[0].cols === row[1].cols) {
+              row[0].cols = 6;
+              row[1].cols = 6;
+            } else if (row[0].cols > row[1].cols) {
+              row[0].cols = 8;
+              row[1].cols = 4;
+            } else {
+              row[0].cols = 4;
+              row[1].cols = 8;
+            }
+          } else if (row.length === 3) {
+            row[0].cols = 4;
+            row[1].cols = 4;
+            row[2].cols = 4;
+          } else if (row.length === 4) {
+            row.forEach((r) => {
+              r.cols = 3;
+            });
+          } else {
+            const diff = 12 - sum;
+            row[row.length - 1].cols = Math.min(12, row[row.length - 1].cols + diff);
+          }
+        }
+        packedVisible.push(...row);
+      }
+
+      const updated = [...packedVisible, ...hidden];
+      try {
+        localStorage.setItem('iot_dashboard_layout', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: 'Semua baris dirapikan tanpa ruang kosong!',
+      showConfirmButton: false,
+      timer: 1600,
+      background: '#0f172a',
+      color: '#f8fafc',
     });
   }, []);
 
@@ -1338,8 +1735,19 @@ export default function Dashboard() {
     setDashboardWidgets((items) => {
       const target = items.find((w) => w.id === id);
       let updated;
-      if (target?.type === 'bucket_widget' && !visible) {
+      if ((target?.type === 'bucket_widget' || target?.type === 'room_widget') && !visible) {
         updated = items.filter((w) => w.id !== id);
+        if (target?.type === 'room_widget' && target.roomId != null) {
+          try {
+            const rawRooms = localStorage.getItem('iot_dashboard_pinned_rooms');
+            if (rawRooms) {
+              const nextRooms = JSON.parse(rawRooms).filter(
+                (r) => String(r.id) !== String(target.roomId)
+              );
+              localStorage.setItem('iot_dashboard_pinned_rooms', JSON.stringify(nextRooms));
+            }
+          } catch {}
+        }
       } else {
         updated = items.map((w) => (w.id === id ? { ...w, visible } : w));
       }
@@ -1362,6 +1770,97 @@ export default function Dashboard() {
     }
     return set;
   }, [dashboardWidgets]);
+
+  // Placed Room IDs on the main dashboard
+  const placedRoomIds = useMemo(() => {
+    const set = new Set();
+    for (const w of dashboardWidgets) {
+      if (w.type === 'room_widget' && w.visible !== false) {
+        if (w.roomId != null) set.add(String(w.roomId));
+        set.add(String(w.id));
+      }
+    }
+    return set;
+  }, [dashboardWidgets]);
+
+  // Built-in widgets list for the sidebar's "Widget Bawaan" tab
+  const builtInWidgets = useMemo(
+    () =>
+      DEFAULT_DASHBOARD_WIDGETS.map((def) => {
+        const found = dashboardWidgets.find((w) => w.id === def.id);
+        return found || def;
+      }),
+    [dashboardWidgets]
+  );
+
+  const handlePlaceRoomWidget = useCallback((room) => {
+    const rId = String(room.id);
+    const cardId = `room_widget_${rId}`;
+
+    setDashboardWidgets((prev) => {
+      if (prev.some((w) => w.id === cardId || (w.type === 'room_widget' && String(w.roomId) === rId))) {
+        return prev;
+      }
+      const newWidget = {
+        id: cardId,
+        type: 'room_widget',
+        roomId: room.id,
+        roomName: room.name,
+        roomIcon: room.icon || 'home',
+        title: `Ruangan: ${room.name}`,
+        cols: 4,
+        height: 'normal',
+        visible: true,
+      };
+      const updated = [...prev, newWidget];
+      try {
+        localStorage.setItem('iot_dashboard_layout', JSON.stringify(updated));
+        const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
+        const pinnedList = rawPinned ? JSON.parse(rawPinned) : [];
+        if (!pinnedList.some((r) => String(r.id) === rId)) {
+          pinnedList.push({
+            id: room.id,
+            name: room.name,
+            icon: room.icon || 'home',
+            devices_count: room.devices_count || 0,
+          });
+          localStorage.setItem('iot_dashboard_pinned_rooms', JSON.stringify(pinnedList));
+        }
+      } catch {}
+      return updated;
+    });
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: `Ruangan "${room.name}" dipasang ke Dashboard!`,
+      showConfirmButton: false,
+      timer: 1800,
+      background: '#0f172a',
+      color: '#f8fafc',
+    });
+  }, []);
+
+  const handleRemoveRoomWidget = useCallback((roomId) => {
+    const targetId = String(roomId);
+    const cardId = `room_widget_${targetId}`;
+
+    setDashboardWidgets((prev) => {
+      const updated = prev.filter(
+        (w) => w.id !== cardId && !(w.type === 'room_widget' && String(w.roomId) === targetId)
+      );
+      try {
+        localStorage.setItem('iot_dashboard_layout', JSON.stringify(updated));
+        const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
+        if (rawPinned) {
+          const nextPinned = JSON.parse(rawPinned).filter((r) => String(r.id) !== targetId);
+          localStorage.setItem('iot_dashboard_pinned_rooms', JSON.stringify(nextPinned));
+        }
+      } catch {}
+      return updated;
+    });
+  }, []);
 
   const handlePlaceBucketWidget = useCallback((item) => {
     const cardId = `bucket_widget_${item.id}`;
@@ -1648,6 +2147,10 @@ export default function Dashboard() {
      Render Specific Widget Content cleanly
   ───────────────────────────────────────────────────────────────────────── */
   const renderWidgetContent = (widget) => {
+    if (widget.type === 'room_widget') {
+      return <RoomDashboardCardContent widget={widget} devices={recentDevices} />;
+    }
+
     if (widget.type === 'bucket_widget') {
       const recs = bucketRecords[widget.bucketId] || [];
       const widgetDef = widget.widget || widget || {};
@@ -1923,420 +2426,6 @@ export default function Dashboard() {
         );
       }
 
-      case 'health': {
-        const healthHeightClass =
-          widget.height === 'compact'
-            ? 'h-[240px] min-h-[240px]'
-            : widget.height === 'tall'
-            ? 'h-[420px] min-h-[420px]'
-            : 'h-[320px] min-h-[320px]';
-        const healthGaugeH =
-          widget.height === 'compact' ? 115 : widget.height === 'tall' ? 190 : 135;
-        return (
-          <div className={`vision-card p-6 flex flex-col justify-between ${healthHeightClass} transition-[height] duration-300 ease-out w-full`}>
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-[16px] font-extrabold text-slate-100 leading-tight">Device Health Rate</h3>
-                <p className="text-[12px] text-slate-400 mt-0.5">Dari seluruh node terdaftar</p>
-              </div>
-
-              {/* Style switcher is ONLY displayed in edit mode */}
-              {editMode && (
-                <div className="flex items-center gap-0.5 bg-slate-900/60 p-0.5 rounded-lg border border-slate-700/50">
-                  {[
-                    { id: 'notches', label: 'Notch' },
-                    { id: 'needle',  label: 'Needle' },
-                    { id: 'solid',   label: 'Solid' },
-                    { id: 'dots',    label: 'Dots' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => updateDashboardStyle('healthGaugeMode', m.id)}
-                      className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all ${
-                        dashboardStyles.healthGaugeMode === m.id
-                          ? 'bg-primary-500 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Bklit UI Gauge + Glowing Center Theme Smiley Badge */}
-            <div className="relative flex flex-col items-center justify-center my-1">
-              <div className="w-[215px]">
-                <BklitGauge
-                  value={healthPct}
-                  totalNotches={dashboardStyles.healthGaugeMode === 'needle' ? 42 : 36}
-                  arcStyle={dashboardStyles.healthGaugeMode === 'solid' ? 'solid' : 'notches'}
-                  needle={dashboardStyles.healthGaugeMode === 'needle' ? 'gradient' : false}
-                  ruler={dashboardStyles.healthGaugeMode === 'needle'}
-                  dots={dashboardStyles.healthGaugeMode === 'dots'}
-                  sector={dashboardStyles.healthGaugeMode === 'solid'}
-                  progressRing={dashboardStyles.healthGaugeMode === 'solid' || dashboardStyles.healthGaugeMode === 'notches'}
-                  centerDisc={dashboardStyles.healthGaugeMode === 'needle'}
-                  glow={true}
-                  height={healthGaugeH}
-                />
-              </div>
-
-              <div
-                className="absolute bottom-3 w-11 h-11 rounded-full flex items-center justify-center text-white shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
-                  boxShadow: '0 0 20px rgb(var(--primary-500) / 0.6)',
-                }}
-              >
-                <Smile size={22} />
-              </div>
-            </div>
-
-            <div className="vision-inner-box px-5 py-3.5 flex items-start justify-between">
-              <span className="text-[11px] font-medium text-slate-500">0%</span>
-              <div className="text-center -mt-0.5">
-                <p className="text-[24px] font-extrabold text-slate-100 leading-none">{healthPct}%</p>
-                <p className="text-[11px] text-slate-400 mt-1">Uptime & Respons</p>
-              </div>
-              <span className="text-[11px] font-medium text-slate-500">100%</span>
-            </div>
-          </div>
-        );
-      }
-
-      case 'tracking': {
-        const trackingHeightClass =
-          widget.height === 'compact'
-            ? 'h-[240px] min-h-[240px]'
-            : widget.height === 'tall'
-            ? 'h-[420px] min-h-[420px]'
-            : 'h-[320px] min-h-[320px]';
-        const trackingGaugeH =
-          widget.height === 'compact' ? 120 : widget.height === 'tall' ? 200 : 145;
-        return (
-          <div className={`vision-card p-6 flex flex-col justify-between ${trackingHeightClass} transition-[height] duration-300 ease-out w-full`}>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-[16px] font-extrabold text-slate-100 leading-tight">Telemetry Tracking</h3>
-              <div className="flex items-center gap-1.5">
-                {/* Style switcher ONLY in edit mode */}
-                {editMode && (
-                  <div className="flex items-center gap-0.5 bg-slate-900/60 p-0.5 rounded-lg border border-slate-700/50">
-                    {[
-                      { id: 'solid',   label: 'Solid' },
-                      { id: 'notches', label: 'Notch' },
-                      { id: 'needle',  label: 'Needle' },
-                      { id: 'dots',    label: 'Dots' },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => updateDashboardStyle('safetyGaugeMode', m.id)}
-                        className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-all ${
-                          dashboardStyles.safetyGaugeMode === m.id
-                            ? 'bg-primary-500 text-white'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <Link
-                  to="/app/buckets"
-                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-primary-400 transition-colors"
-                  title="Buka Data Buckets"
-                >
-                  <MoreHorizontal size={16} />
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 my-auto pt-3">
-              <div className="flex flex-col gap-3.5 w-full sm:w-[44%]">
-                <div className="vision-inner-box p-4">
-                  <p className="text-[11px] font-medium text-slate-400">Data Buckets</p>
-                  <p className="text-[16px] font-extrabold text-slate-100 mt-1">{totalBuckets} Bucket</p>
-                </div>
-                <div className="vision-inner-box p-4">
-                  <p className="text-[11px] font-medium text-slate-400">Total Records</p>
-                  <p className="text-[16px] font-extrabold text-slate-100 mt-1">{totalPoints.toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div className="relative flex items-center justify-center flex-1">
-                <div className="w-[185px]">
-                  <BklitGauge
-                    value={Math.round(safetyScore * 10)}
-                    centerValue={safetyScore}
-                    defaultLabel="Skor Telemetri"
-                    formatOptions={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }}
-                    totalNotches={dashboardStyles.safetyGaugeMode === 'needle' ? 40 : 34}
-                    startAngle={-Math.PI * 0.75}
-                    endAngle={Math.PI * 0.75}
-                    arcStyle={dashboardStyles.safetyGaugeMode === 'solid' ? 'solid' : 'notches'}
-                    needle={dashboardStyles.safetyGaugeMode === 'needle' ? 'gradient' : false}
-                    ruler={dashboardStyles.safetyGaugeMode === 'needle'}
-                    dots={dashboardStyles.safetyGaugeMode === 'dots'}
-                    sector={dashboardStyles.safetyGaugeMode === 'solid'}
-                    progressRing={dashboardStyles.safetyGaugeMode === 'solid' || dashboardStyles.safetyGaugeMode === 'notches'}
-                    centerDisc={dashboardStyles.safetyGaugeMode === 'needle'}
-                    glow={true}
-                    height={trackingGaugeH}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      case 'telemetry_chart': {
-        const chartH =
-          widget.height === 'compact'
-            ? 'h-[210px]'
-            : widget.height === 'tall'
-            ? 'h-[430px]'
-            : 'h-[290px]';
-        const chartInnerH =
-          widget.height === 'compact'
-            ? 'h-[200px]'
-            : widget.height === 'tall'
-            ? 'h-[420px]'
-            : 'h-[280px]';
-        return (
-          <div className="vision-card p-6 flex flex-col justify-between w-full h-full">
-            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-[16px] font-extrabold text-slate-100 leading-tight">Live Telemetry Overview</h3>
-                <p className="text-[12px] text-slate-400 mt-1">
-                  <span className="text-emerald-400 font-bold">(+Realtime)</span> aliran sensor Suhu & Kelembapan
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {/* Variant Switcher Pills ONLY in edit mode */}
-                {editMode && (
-                  <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-700/50">
-                    {[
-                      { id: 'smooth',  label: 'Smooth Flow' },
-                      { id: 'stepped', label: 'Step Pulse' },
-                      { id: 'glow',    label: 'Cyber Glow' },
-                    ].map((mode) => (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => updateDashboardStyle('telemetryMode', mode.id)}
-                        className={`px-2.5 py-1 text-[11px] font-extrabold rounded-lg transition-all ${
-                          dashboardStyles.telemetryMode === mode.id
-                            ? 'bg-primary-500 text-white shadow-[0_2px_10px_rgba(var(--primary-500),0.4)]'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                        }`}
-                      >
-                        {mode.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="hidden xl:flex items-center gap-3 text-[11px] font-bold text-slate-400">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgb(var(--primary-500))' }} />
-                    Stream A
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgb(var(--primary-300))' }} />
-                    Stream B
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className={`w-full ${chartH} pt-2 transition-[height] duration-300 ease-out`}>
-              {dashboardStyles.telemetryMode === 'glow' ? (
-                <BklitLineChart
-                  data={bklitTelemetry}
-                  xDataKey="date"
-                  className={`w-full ${chartInnerH}`}
-                  margin={{ top: 10, right: 15, left: 15, bottom: 20 }}
-                >
-                  <BklitGrid stroke="rgba(148, 163, 184, 0.08)" strokeDasharray="4,4" />
-                  <BklitLine
-                    dataKey="sensorA"
-                    stroke="rgb(var(--primary-500))"
-                    strokeWidth={2.5}
-                    curve={curveNatural}
-                    glow={{ blur: 10, opacity: 0.8 }}
-                  />
-                  <BklitLine
-                    dataKey="sensorB"
-                    stroke="rgb(var(--primary-300))"
-                    strokeWidth={2}
-                    curve={curveNatural}
-                    glow={{ blur: 8, opacity: 0.6 }}
-                  />
-                  <BklitXAxis />
-                  <BklitChartTooltip />
-                </BklitLineChart>
-              ) : (
-                <BklitAreaChart
-                  data={bklitTelemetry}
-                  xDataKey="date"
-                  className={`w-full ${chartInnerH}`}
-                  margin={{ top: 10, right: 15, left: 15, bottom: 20 }}
-                >
-                  <BklitGrid stroke="rgba(148, 163, 184, 0.08)" strokeDasharray="4,4" />
-                  <BklitArea
-                    dataKey="sensorA"
-                    stroke="rgb(var(--primary-500))"
-                    fill="rgb(var(--primary-500))"
-                    fillOpacity={0.35}
-                    strokeWidth={2.5}
-                    curve={dashboardStyles.telemetryMode === 'stepped' ? curveStep : curveNatural}
-                  />
-                  <BklitArea
-                    dataKey="sensorB"
-                    stroke="rgb(var(--primary-300))"
-                    fill="rgb(var(--primary-300))"
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                    curve={dashboardStyles.telemetryMode === 'stepped' ? curveStep : curveNatural}
-                  />
-                  <BklitXAxis />
-                  <BklitChartTooltip />
-                </BklitAreaChart>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      case 'infrastructure_chart': {
-        const barH =
-          widget.height === 'compact'
-            ? 'h-[140px]'
-            : widget.height === 'tall'
-            ? 'h-[290px]'
-            : 'h-[200px]';
-        const barInnerH =
-          widget.height === 'compact'
-            ? 'h-[115px]'
-            : widget.height === 'tall'
-            ? 'h-[265px]'
-            : 'h-[175px]';
-        return (
-          <div className="vision-card p-6 flex flex-col justify-between w-full h-full">
-            {/* Top Switcher ONLY in edit mode */}
-            {editMode && (
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-primary-400" />
-                  Bar Render:
-                </span>
-                <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-700/50">
-                  {[
-                    { id: 'rounded', label: 'Rounded' },
-                    { id: 'squares', label: 'Matrix' },
-                    { id: 'depth',   label: '3D Depth' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => updateDashboardStyle('barMode', m.id)}
-                      className={`px-2 py-0.5 text-[10px] font-extrabold rounded-lg transition-all ${
-                        dashboardStyles.barMode === m.id
-                          ? 'bg-primary-500 text-white shadow-[0_2px_8px_rgba(var(--primary-500),0.4)]'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className={`vision-inner-box p-4 ${barH} w-full flex items-center justify-center transition-[height] duration-300 ease-out`}>
-              <BklitBarChart
-                data={brokerThroughputBars}
-                xDataKey="slot"
-                className={`w-full ${barInnerH}`}
-                margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
-                barGap={0.3}
-              >
-                <BklitGrid stroke="rgba(148, 163, 184, 0.06)" />
-                {dashboardStyles.barMode === 'squares' ? (
-                  <BklitBarSquares
-                    dataKey="msg"
-                    fill="rgb(var(--primary-500))"
-                    squareGap={2.5}
-                    squareRadius={0.25}
-                  />
-                ) : dashboardStyles.barMode === 'depth' ? (
-                  <BklitBar
-                    dataKey="msg"
-                    fill="rgb(var(--primary-500))"
-                    perspective={true}
-                    lineCap="round"
-                  />
-                ) : (
-                  <BklitBar
-                    dataKey="msg"
-                    fill="rgb(var(--primary-500))"
-                    lineCap="round"
-                  />
-                )}
-                <BklitChartTooltip />
-              </BklitBarChart>
-            </div>
-
-            <div className="mt-5 mb-4">
-              <h3 className="text-[16px] font-extrabold text-slate-100 leading-tight">Active Infrastructure</h3>
-              <p className="text-[12px] text-slate-400 mt-0.5">
-                <span className="text-emerald-400 font-bold">(+Realtime)</span> kapasitas node & trafik broker
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: 'Devices',   value: String(totalDev),        icon: Cpu,      progress: 75 },
-                { label: 'Online',    value: String(onlineDev),       icon: Wifi,     progress: healthPct },
-                { label: 'Buckets',   value: String(totalBuckets),    icon: Database, progress: 65 },
-                { label: 'Endpoints', value: String(activeEndpoints), icon: Webhook,  progress: 80 },
-              ].map((item, idx) => (
-                <div key={idx}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-                      style={{
-                        background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
-                        boxShadow: '0 2px 8px rgb(var(--primary-500) / 0.45)',
-                      }}
-                    >
-                      <item.icon size={12} />
-                    </div>
-                    <span className="text-[12px] font-medium text-slate-400 truncate">{item.label}</span>
-                  </div>
-                  <p className="text-[16px] font-extrabold text-slate-100 leading-tight mb-2">{item.value}</p>
-                  <div className="w-full h-1 rounded-full bg-slate-700/80 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${item.progress}%`,
-                        background: 'rgb(var(--primary-500))',
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      }
-
       case 'devices_table': {
         const tableLimit =
           widget.height === 'compact' ? 3 : widget.height === 'tall' ? 8 : 5;
@@ -2518,14 +2607,55 @@ export default function Dashboard() {
         );
       }
 
-      case 'quick_controls': {
-        const isHalf = widget.cols <= 6;
+      case 'switch_living': {
+        const swHeightClass =
+          widget.height === 'compact'
+            ? 'h-[240px] min-h-[240px]'
+            : widget.height === 'tall'
+            ? 'h-[420px] min-h-[420px]'
+            : 'h-[320px] min-h-[320px]';
         return (
-          <div className={`grid grid-cols-1 ${isHalf ? 'grid-cols-1' : 'md:grid-cols-3'} gap-5 pt-1 w-full`}>
-            <SmartSwitchWidget title="Lampu Ruang Tamu" initialState={true} topic="home/living-room/light" />
-            <SmartSwitchWidget title="Lampu Teras" initialState={false} topic="home/porch/light" />
-            <ThermostatWidget title="Living Room AC" initialValue={22} min={16} max={30} />
-          </div>
+          <SmartSwitchWidget
+            title="Lampu Ruang Tamu"
+            initialState={true}
+            topic="home/living-room/light"
+            className={swHeightClass}
+          />
+        );
+      }
+
+      case 'switch_porch': {
+        const swHeightClass =
+          widget.height === 'compact'
+            ? 'h-[240px] min-h-[240px]'
+            : widget.height === 'tall'
+            ? 'h-[420px] min-h-[420px]'
+            : 'h-[320px] min-h-[320px]';
+        return (
+          <SmartSwitchWidget
+            title="Lampu Teras"
+            initialState={false}
+            topic="home/porch/light"
+            className={swHeightClass}
+          />
+        );
+      }
+
+      case 'thermostat_ac': {
+        const thHeightClass =
+          widget.height === 'compact'
+            ? 'h-[240px] min-h-[240px]'
+            : widget.height === 'tall'
+            ? 'h-[420px] min-h-[420px]'
+            : 'h-[320px] min-h-[320px]';
+        return (
+          <ThermostatWidget
+            title="Living Room AC"
+            initialValue={22}
+            min={16}
+            max={30}
+            className={thHeightClass}
+          />
         );
       }
 
@@ -2555,24 +2685,33 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
             {editMode ? (
               <>
-                {/* Toggle Bucket Widgets Right Sidebar (Only shown in Edit Mode) */}
+                {/* Toggle Widget Catalog Sidebar (Icon Only) */}
                 <button
                   type="button"
                   onClick={toggleBucketSidebar}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm ${
+                  className={`relative w-9 h-9 rounded-xl flex items-center justify-center border transition-all shadow-sm ${
                     bucketSidebarOpen
                       ? 'bg-primary-500 text-white border-primary-400 shadow-md shadow-primary-500/25 ring-1 ring-primary-300/40'
                       : 'bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border-slate-700'
                   }`}
-                  title={bucketSidebarOpen ? 'Sembunyikan Sidebar Bucket Widget' : 'Buka Sidebar Bucket Widget'}
+                  title={bucketSidebarOpen ? 'Sembunyikan Katalog Widget' : 'Buka Katalog Widget'}
                 >
-                  <Database size={14} className={bucketSidebarOpen ? 'text-white' : 'text-primary-400'} />
-                  <span>Bucket Widgets</span>
+                  <LayoutGrid size={16} className={bucketSidebarOpen ? 'text-white' : 'text-primary-400'} />
                   {pinnedCount > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${bucketSidebarOpen ? 'bg-white text-primary-600' : 'bg-primary-500 text-white'}`}>
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-black flex items-center justify-center bg-primary-500 text-white border border-slate-900">
                       {pinnedCount}
                     </span>
                   )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAutoPackGrid}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-emerald-200 border border-slate-700 transition-all shadow-sm"
+                  title="Otomatis sesuaikan lebar widget agar seluruh baris terisi penuh tanpa celah kosong"
+                >
+                  <Maximize2 size={13} className="text-emerald-400" />
+                  <span>Rapikan Ruang Kosong</span>
                 </button>
 
                 <button
@@ -2621,17 +2760,17 @@ export default function Dashboard() {
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-ping" />
                 <p className="text-xs font-bold text-slate-200">
-                  <strong className="text-primary-400">Mode Kustomisasi Aktif:</strong> Drag ikon grip untuk geser posisi, klik pill ukuran (kolom & tinggi) atau tarik handle tepi/sudut untuk resize card, dan pilih style visual widget secara langsung.
+                  <strong className="text-primary-400">Mode Kustomisasi Aktif:</strong> Drag ikon grip atau klik panah <code className="px-1 py-0.5 rounded bg-slate-800 text-primary-300">&lt; &gt;</code> untuk bebas mengatur posisi, pilih ukuran kolom, atau klik <strong>Rapikan Ruang Kosong</strong> agar grid terisi rapat tanpa celah.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
                   onClick={toggleBucketSidebar}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary-500/20 hover:bg-primary-500/30 text-primary-300 border border-primary-500/40 transition-all shadow-sm"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center bg-primary-500/20 hover:bg-primary-500/30 text-primary-300 border border-primary-500/40 transition-all shadow-sm"
+                  title={bucketSidebarOpen ? 'Tutup Katalog Widget' : 'Buka Katalog Widget'}
                 >
-                  <Database size={13} className="text-primary-400" />
-                  <span>{bucketSidebarOpen ? 'Tutup Sidebar Bucket Widgets' : 'Buka Sidebar Bucket Widgets'}</span>
+                  <LayoutGrid size={14} className="text-primary-400" />
                 </button>
                 <span className="text-[11px] font-bold text-slate-400 bg-slate-900/60 px-2.5 py-1 rounded-lg border border-slate-700/60 flex-shrink-0">
                   Perubahan tersimpan otomatis
@@ -2662,14 +2801,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Dynamic Grid of Dashboard Cards with Sortable Reorder ── */}
+        {/* ── Dynamic Grid of Dashboard Cards with Dense Auto-Placement & Sortable Reorder ── */}
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={smartCollisionDetection}
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={visibleWidgets.map((w) => w.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-flow-row-dense gap-5 items-start">
               {visibleWidgets.map((widget) => (
                 <SortableDashboardCard
                   key={widget.id}
@@ -2678,11 +2817,12 @@ export default function Dashboard() {
                   cols={widget.cols}
                   height={widget.height || 'normal'}
                   allowedCols={
-                    widget.type === 'bucket_widget'
-                      ? [3, 4, 6, 8, 12]
-                      : (ALLOWED_COLS[widget.id] || [12])
+                    widget.type === 'bucket_widget' || widget.type === 'room_widget'
+                      ? STANDARD_ALLOWED_COLS
+                      : (ALLOWED_COLS[widget.id] || STANDARD_ALLOWED_COLS)
                   }
                   onResize={handleResizeWidget}
+                  onMoveOrder={handleMoveWidgetOrder}
                   onToggleVisibility={handleToggleVisibility}
                   editMode={editMode}
                 >
@@ -2695,7 +2835,7 @@ export default function Dashboard() {
           </SortableContext>
         </DndContext>
 
-      {/* ── Floating Right Pill Tab: ONLY in Edit Mode ── */}
+      {/* ── Floating Right Icon Trigger: ONLY in Edit Mode (Icon Only, No Text) ── */}
       {editMode && !bucketSidebarOpen && (
         <button
           type="button"
@@ -2703,29 +2843,37 @@ export default function Dashboard() {
             setBucketSidebarOpen(true);
             localStorage.setItem('iot_dashboard_bucket_sidebar_open', JSON.stringify(true));
           }}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 pl-3.5 pr-2.5 py-2.5 rounded-l-2xl bg-slate-900/95 hover:bg-slate-800 border-y border-l border-primary-500/50 shadow-[-4px_4px_25px_rgba(var(--primary-500),0.3)] text-primary-300 hover:text-white transition-all group cursor-pointer backdrop-blur-md"
-          title="Buka Sidebar Widget Data Bucket"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-40 w-11 h-11 flex items-center justify-center rounded-l-2xl bg-slate-900/95 hover:bg-slate-800 border-y border-l border-primary-500/50 shadow-[-4px_4px_25px_rgba(var(--primary-500),0.3)] text-primary-300 hover:text-white transition-all group cursor-pointer backdrop-blur-md"
+          title="Buka Katalog Widget"
         >
-          <Database size={15} className="text-primary-400 group-hover:scale-110 transition-transform animate-pulse" />
-          <span className="text-[11px] font-black tracking-wider uppercase hidden sm:inline">Bucket Widgets</span>
+          <LayoutGrid size={18} className="text-primary-400 group-hover:scale-110 transition-transform" />
           {pinnedCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-primary-500 text-white leading-none">
+            <span className="absolute -top-1.5 left-1.5 min-w-[17px] h-[17px] px-1 rounded-full text-[9px] font-extrabold bg-primary-500 text-white flex items-center justify-center border border-slate-900">
               {pinnedCount}
             </span>
           )}
         </button>
       )}
 
-      {/* ── Right Sidebar: Bucket Telemetry Widgets ── */}
+      {/* ── Right Sidebar: 2-Tab Widget Catalog (Built-in + Rooms & Data Bucket Widgets) ── */}
       <BucketWidgetsSidebar
         isOpen={bucketSidebarOpen}
         onClose={() => {
           setBucketSidebarOpen(false);
           localStorage.setItem('iot_dashboard_bucket_sidebar_open', JSON.stringify(false));
         }}
+        builtInWidgets={builtInWidgets}
+        onToggleBuiltInWidget={handleToggleVisibility}
+        placedRoomIds={placedRoomIds}
+        onPlaceRoomWidget={handlePlaceRoomWidget}
+        onRemoveRoomWidget={handleRemoveRoomWidget}
         placedWidgetIds={placedWidgetIds}
         onAddToDashboard={handlePlaceBucketWidget}
         onRemoveFromDashboard={handleRemoveBucketWidgetFromDashboard}
+        dashboardStats={stats}
+        recentDevices={recentDevices}
+        recentActivity={activity}
+        currentUser={currentUser}
       />
     </div>
   );
