@@ -9,7 +9,7 @@ import {
   useReducedMotion,
 } from "motion/react";
 import { type ReactNode, useId, useMemo, useRef } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { ParentSize } from "./chart-parent-size";
 import {
   type ChartStatFlowFormat,
@@ -1162,7 +1162,7 @@ export function Gauge({
 }: GaugeProps) {
   const props = { ...gaugeProps, value, centerValue, zones };
   const isLinear = orientation === "linear";
-  const resolvedMinWidth = minWidth ?? (isLinear ? 100 : 120);
+  const resolvedMinWidth = minWidth ?? (isLinear ? 200 : 300);
   const resolvedLinearHeight = linearHeight ?? DEFAULT_LINEAR_GAUGE_HEIGHT;
 
   if (isLinear) {
@@ -1221,31 +1221,6 @@ export function Gauge({
             width={widthProp}
             {...props}
           />
-        </div>
-      </LazyMotion>
-    );
-  }
-
-  if (heightProp != null) {
-    return (
-      <LazyMotion features={domAnimation}>
-        <div
-          className={cn("relative w-full max-w-full flex items-center justify-center", className)}
-          style={{ minWidth: resolvedMinWidth, height: heightProp }}
-        >
-          <ParentSize debounceTime={10}>
-            {({ width, height }) => {
-              const actualH = height && height > 0 ? height : heightProp;
-              return width > 0 && actualH > 0 ? (
-                <GaugeInner
-                  height={actualH}
-                  orientation="arc"
-                  width={width}
-                  {...props}
-                />
-              ) : null;
-            }}
-          </ParentSize>
         </div>
       </LazyMotion>
     );

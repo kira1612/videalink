@@ -1,7 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User, Key, Bell, Shield, Save, Eye, EyeOff, Copy, RefreshCw, Check, Globe, Camera, Palette, Sun, Moon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  User,
+  Key,
+  Bell,
+  Shield,
+  Save,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
+  Globe,
+  Camera,
+  Palette,
+  Sun,
+  Moon,
+  Trash2,
+  CreditCard,
+  ArrowUpRight,
+  AlertCircle,
+  RotateCcw,
+  ChevronDown,
+} from 'lucide-react';
 import { userApi } from '../services/api';
 import { applyCustomPrimaryHex } from '../App';
+import {
+  PREF_KEYS,
+  getUserStringPref,
+  setUserStringPref,
+  getUserJsonPref,
+  setUserJsonPref,
+} from '../utils/dashboardPrefs';
+import { useBillingQuota } from '../hooks/useBillingQuota';
 import Swal from 'sweetalert2';
 
 const INTERFACE_THEMES = [
@@ -67,214 +97,296 @@ const INTERFACE_THEMES = [
   },
 ];
 
-// ─── Common timezone list ────────────────────────────────────────────────────
 const TIMEZONES = [
-  { value: 'Pacific/Midway',      label: '(UTC-11:00) Midway Island' },
-  { value: 'Pacific/Honolulu',    label: '(UTC-10:00) Hawaii' },
-  { value: 'America/Anchorage',   label: '(UTC-09:00) Alaska' },
+  { value: 'Pacific/Midway', label: '(UTC-11:00) Midway Island' },
+  { value: 'Pacific/Honolulu', label: '(UTC-10:00) Hawaii' },
+  { value: 'America/Anchorage', label: '(UTC-09:00) Alaska' },
   { value: 'America/Los_Angeles', label: '(UTC-08:00) Pacific Time (US & Canada)' },
-  { value: 'America/Denver',      label: '(UTC-07:00) Mountain Time (US & Canada)' },
-  { value: 'America/Chicago',     label: '(UTC-06:00) Central Time (US & Canada)' },
-  { value: 'America/New_York',    label: '(UTC-05:00) Eastern Time (US & Canada)' },
-  { value: 'America/Caracas',     label: '(UTC-04:30) Venezuela' },
-  { value: 'America/Halifax',     label: '(UTC-04:00) Atlantic Time (Canada)' },
-  { value: 'America/Sao_Paulo',   label: '(UTC-03:00) Brasilia' },
-  { value: 'Atlantic/South_Georgia', label: '(UTC-02:00) Mid-Atlantic' },
-  { value: 'Atlantic/Azores',     label: '(UTC-01:00) Azores' },
-  { value: 'UTC',                 label: '(UTC+00:00) UTC / London' },
-  { value: 'Europe/Paris',        label: '(UTC+01:00) Central European Time' },
-  { value: 'Europe/Helsinki',     label: '(UTC+02:00) Eastern European Time' },
-  { value: 'Europe/Moscow',       label: '(UTC+03:00) Moscow' },
-  { value: 'Asia/Tehran',         label: '(UTC+03:30) Tehran' },
-  { value: 'Asia/Dubai',          label: '(UTC+04:00) Abu Dhabi, Muscat' },
-  { value: 'Asia/Kabul',          label: '(UTC+04:30) Kabul' },
-  { value: 'Asia/Karachi',        label: '(UTC+05:00) Islamabad, Karachi' },
-  { value: 'Asia/Kolkata',        label: '(UTC+05:30) Mumbai, New Delhi' },
-  { value: 'Asia/Kathmandu',      label: '(UTC+05:45) Kathmandu' },
-  { value: 'Asia/Dhaka',          label: '(UTC+06:00) Dhaka, Astana' },
-  { value: 'Asia/Rangoon',        label: '(UTC+06:30) Yangon (Rangoon)' },
-  { value: 'Asia/Bangkok',        label: '(UTC+07:00) Bangkok, Hanoi' },
-  { value: 'Asia/Jakarta',        label: '(UTC+07:00) Jakarta, WIB' },
-  { value: 'Asia/Hong_Kong',      label: '(UTC+08:00) Beijing, Hong Kong, Singapore' },
-  { value: 'Asia/Makassar',       label: '(UTC+08:00) Makassar, WITA' },
-  { value: 'Asia/Tokyo',          label: '(UTC+09:00) Tokyo, Seoul' },
-  { value: 'Asia/Jayapura',       label: '(UTC+09:00) Jayapura, WIT' },
-  { value: 'Australia/Sydney',    label: '(UTC+10:00) Sydney, Melbourne' },
-  { value: 'Pacific/Auckland',    label: '(UTC+12:00) Auckland, Wellington' },
+  { value: 'America/Denver', label: '(UTC-07:00) Mountain Time (US & Canada)' },
+  { value: 'America/Chicago', label: '(UTC-06:00) Central Time (US & Canada)' },
+  { value: 'America/New_York', label: '(UTC-05:00) Eastern Time (US & Canada)' },
+  { value: 'UTC', label: '(UTC+00:00) UTC / London' },
+  { value: 'Europe/Paris', label: '(UTC+01:00) Central European Time' },
+  { value: 'Europe/Helsinki', label: '(UTC+02:00) Eastern European Time' },
+  { value: 'Asia/Dubai', label: '(UTC+04:00) Abu Dhabi, Muscat' },
+  { value: 'Asia/Bangkok', label: '(UTC+07:00) Bangkok, Hanoi' },
+  { value: 'Asia/Jakarta', label: '(UTC+07:00) Jakarta, WIB' },
+  { value: 'Asia/Hong_Kong', label: '(UTC+08:00) Beijing, Hong Kong, Singapore' },
+  { value: 'Asia/Makassar', label: '(UTC+08:00) Makassar, WITA' },
+  { value: 'Asia/Tokyo', label: '(UTC+09:00) Tokyo, Seoul' },
+  { value: 'Asia/Jayapura', label: '(UTC+09:00) Jayapura, WIT' },
+  { value: 'Australia/Sydney', label: '(UTC+10:00) Sydney, Melbourne' },
 ];
 
-function SettingsSection({ title, icon: Icon, children }) {
+const DEFAULT_NOTIFICATIONS = {
+  deviceOffline: true,
+  deviceOnline: false,
+  highTemperature: true,
+  endpointTrigger: true,
+  weeklyReport: false,
+};
+
+const NOTIFICATION_ITEMS = [
+  {
+    key: 'deviceOffline',
+    label: 'Perangkat Terputus (Offline)',
+    desc: 'Beri peringatan saat perangkat kehilangan koneksi ke broker MQTT atau timeout.',
+  },
+  {
+    key: 'deviceOnline',
+    label: 'Perangkat Kembali Online',
+    desc: 'Tampilkan notifikasi saat perangkat berhasil terhubung ulang.',
+  },
+  {
+    key: 'highTemperature',
+    label: 'Peringatan Ambang Batas (Threshold)',
+    desc: 'Kirim alert ketika pembacaan sensor melewati batas aturan yang ditentukan.',
+  },
+  {
+    key: 'endpointTrigger',
+    label: 'Eksekusi Webhook & Endpoint',
+    desc: 'Catat pemberitahuan ketika automasi memicu endpoint eksternal.',
+  },
+  {
+    key: 'weeklyReport',
+    label: 'Ringkasan Aktivitas Mingguan',
+    desc: 'Terima laporan ringkas performa perangkat dan pemakaian kuota tiap minggu.',
+  },
+];
+
+const SETTINGS_TABS = [
+  { id: 'profile', label: 'Profil Akun', icon: User },
+  { id: 'appearance', label: 'Tampilan', icon: Palette },
+  { id: 'preferences', label: 'Zona Waktu', icon: Globe },
+  { id: 'security', label: 'Keamanan', icon: Shield },
+  { id: 'api', label: 'Token API', icon: Key },
+  { id: 'notifications', label: 'Notifikasi', icon: Bell },
+];
+
+function SectionCard({ title, subtitle, children }) {
   return (
-    <div className="vision-card p-6">
-      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-800/70">
-        <div className="vision-icon-box w-9 h-9 rounded-xl">
-          <Icon size={16} />
-        </div>
-        <h3 className="font-bold text-[16px] text-slate-100">{title}</h3>
-      </div>
+    <section className="ops-surface p-6 sm:p-7 space-y-6">
+      <header
+        className="pb-4 border-b space-y-1"
+        style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+      >
+        <h2
+          className="text-base font-bold tracking-tight"
+          style={{ color: 'rgb(var(--surface-50))', textWrap: 'balance' }}
+        >
+          {title}
+        </h2>
+        {subtitle && (
+          <p
+            className="text-xs"
+            style={{ color: 'rgb(var(--surface-400))', textWrap: 'pretty' }}
+          >
+            {subtitle}
+          </p>
+        )}
+      </header>
       {children}
-    </div>
+    </section>
   );
 }
 
 export default function Settings() {
+  const { billingSummary } = useBillingQuota();
+  const fileInputRef = useRef(null);
+
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('iot_user');
-    return saved ? JSON.parse(saved) : { name: 'Admin', email: '', role: 'Administrator', timezone: 'Asia/Jakarta' };
+    try {
+      const saved = localStorage.getItem('iot_user');
+      return saved
+        ? JSON.parse(saved)
+        : { name: 'Admin', email: '', role: 'admin', timezone: 'Asia/Jakarta' };
+    } catch {
+      return { name: 'Admin', email: '', role: 'admin', timezone: 'Asia/Jakarta' };
+    }
   });
 
+  const [activeTab, setActiveTab] = useState('profile');
+
+  // Profile state
   const [profile, setProfile] = useState({
-    name: currentUser.name,
-    email: currentUser.email,
+    name: currentUser.name || '',
+    email: currentUser.email || '',
   });
   const [avatar, setAvatar] = useState(currentUser.avatar || null);
-  const fileInputRef = useRef(null);
-  const [timezone, setTimezone] = useState(currentUser.timezone || 'Asia/Jakarta');
-  const [theme, setTheme] = useState(() => {
-    const userStr = localStorage.getItem('iot_user');
-    const user = userStr ? JSON.parse(userStr) : {};
-    return user.theme || localStorage.getItem('iot_theme') || 'blue';
-  });
-  const [mode, setMode] = useState(() => {
-    const userStr = localStorage.getItem('iot_user');
-    const user = userStr ? JSON.parse(userStr) : {};
-    return user.mode || localStorage.getItem('iot_mode') || 'dark';
-  });
+  const [profileError, setProfileError] = useState('');
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  // Appearance state
+  const [theme, setTheme] = useState(() => currentUser.theme || 'blue');
+  const [mode, setMode] = useState(() => currentUser.mode || 'dark');
   const [customHex, setCustomHex] = useState(() => {
-    const savedCustom = localStorage.getItem('iot_custom_primary');
-    if (savedCustom) return savedCustom.replace('#', '').toUpperCase();
-    const userStr = localStorage.getItem('iot_user');
-    const user = userStr ? JSON.parse(userStr) : {};
-    const activeId = user.theme || localStorage.getItem('iot_theme') || 'blue';
-    const found = INTERFACE_THEMES.find(t => t.id === activeId);
+    const savedCustom =
+      getUserStringPref(PREF_KEYS.CUSTOM_PRIMARY, null, currentUser?.id) ||
+      currentUser?.dashboard_preferences?.custom_primary;
+    if (savedCustom) return String(savedCustom).replace('#', '').toUpperCase();
+    const found = INTERFACE_THEMES.find((t) => t.id === (currentUser.theme || 'blue'));
     return found ? found.hex : '0075FF';
   });
-  const [transparentSidebar, setTransparentSidebar] = useState(() => {
-    return localStorage.getItem('iot_transparent_sidebar') !== 'false';
-  });
-  const [passwordForm, setPasswordForm] = useState({ current_password: '', password: '' });
-  const [showToken, setShowToken] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [transparentSidebar, setTransparentSidebar] = useState(
+    () => getUserStringPref(PREF_KEYS.TRANSPARENT_SIDEBAR, null) !== 'false'
+  );
+
+  // Timezone state
+  const [timezone, setTimezone] = useState(currentUser.timezone || 'Asia/Jakarta');
+  const [tzBusy, setTzBusy] = useState(false);
   const [tzSaved, setTzSaved] = useState(false);
+  const [previewTime, setPreviewTime] = useState('');
+
+  // Security state
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    password: '',
+    password_confirmation: '',
+  });
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [passError, setPassError] = useState('');
+  const [passBusy, setPassBusy] = useState(false);
   const [passSaved, setPassSaved] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [tzLoading, setTzLoading] = useState(false);
-  const [notifications, setNotifications] = useState({
-    deviceOffline: true,
-    deviceOnline: false,
-    highTemperature: true,
-    endpointTrigger: true,
-    weeklyReport: false,
+
+  // API Token state
+  const [showToken, setShowToken] = useState(false);
+  const [copiedType, setCopiedType] = useState('');
+  const token = localStorage.getItem('iot_token') || '';
+
+  // Notifications state
+  const [notifications, setNotifications] = useState(() => {
+    const saved = getUserJsonPref(PREF_KEYS.NOTIFICATIONS, null);
+    return saved && typeof saved === 'object'
+      ? { ...DEFAULT_NOTIFICATIONS, ...saved }
+      : DEFAULT_NOTIFICATIONS;
   });
 
-  const token = localStorage.getItem('iot_token') || 'No token found';
+  useEffect(() => {
+    const updateClock = () => {
+      try {
+        setPreviewTime(
+          new Intl.DateTimeFormat('id-ID', {
+            timeZone: timezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }).format(new Date())
+        );
+      } catch {
+        setPreviewTime('Zona waktu tidak valid');
+      }
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, [timezone]);
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(token);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const userInitials = useMemo(() => {
+    const name = (profile.name || currentUser.name || 'U').trim();
+    return name
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }, [profile.name, currentUser.name]);
 
   const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        Swal.fire({ icon: 'error', title: 'File Too Large', text: 'Please select an image under 2MB', background: '#1e293b', color: '#e2e8f0' });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Ukuran File Terlalu Besar',
+        text: 'Pilih gambar dengan ukuran maksimal 2 MB.',
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatar(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setProfileError('');
+
+    const trimmedName = profile.name.trim();
+    const trimmedEmail = profile.email.trim();
+    if (!trimmedName) {
+      setProfileError('Nama lengkap tidak boleh kosong.');
+      return;
+    }
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setProfileError('Masukkan alamat email yang valid.');
+      return;
+    }
+
+    setProfileBusy(true);
+    try {
+      const res = await userApi.update({
+        name: trimmedName,
+        email: trimmedEmail,
+        avatar,
+      });
+      const updatedUser = {
+        ...currentUser,
+        name: res.data?.name ?? trimmedName,
+        email: res.data?.email ?? trimmedEmail,
+        avatar: res.data?.avatar !== undefined ? res.data.avatar : avatar,
       };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    setLoading(true);
-    try {
-      // In a real app we'd send multipart form data or URL to the backend
-      const payload = { ...profile, avatar };
-      const res = await userApi.update(payload);
-      const updatedUser = { ...currentUser, name: res.data.name, email: res.data.email, avatar: res.data.avatar || avatar };
       setCurrentUser(updatedUser);
       localStorage.setItem('iot_user', JSON.stringify(updatedUser));
       window.dispatchEvent(new Event('user-updated'));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
       Swal.fire({
-        toast: true, position: 'top-end', icon: 'success',
-        title: 'Profile saved!', showConfirmButton: false,
-        timer: 2000, timerProgressBar: true,
-        background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399',
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Profil diperbarui.',
+        showConfirmButton: false,
+        timer: 2000,
       });
     } catch (err) {
-      // Fallback for demo if API fails
-      const updatedUser = { ...currentUser, name: profile.name, email: profile.email, avatar };
-      setCurrentUser(updatedUser);
-      localStorage.setItem('iot_user', JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event('user-updated'));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-      Swal.fire({
-        toast: true, position: 'top-end', icon: 'success',
-        title: 'Profile saved locally!', showConfirmButton: false,
-        timer: 2000, timerProgressBar: true,
-        background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399',
-      });
+      setProfileError(
+        err?.response?.data?.message ||
+          'Gagal menyimpan perubahan profil. Periksa koneksi ke server.'
+      );
     } finally {
-      setLoading(false);
+      setProfileBusy(false);
     }
   };
 
-  const handleSaveTimezone = async () => {
-    setTzLoading(true);
-    try {
-      const res = await userApi.update({ timezone });
-      const updatedUser = { ...currentUser, timezone: res.data.timezone ?? timezone };
-      setCurrentUser(updatedUser);
-      localStorage.setItem('iot_user', JSON.stringify(updatedUser));
-      window.dispatchEvent(new Event('user-updated'));
-      setTzSaved(true);
-      setTimeout(() => setTzSaved(false), 2500);
-      Swal.fire({
-        toast: true, position: 'top-end', icon: 'success',
-        title: 'Timezone updated!', showConfirmButton: false,
-        timer: 2000, timerProgressBar: true,
-        background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399',
-      });
-    } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed', text: err.response?.data?.message || 'Failed to update timezone', background: '#1e293b', color: '#e2e8f0' });
-    } finally {
-      setTzLoading(false);
-    }
-  };
-
-  const handleThemeChange = async (newTheme) => {
+  const handleThemeChange = (newTheme) => {
     setTheme(newTheme);
-    localStorage.removeItem('iot_custom_primary');
+    setUserStringPref(PREF_KEYS.CUSTOM_PRIMARY, null);
     applyCustomPrimaryHex(null);
-    const found = INTERFACE_THEMES.find(t => t.id === newTheme);
-    if (found) {
-      setCustomHex(found.hex);
-      localStorage.setItem('iot_theme_color', `#${found.hex}`);
-    }
+    const found = INTERFACE_THEMES.find((t) => t.id === newTheme);
+    if (found) setCustomHex(found.hex);
 
-    const userStr = localStorage.getItem('iot_user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
+    try {
+      const savedStr = localStorage.getItem('iot_user');
+      if (savedStr) {
+        const user = JSON.parse(savedStr);
         user.theme = newTheme;
         localStorage.setItem('iot_user', JSON.stringify(user));
-        // Update DB without blocking
+        setCurrentUser(user);
         userApi.update({ theme: newTheme }).catch(() => {});
-      } catch (e) {}
-    } else {
-      localStorage.setItem('iot_theme', newTheme);
-    }
-    localStorage.setItem('iot_theme', newTheme);
-    
+      } else {
+        localStorage.setItem('iot_theme', newTheme);
+      }
+    } catch {}
+
     if (newTheme === 'blue') {
       document.documentElement.removeAttribute('data-theme');
     } else {
@@ -288,57 +400,26 @@ export default function Settings() {
     setCustomHex(cleaned);
     if (cleaned.length === 6) {
       const hexWithHash = `#${cleaned}`;
-      localStorage.setItem('iot_custom_primary', hexWithHash);
-      localStorage.setItem('iot_theme_color', hexWithHash);
+      setUserStringPref(PREF_KEYS.CUSTOM_PRIMARY, hexWithHash);
       applyCustomPrimaryHex(hexWithHash);
       window.dispatchEvent(new Event('theme-updated'));
     }
   };
 
-  const handleToggleTransparentSidebar = () => {
-    const next = !transparentSidebar;
-    setTransparentSidebar(next);
-    localStorage.setItem('iot_transparent_sidebar', String(next));
-    window.dispatchEvent(new Event('theme-updated'));
-  };
-
-  const handleSaveAppearancePreferences = () => {
-    Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'success',
-      title: 'Appearance preferences saved!',
-      showConfirmButton: false,
-      timer: 2000,
-      timerProgressBar: true,
-      background: '#0f1535',
-      color: '#f8fafc',
-      iconColor: `#${customHex.length === 6 ? customHex : '0075FF'}`,
-    });
-  };
-
-  const handleResetAppearance = () => {
-    handleThemeChange('blue');
-    handleModeChange('dark');
-    setTransparentSidebar(true);
-    localStorage.setItem('iot_transparent_sidebar', 'true');
-    window.dispatchEvent(new Event('theme-updated'));
-  };
-
-  const handleModeChange = async (newMode) => {
+  const handleModeChange = (newMode) => {
     setMode(newMode);
-    const userStr = localStorage.getItem('iot_user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
+    try {
+      const savedStr = localStorage.getItem('iot_user');
+      if (savedStr) {
+        const user = JSON.parse(savedStr);
         user.mode = newMode;
         localStorage.setItem('iot_user', JSON.stringify(user));
-        // Update DB without blocking
+        setCurrentUser(user);
         userApi.update({ mode: newMode }).catch(() => {});
-      } catch (e) {}
-    } else {
-      localStorage.setItem('iot_mode', newMode);
-    }
+      } else {
+        localStorage.setItem('iot_mode', newMode);
+      }
+    } catch {}
 
     if (newMode === 'dark') {
       document.documentElement.removeAttribute('data-mode');
@@ -347,203 +428,492 @@ export default function Settings() {
     }
   };
 
-  const handleSavePassword = async () => {
+  const handleToggleTransparentSidebar = () => {
+    const next = !transparentSidebar;
+    setTransparentSidebar(next);
+    setUserStringPref(PREF_KEYS.TRANSPARENT_SIDEBAR, String(next));
+    window.dispatchEvent(new Event('theme-updated'));
+  };
+
+  const handleResetAppearance = () => {
+    handleThemeChange('blue');
+    handleModeChange('dark');
+    setTransparentSidebar(true);
+    setUserStringPref(PREF_KEYS.TRANSPARENT_SIDEBAR, 'true');
+    window.dispatchEvent(new Event('theme-updated'));
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'info',
+      title: 'Tampilan dikembalikan ke default.',
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  };
+
+  const handleSaveAppearancePreferences = () => {
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'success',
+      title: 'Preferensi tampilan tersimpan.',
+      showConfirmButton: false,
+      timer: 2000,
+    });
+  };
+
+  const handleSaveTimezone = async () => {
+    setTzBusy(true);
     try {
-      await userApi.updatePassword(passwordForm);
-      setPasswordForm({ current_password: '', password: '' });
-      setPassSaved(true);
-      setTimeout(() => setPassSaved(false), 2500);
+      const res = await userApi.update({ timezone });
+      const updatedUser = { ...currentUser, timezone: res.data?.timezone ?? timezone };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('iot_user', JSON.stringify(updatedUser));
+      window.dispatchEvent(new Event('user-updated'));
+      setTzSaved(true);
+      setTimeout(() => setTzSaved(false), 2500);
       Swal.fire({
-        toast: true, position: 'top-end', icon: 'success',
-        title: 'Password updated!', showConfirmButton: false,
-        timer: 2000, timerProgressBar: true,
-        background: '#1e293b', color: '#e2e8f0', iconColor: '#34d399',
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Zona waktu diperbarui.',
+        showConfirmButton: false,
+        timer: 2000,
       });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Failed', text: err.response?.data?.message || 'Failed to update password', background: '#1e293b', color: '#e2e8f0' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memperbarui',
+        text: err?.response?.data?.message || 'Tidak dapat menyimpan zona waktu.',
+      });
+    } finally {
+      setTzBusy(false);
     }
   };
 
-  // Live preview of current time in selected timezone
-  const [previewTime, setPreviewTime] = useState('');
-  useEffect(() => {
-    const update = () => {
-      try {
-        setPreviewTime(new Intl.DateTimeFormat('id-ID', {
-          timeZone: timezone,
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          hour12: false,
-          year: 'numeric', month: 'short', day: 'numeric',
-        }).format(new Date()));
-      } catch { setPreviewTime('Invalid timezone'); }
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [timezone]);
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+    setPassError('');
 
-  const [activeTab, setActiveTab] = useState('profile');
+    if (!passwordForm.current_password) {
+      setPassError('Masukkan kata sandi Anda saat ini.');
+      return;
+    }
+    if (passwordForm.password.length < 8) {
+      setPassError('Kata sandi baru minimal harus 8 karakter.');
+      return;
+    }
+    if (passwordForm.password !== passwordForm.password_confirmation) {
+      setPassError('Konfirmasi kata sandi baru tidak cocok.');
+      return;
+    }
 
-  const tabs = [
-    { id: 'profile', label: 'General Profile', icon: User, desc: 'Your personal info' },
-    { id: 'appearance', label: 'Appearance', icon: Palette, desc: 'Theme & colors' },
-    { id: 'preferences', label: 'Preferences', icon: Globe, desc: 'Localization & timezone' },
-    { id: 'security', label: 'Security', icon: Shield, desc: 'Password & authentication' },
-    { id: 'api', label: 'API Keys', icon: Key, desc: 'Tokens for integration' },
-    { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'Alerts & emails' },
-  ];
+    setPassBusy(true);
+    try {
+      await userApi.updatePassword({
+        current_password: passwordForm.current_password,
+        password: passwordForm.password,
+      });
+      setPasswordForm({
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+      });
+      setPassSaved(true);
+      setTimeout(() => setPassSaved(false), 2500);
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Kata sandi diperbarui.',
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch (err) {
+      setPassError(
+        err?.response?.data?.message || 'Kata sandi saat ini salah atau gagal diperbarui.'
+      );
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  const handleCopyText = (type, text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedType(type);
+    setTimeout(() => setCopiedType(''), 2000);
+  };
+
+  const handleToggleNotification = (key) => {
+    setNotifications((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      setUserJsonPref(PREF_KEYS.NOTIFICATIONS, next);
+      return next;
+    });
+  };
+
+  const isCustomHexActive = Boolean(getUserStringPref(PREF_KEYS.CUSTOM_PRIMARY, null));
+
+  const fieldStyle = {
+    backgroundColor: 'rgb(var(--surface-800) / 0.4)',
+    borderColor: 'rgb(var(--surface-700) / 0.75)',
+    color: 'rgb(var(--surface-50))',
+  };
 
   return (
-    <div className="animate-fade-in max-w-6xl mx-auto h-[calc(100vh-8rem)]">
-      <div className="flex flex-col md:flex-row gap-6 h-full">
-        {/* Settings Sidebar Tabs */}
-        <div className="w-full md:w-72 flex-shrink-0 flex flex-col gap-2.5">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-start gap-3.5 p-3.5 rounded-2xl transition-all duration-300 text-left ${
-                  isActive 
-                    ? 'vision-card border-primary-500/40' 
-                    : 'hover:bg-slate-800/40 text-slate-400 hover:text-slate-200 border border-transparent'
-                }`}
-              >
-                <div className={isActive ? 'vision-icon-box w-9 h-9 rounded-xl flex-shrink-0' : 'vision-inner-box w-9 h-9 rounded-xl flex items-center justify-center text-primary-400 flex-shrink-0'}>
-                  <Icon size={17} />
-                </div>
-                <div>
-                  <h4 className={`font-bold text-sm ${isActive ? 'text-slate-100' : 'text-slate-300'}`}>{tab.label}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{tab.desc}</p>
-                </div>
-              </button>
-            )
-          })}
+    <div className="space-y-5 pb-10 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <h1
+            className="text-xl font-bold tracking-tight"
+            style={{ color: 'rgb(var(--surface-50))', textWrap: 'balance' }}
+          >
+            Pengaturan
+          </h1>
+          <p
+            className="text-xs"
+            style={{ color: 'rgb(var(--surface-400))', textWrap: 'pretty' }}
+          >
+            Kelola profil akun, tampilan workspace, zona waktu, keamanan, dan token API.
+          </p>
         </div>
 
-        {/* Settings Content Area */}
-        <div className="flex-1 min-w-0 pb-10">
+        {billingSummary?.plan && (
+          <Link
+            to="/app/billing"
+            className="self-start sm:self-auto min-h-[38px] px-3.5 rounded-lg border text-xs font-semibold flex items-center gap-2 transition-[background-color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary-500))]"
+            style={{
+              backgroundColor: 'rgb(var(--surface-900))',
+              borderColor: 'rgb(var(--surface-700) / 0.7)',
+              color: 'rgb(var(--surface-100))',
+            }}
+          >
+            <CreditCard size={14} style={{ color: 'rgb(var(--primary-400))' }} />
+            <span>Paket {billingSummary.plan.name}</span>
+            <ArrowUpRight size={13} style={{ color: 'rgb(var(--surface-400))' }} />
+          </Link>
+        )}
+      </div>
+
+      {/* Mobile Horizontal Tabs */}
+      <div
+        role="tablist"
+        aria-label="Kategori Pengaturan"
+        className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1"
+      >
+        {SETTINGS_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(tab.id)}
+              className="min-h-[38px] px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-[background-color,border-color,color] duration-150"
+              style={{
+                backgroundColor: active ? 'rgb(var(--primary-500))' : 'rgb(var(--surface-900))',
+                borderColor: active
+                  ? 'rgb(var(--primary-500))'
+                  : 'rgb(var(--surface-700) / 0.65)',
+                color: active ? '#ffffff' : 'rgb(var(--surface-300))',
+              }}
+            >
+              <Icon size={14} strokeWidth={1.75} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Split Layout */}
+      <div className="flex flex-col md:flex-row gap-6 items-start">
+        {/* Quiet Borderless Settings Rail */}
+        <aside className="hidden md:flex w-56 lg:w-60 shrink-0 flex-col gap-5 md:sticky md:top-6">
+          <nav
+            role="tablist"
+            aria-orientation="vertical"
+            aria-label="Menu Pengaturan"
+            className="flex flex-col gap-0.5"
+          >
+            {SETTINGS_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="w-full min-h-[40px] px-3 rounded-lg flex items-center gap-2.5 text-left text-[13px] font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary-500))]"
+                  style={{
+                    backgroundColor: isActive
+                      ? 'rgb(var(--surface-800) / 0.75)'
+                      : 'transparent',
+                    color: isActive ? 'rgb(var(--surface-50))' : 'rgb(var(--surface-400))',
+                  }}
+                >
+                  <Icon
+                    size={15}
+                    strokeWidth={1.75}
+                    style={{
+                      color: isActive
+                        ? 'rgb(var(--primary-400))'
+                        : 'rgb(var(--surface-400))',
+                    }}
+                  />
+                  <span className={isActive ? 'font-semibold' : ''}>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Subtle Account Footer */}
+          <div
+            className="pt-4 border-t px-2 flex items-center gap-2.5"
+            style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+          >
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0 overflow-hidden"
+              style={{
+                backgroundColor: 'rgb(var(--surface-800))',
+                color: 'rgb(var(--surface-200))',
+                outline: '1px solid rgba(255,255,255,0.08)',
+                outlineOffset: '-1px',
+              }}
+            >
+              {avatar ? (
+                <img src={avatar} alt={profile.name} className="w-full h-full object-cover" />
+              ) : (
+                userInitials
+              )}
+            </div>
+            <div className="min-w-0">
+              <div
+                className="text-xs font-semibold truncate"
+                style={{ color: 'rgb(var(--surface-100))' }}
+              >
+                {profile.name || currentUser.name}
+              </div>
+              <div
+                className="text-[11px] truncate"
+                style={{ color: 'rgb(var(--surface-400))' }}
+              >
+                {currentUser.role === 'admin' ? 'Administrator' : 'Member IoT'}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Active Panel */}
+        <div className="flex-1 min-w-0 w-full">
+          {/* 1. PROFILE */}
           {activeTab === 'profile' && (
-            <div className="space-y-6 animate-fade-in">
-              <SettingsSection title="Personal Information" icon={User}>
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="relative group flex-shrink-0">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-500 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-lg shadow-primary-500/20 ring-4 ring-slate-900 overflow-hidden">
+            <SectionCard
+              title="Informasi Pribadi"
+              subtitle="Perbarui foto profil, nama tampilan, dan alamat email akun Anda."
+            >
+              <form onSubmit={handleSaveProfile} className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="relative group shrink-0 self-start">
+                    <div
+                      className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold overflow-hidden"
+                      style={{
+                        backgroundColor: 'rgb(var(--surface-800))',
+                        color: 'rgb(var(--surface-100))',
+                        outline: '1px solid rgba(255,255,255,0.1)',
+                        outlineOffset: '-1px',
+                      }}
+                    >
                       {avatar ? (
-                        <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                        <img
+                          src={avatar}
+                          alt={profile.name || 'Foto Profil'}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'
+                        userInitials
                       )}
                     </div>
-                    
-                    <button 
+
+                    <button
+                      type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-primary-500/50 backdrop-blur-sm"
-                      title="Change Photo"
+                      aria-label="Unggah foto profil baru"
+                      className="absolute inset-0 bg-slate-950/65 flex items-center justify-center rounded-xl opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 cursor-pointer"
                     >
-                      <Camera size={20} className="text-white mb-1" />
-                      <span className="text-[10px] font-medium text-white uppercase tracking-wider">Upload</span>
+                      <Camera size={16} className="text-white" />
                     </button>
-                    
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      onChange={handleAvatarChange} 
-                      accept="image/*" 
-                      className="hidden" 
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleAvatarChange}
+                      accept="image/*"
+                      className="hidden"
                     />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-100">{profile.name}</h3>
-                    <p className="text-sm text-primary-400 font-medium mb-1">{currentUser.role || 'Administrator'}</p>
-                    <p className="text-sm text-slate-500">Update your photo and personal details here.</p>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="min-h-[36px] px-3 rounded-lg border text-xs font-semibold transition-[background-color] duration-150"
+                        style={{
+                          borderColor: 'rgb(var(--surface-700) / 0.7)',
+                          color: 'rgb(var(--surface-100))',
+                        }}
+                      >
+                        Unggah Foto
+                      </button>
+                      {avatar && (
+                        <button
+                          type="button"
+                          onClick={() => setAvatar(null)}
+                          className="min-h-[36px] px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-[background-color] duration-150"
+                          style={{
+                            borderColor: 'rgb(244 63 94 / 0.3)',
+                            color: 'rgb(251 113 133)',
+                          }}
+                        >
+                          <Trash2 size={13} />
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px]" style={{ color: 'rgb(var(--surface-400))' }}>
+                      Format JPG atau PNG, maksimal 2 MB.
+                    </p>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2" htmlFor="settings-name">Full Name</label>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="settings-name"
+                      className="block text-xs font-semibold"
+                      style={{ color: 'rgb(var(--surface-200))' }}
+                    >
+                      Nama Lengkap
+                    </label>
                     <input
                       id="settings-name"
-                      className="input-field bg-slate-900/50"
+                      type="text"
                       value={profile.name}
-                      onChange={e => setProfile({ ...profile, name: e.target.value })}
+                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                      className="w-full min-h-[40px] px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                      style={fieldStyle}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2" htmlFor="settings-email">Email Address</label>
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="settings-email"
+                      className="block text-xs font-semibold"
+                      style={{ color: 'rgb(var(--surface-200))' }}
+                    >
+                      Alamat Email
+                    </label>
                     <input
                       id="settings-email"
                       type="email"
-                      className="input-field bg-slate-900/50"
                       value={profile.email}
-                      onChange={e => setProfile({ ...profile, email: e.target.value })}
+                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                      className="w-full min-h-[40px] px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                      style={fieldStyle}
                     />
                   </div>
                 </div>
-                <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-end">
+
+                {profileError && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium"
+                    style={{
+                      backgroundColor: 'rgb(244 63 94 / 0.08)',
+                      borderColor: 'rgb(244 63 94 / 0.3)',
+                      color: 'rgb(251 113 133)',
+                    }}
+                  >
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span>{profileError}</span>
+                  </div>
+                )}
+
+                <div
+                  className="pt-4 border-t flex justify-end"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
                   <button
                     id="btn-save-profile"
-                    onClick={handleSaveProfile}
-                    disabled={loading}
-                    className={`flex items-center gap-2 transition-all px-6 py-2.5 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-70
-                      ${saved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-emerald-500/10' : 'btn-primary shadow-primary-500/20'}`}
+                    type="submit"
+                    disabled={profileBusy}
+                    className="min-h-[40px] px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                    style={{
+                      backgroundColor: profileSaved
+                        ? 'rgb(16 185 129)'
+                        : 'rgb(var(--primary-500))',
+                    }}
                   >
-                    {loading
-                      ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Saving...</>
-                      : saved ? <><Check size={16} /> Saved Successfully</>
-                      : <><Save size={16} /> Save Changes</>}
+                    {profileBusy ? (
+                      'Menyimpan...'
+                    ) : profileSaved ? (
+                      <>
+                        <Check size={14} /> Tersimpan
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} /> Simpan Perubahan
+                      </>
+                    )}
                   </button>
                 </div>
-              </SettingsSection>
-            </div>
+              </form>
+            </SectionCard>
           )}
 
+          {/* 2. APPEARANCE */}
           {activeTab === 'appearance' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="vision-card p-6 sm:p-8 max-w-4xl">
-                {/* ── Modal-style Header ── */}
-                <div className="flex items-center justify-between pb-5 mb-6 border-b border-slate-800/80">
+            <SectionCard
+              title="Tampilan & Tema"
+              subtitle="Sesuaikan palet warna, mode permukaan terang/gelap, dan transparansi sidebar."
+            >
+              <div className="space-y-6">
+                <div className="space-y-3">
                   <div>
-                    <h3 className="text-[19px] font-bold text-slate-100 tracking-tight">Appearance</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Personalize your Videa Link IoT workspace atmosphere</p>
+                    <h3
+                      className="text-xs font-bold uppercase tracking-wider"
+                      style={{ color: 'rgb(var(--surface-300))' }}
+                    >
+                      Tema Antarmuka
+                    </h3>
                   </div>
-                  <div className="vision-icon-box w-9 h-9 rounded-xl">
-                    <Palette size={17} />
-                  </div>
-                </div>
 
-                {/* ── 1. Interface Theme (Visual Mini-UI Cards like Reference Image) ── */}
-                <div className="mb-7">
-                  <h4 className="text-[14px] font-bold text-slate-100">Interface theme</h4>
-                  <p className="text-[12px] text-slate-400 mt-0.5 mb-4">Customize your workspace theme</p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                     {INTERFACE_THEMES.map((t) => {
-                      const isSelected = theme === t.id && !localStorage.getItem('iot_custom_primary');
+                      const isSelected = theme === t.id && !isCustomHexActive;
                       return (
                         <button
                           key={t.id}
                           type="button"
                           onClick={() => handleThemeChange(t.id)}
-                          className="rounded-2xl p-3 text-left transition-all duration-300 relative group focus:outline-none"
+                          aria-pressed={isSelected}
+                          className="rounded-xl p-2.5 text-left transition-[border-color,transform] duration-150 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary-500))]"
                           style={{
-                            background: 'rgb(var(--surface-900) / 0.78)',
+                            backgroundColor: 'rgb(var(--surface-800) / 0.35)',
                             border: isSelected
                               ? `1.5px solid ${t.accent}`
-                              : '1.5px solid rgba(148, 163, 184, 0.14)',
-                            boxShadow: isSelected
-                              ? `0 0 24px -4px ${t.accent}45, inset 0 1px 0 0 rgba(255,255,255,0.08)`
-                              : '0 8px 20px -6px rgba(0, 0, 0, 0.35)',
+                              : '1px solid rgb(var(--surface-700) / 0.55)',
                           }}
                         >
-                          {/* Mini Application Window Mockup */}
-                          <div className="rounded-xl overflow-hidden border border-white/[0.07] mb-3 shadow-inner">
-                            {/* Window Titlebar */}
+                          <div className="rounded-lg overflow-hidden border border-white/10 mb-2">
                             <div
-                              className="h-5 px-2.5 flex items-center justify-between border-b border-white/[0.05]"
+                              className="h-4 px-2 flex items-center justify-between border-b border-white/5"
                               style={{ backgroundColor: t.topBar }}
                             >
                               <div className="flex items-center gap-1">
@@ -552,106 +922,81 @@ export default function Settings() {
                                   style={{ backgroundColor: t.accent }}
                                 />
                                 <span className="w-1.5 h-1.5 rounded-full bg-white/25" />
-                                <span className="w-1.5 h-1.5 rounded-full bg-white/25" />
                               </div>
-                              {/* Mini Top Search Pill */}
-                              <div className="w-14 h-2 rounded-full border border-white/20 bg-white/[0.06]" />
-                              <div className="w-4" />
+                              <div className="w-10 h-1 rounded-full bg-white/15" />
                             </div>
 
-                            {/* Window Split Body */}
-                            <div className="flex h-[96px]">
-                              {/* Left Mini Sidebar */}
+                            <div className="flex h-[76px]">
                               <div
-                                className="w-[30%] p-2 flex flex-col gap-1.5 border-r border-white/[0.05]"
+                                className="w-[30%] p-1.5 flex flex-col gap-1 border-r border-white/5"
                                 style={{ backgroundColor: t.sidebarBg }}
                               >
-                                {/* Active Sidebar Item */}
                                 <div
-                                  className="h-2.5 w-full rounded-[3px] mb-0.5 shadow-sm"
+                                  className="h-2 w-full rounded-[2px]"
                                   style={{ backgroundColor: t.accent }}
                                 />
-                                {/* Inactive Sidebar Items */}
-                                <div className="flex items-center gap-1 opacity-50">
-                                  <span className="w-1 h-1 rounded-full bg-white/50 flex-shrink-0" />
-                                  <span className="h-1 w-full rounded-full bg-white/30" />
-                                </div>
-                                <div className="h-px bg-white/[0.06] my-0.5" />
-                                <div className="flex items-center gap-1 opacity-40">
-                                  <span className="w-1 h-1 rounded-full bg-white/50 flex-shrink-0" />
-                                  <span className="h-1 w-4/5 rounded-full bg-white/30" />
-                                </div>
-                                <div className="h-px bg-white/[0.06] my-0.5" />
-                                <div className="flex items-center gap-1 opacity-40">
-                                  <span className="w-1 h-1 rounded-full bg-white/50 flex-shrink-0" />
-                                  <span className="h-1 w-3/5 rounded-full bg-white/30" />
-                                </div>
+                                <div className="h-1 w-4/5 rounded-full bg-white/25" />
+                                <div className="h-1 w-3/5 rounded-full bg-white/20" />
                               </div>
 
-                              {/* Right Mini Main Workspace */}
                               <div
-                                className="flex-1 px-3 pt-4 pb-0 flex flex-col justify-end gap-2.5 relative overflow-hidden"
+                                className="flex-1 px-2.5 pt-2.5 pb-0 flex flex-col justify-end gap-1.5"
                                 style={{ background: t.canvasBg }}
                               >
-                                {/* Row 1: Primary Accent Pill */}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1">
                                   <span
-                                    className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm"
+                                    className="w-2 h-2 rounded-full shrink-0"
                                     style={{ backgroundColor: t.accent }}
                                   />
                                   <div
-                                    className="h-3.5 w-[66%] rounded-[5px] shadow-sm"
+                                    className="h-2.5 w-[68%] rounded-[3px]"
                                     style={{ backgroundColor: t.accent }}
                                   />
                                 </div>
-
-                                {/* Row 2: Muted Surface Pill */}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1">
                                   <span
-                                    className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0 ml-0.5"
+                                    className="w-1.5 h-1.5 rounded-[2px] shrink-0 ml-0.5"
                                     style={{ backgroundColor: t.mutedBar }}
                                   />
                                   <div
-                                    className="h-3.5 w-[82%] rounded-[5px]"
+                                    className="h-2.5 w-[84%] rounded-[3px]"
                                     style={{ backgroundColor: t.mutedBar }}
                                   />
                                 </div>
-
-                                {/* Row 3: Bottom Accent Pill Peek */}
-                                <div className="flex items-center gap-1.5 translate-y-[2px]">
+                                <div className="flex items-center gap-1">
                                   <span
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: t.accent, opacity: 0.9 }}
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: t.accent, opacity: 0.85 }}
                                   />
                                   <div
-                                    className="h-2.5 w-[46%] rounded-t-[5px]"
-                                    style={{ backgroundColor: t.accent, opacity: 0.9 }}
+                                    className="h-1.5 w-[45%] rounded-t-[3px]"
+                                    style={{ backgroundColor: t.accent, opacity: 0.85 }}
                                   />
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* Card Footer: Theme Name & Checkmark Radio */}
-                          <div className="flex items-center justify-between px-1 pt-0.5">
-                            <span className="text-[13px] font-bold text-slate-100 group-hover:text-primary-400 transition-colors">
+                          <div className="flex items-center justify-between px-0.5">
+                            <span
+                              className="text-xs font-semibold"
+                              style={{ color: 'rgb(var(--surface-100))' }}
+                            >
                               {t.name}
                             </span>
                             <span
-                              className="w-5 h-5 rounded-full flex items-center justify-center transition-all"
+                              className="w-4 h-4 rounded-full flex items-center justify-center"
                               style={
                                 isSelected
                                   ? {
                                       border: `1.5px solid ${t.accent}`,
                                       backgroundColor: `${t.accent}20`,
                                     }
-                                  : {
-                                      border: '1.5px solid rgba(148, 163, 184, 0.25)',
-                                    }
+                                  : { border: '1px solid rgb(var(--surface-600) / 0.5)' }
                               }
                             >
                               {isSelected && (
-                                <Check size={11} strokeWidth={3} style={{ color: t.accent }} />
+                                <Check size={10} strokeWidth={3} style={{ color: t.accent }} />
                               )}
                             </span>
                           </div>
@@ -661,306 +1006,555 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* ── 2. Color Mode (Dark vs Light Mini-Preview Cards) ── */}
-                <div className="pt-6 pb-6 border-t border-slate-800/80">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h4 className="text-[14px] font-bold text-slate-100">Surface mode</h4>
-                      <p className="text-[12px] text-slate-400 mt-0.5">Switch between deep dark midnight and crisp daylight surface</p>
-                    </div>
-                    <div className="vision-inner-box p-1 rounded-xl flex items-center gap-1 self-start sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleModeChange('dark')}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                          mode === 'dark'
-                            ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <Moon size={14} /> Dark Mode
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleModeChange('light')}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
-                          mode === 'light'
-                            ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <Sun size={14} /> Light Mode
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── 3. Customize Primary Color (Hex Input + Native Swatch like Reference Image) ── */}
-                <div className="pt-6 pb-6 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                {/* Surface Mode */}
+                <div
+                  className="pt-5 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
                   <div>
-                    <h4 className="text-[14px] font-bold text-slate-100">Customize primary color</h4>
-                    <p className="text-[12px] text-slate-400 mt-0.5">
-                      Customize the look of your workspace. Feeling adventurous?
+                    <h3
+                      className="text-sm font-semibold"
+                      style={{ color: 'rgb(var(--surface-100))' }}
+                    >
+                      Mode Permukaan
+                    </h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--surface-400))' }}>
+                      Pilih tampilan gelap atau terang untuk seluruh dashboard.
                     </p>
                   </div>
 
-                  <div className="vision-inner-box px-3.5 py-2 rounded-xl flex items-center gap-2.5 self-start sm:self-auto border border-slate-700/70 focus-within:border-primary-500 transition-colors">
-                    <label className="relative w-4 h-4 rounded-md overflow-hidden cursor-pointer flex-shrink-0 shadow-sm ring-1 ring-white/20">
+                  <div
+                    role="tablist"
+                    aria-label="Mode Permukaan"
+                    className="inline-flex p-0.5 rounded-lg border self-start sm:self-auto"
+                    style={{
+                      backgroundColor: 'rgb(var(--surface-800) / 0.5)',
+                      borderColor: 'rgb(var(--surface-700) / 0.6)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === 'dark'}
+                      onClick={() => handleModeChange('dark')}
+                      className="min-h-[34px] px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-[background-color,color] duration-150"
+                      style={{
+                        backgroundColor:
+                          mode === 'dark' ? 'rgb(var(--primary-500))' : 'transparent',
+                        color: mode === 'dark' ? '#ffffff' : 'rgb(var(--surface-300))',
+                      }}
+                    >
+                      <Moon size={13} /> Dark
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === 'light'}
+                      onClick={() => handleModeChange('light')}
+                      className="min-h-[34px] px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-[background-color,color] duration-150"
+                      style={{
+                        backgroundColor:
+                          mode === 'light' ? 'rgb(var(--primary-500))' : 'transparent',
+                        color: mode === 'light' ? '#ffffff' : 'rgb(var(--surface-300))',
+                      }}
+                    >
+                      <Sun size={13} /> Light
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Primary Color */}
+                <div
+                  className="pt-5 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
+                  <div>
+                    <h3
+                      className="text-sm font-semibold"
+                      style={{ color: 'rgb(var(--surface-100))' }}
+                    >
+                      Warna Aksen Kustom
+                    </h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--surface-400))' }}>
+                      Masukkan kode Hex untuk warna primer khusus workspace.
+                    </p>
+                  </div>
+
+                  <div
+                    className="px-3 min-h-[38px] rounded-lg border flex items-center gap-2 self-start sm:self-auto focus-within:ring-2 focus-within:ring-[rgb(var(--primary-500)/0.3)]"
+                    style={fieldStyle}
+                  >
+                    <label className="relative w-4 h-4 rounded overflow-hidden cursor-pointer shrink-0 ring-1 ring-white/20">
                       <input
                         type="color"
+                        aria-label="Pilih warna primer"
                         value={`#${customHex.length === 6 ? customHex : '0075FF'}`}
                         onChange={(e) => handleCustomHexChange(e.target.value)}
                         className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
                       />
                       <span
                         className="block w-full h-full"
-                        style={{ backgroundColor: `#${customHex.length === 6 ? customHex : '0075FF'}` }}
+                        style={{
+                          backgroundColor: `#${customHex.length === 6 ? customHex : '0075FF'}`,
+                        }}
                       />
                     </label>
-                    <span className="text-slate-400 font-mono text-[13px] font-bold select-none">#</span>
+                    <span
+                      className="font-mono text-xs font-bold select-none"
+                      style={{ color: 'rgb(var(--surface-400))' }}
+                    >
+                      #
+                    </span>
                     <input
                       type="text"
+                      aria-label="Kode Hex Warna Primer"
                       value={customHex}
                       onChange={(e) => handleCustomHexChange(e.target.value)}
                       maxLength={6}
                       placeholder="0075FF"
-                      className="w-[64px] bg-transparent text-slate-100 font-mono text-[13px] font-bold uppercase tracking-wider focus:outline-none"
+                      className="w-[64px] bg-transparent font-mono text-xs font-bold uppercase tracking-wider tabular-nums focus:outline-none"
+                      style={{ color: 'rgb(var(--surface-50))' }}
                     />
                   </div>
                 </div>
 
-                {/* ── 4. Transparent Sidebar Toggle (Like Reference Image) ── */}
-                <div className="pt-6 pb-6 border-t border-slate-800/80 flex items-center justify-between gap-4">
+                {/* Transparent Sidebar */}
+                <div
+                  className="pt-5 border-t flex items-center justify-between gap-4"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
                   <div>
-                    <h4 className="text-[14px] font-bold text-slate-100">Transparent Sidebar</h4>
-                    <p className="text-[12px] text-slate-400 mt-0.5">
-                      Add a transparency layer to your sidebar
+                    <h3
+                      className="text-sm font-semibold"
+                      style={{ color: 'rgb(var(--surface-100))' }}
+                    >
+                      Sidebar Transparan
+                    </h3>
+                    <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--surface-400))' }}>
+                      Tambahkan efek transparansi pada panel navigasi kiri.
                     </p>
                   </div>
 
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={transparentSidebar}
+                    aria-label="Aktifkan sidebar transparan"
                     onClick={handleToggleTransparentSidebar}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                      transparentSidebar ? 'bg-primary-500' : 'bg-slate-700'
-                    }`}
+                    className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-[background-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary-500))]"
+                    style={{
+                      backgroundColor: transparentSidebar
+                        ? 'rgb(var(--primary-500))'
+                        : 'rgb(var(--surface-700))',
+                    }}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-150 ${
                         transparentSidebar ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
                 </div>
 
-                {/* ── 5. Footer Action Bar (Cancel & Save preferences) ── */}
-                <div className="pt-6 border-t border-slate-800/80 flex items-center justify-end gap-3">
+                {/* Footer */}
+                <div
+                  className="pt-5 border-t flex flex-wrap items-center justify-end gap-2"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
                   <button
                     type="button"
                     onClick={handleResetAppearance}
-                    className="px-4 py-2.5 rounded-xl vision-inner-box text-slate-300 hover:text-slate-100 text-[13px] font-bold transition-all"
+                    className="min-h-[38px] px-3.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-[background-color] duration-150"
+                    style={{
+                      borderColor: 'rgb(var(--surface-700) / 0.7)',
+                      color: 'rgb(var(--surface-200))',
+                    }}
                   >
-                    Cancel
+                    <RotateCcw size={13} />
+                    Reset Default
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveAppearancePreferences}
-                    className="px-5 py-2.5 rounded-xl text-[13px] font-extrabold text-slate-950 transition-all hover:brightness-110 active:scale-[0.99] shadow-lg"
-                    style={{
-                      backgroundColor: `#${customHex.length === 6 ? customHex : '0075FF'}`,
-                      color: ['amber', 'emerald', 'cyan'].includes(theme) && !localStorage.getItem('iot_custom_primary') ? '#090D16' : '#FFFFFF',
-                      boxShadow: `0 6px 20px -4px #${customHex.length === 6 ? customHex : '0075FF'}65`,
-                    }}
+                    className="min-h-[38px] px-4 rounded-lg text-xs font-semibold text-white transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98]"
+                    style={{ backgroundColor: 'rgb(var(--primary-500))' }}
                   >
-                    Save preferences
+                    Simpan Preferensi
                   </button>
                 </div>
               </div>
-            </div>
+            </SectionCard>
           )}
 
+          {/* 3. TIMEZONE */}
           {activeTab === 'preferences' && (
-            <div className="space-y-6 animate-fade-in">
-              <SettingsSection title="Localization & Timezone" icon={Globe}>
-                <div className="max-w-2xl">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Platform Timezone</label>
-                  <p className="text-sm text-slate-400 mb-6">
-                    All IoT data timestamps (Raw Records, charts) will be displayed in the timezone you select here. This does not affect data storage, which is always in UTC.
-                  </p>
-                  
-                  <div className="relative mb-6">
+            <SectionCard
+              title="Lokalisasi & Zona Waktu"
+              subtitle="Atur zona waktu tampilan timestamp pada grafik dan catatan telemetri."
+            >
+              <div className="max-w-xl space-y-5">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="settings-timezone"
+                    className="block text-xs font-semibold"
+                    style={{ color: 'rgb(var(--surface-200))' }}
+                  >
+                    Zona Waktu Platform
+                  </label>
+                  <div className="relative">
                     <select
-                      className="input-field w-full appearance-none bg-slate-900/50 text-sm py-3"
+                      id="settings-timezone"
                       value={timezone}
-                      onChange={e => setTimezone(e.target.value)}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      className="w-full min-h-[40px] pl-3 pr-9 rounded-lg border text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                      style={fieldStyle}
                     >
-                      {TIMEZONES.map(tz => (
-                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                      {TIMEZONES.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
                       ))}
                     </select>
-                    <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-500">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 mb-8">
-                    <div className="p-3 bg-primary-500/10 rounded-lg text-primary-400">
-                      <Globe size={20} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Current local time</p>
-                      <p className="text-lg font-mono text-slate-100">{previewTime}</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-6 border-t border-slate-700/50 flex justify-end">
-                    <button
-                      onClick={handleSaveTimezone}
-                      disabled={tzLoading}
-                      className={`flex items-center gap-2 transition-all px-6 py-2.5 rounded-lg font-semibold text-sm shadow-lg disabled:opacity-70
-                        ${tzSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'btn-primary shadow-primary-500/20'}`}
-                    >
-                      {tzLoading
-                        ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Saving...</>
-                        : tzSaved ? <><Check size={16} /> Saved Successfully</>
-                        : <><Save size={16} /> Save Preferences</>}
-                    </button>
+                    <ChevronDown
+                      size={15}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ color: 'rgb(var(--surface-400))' }}
+                    />
                   </div>
                 </div>
-              </SettingsSection>
-            </div>
+
+                <div
+                  className="px-4 py-3 rounded-lg border flex items-center justify-between gap-4"
+                  style={{
+                    backgroundColor: 'rgb(var(--surface-800) / 0.3)',
+                    borderColor: 'rgb(var(--surface-700) / 0.5)',
+                  }}
+                >
+                  <span className="text-xs font-medium" style={{ color: 'rgb(var(--surface-400))' }}>
+                    Waktu Lokal Saat Ini
+                  </span>
+                  <span
+                    className="text-sm font-mono font-bold tabular-nums"
+                    style={{ color: 'rgb(var(--surface-50))' }}
+                  >
+                    {previewTime}
+                  </span>
+                </div>
+
+                <div
+                  className="pt-4 border-t flex justify-end"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleSaveTimezone}
+                    disabled={tzBusy}
+                    className="min-h-[40px] px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                    style={{
+                      backgroundColor: tzSaved ? 'rgb(16 185 129)' : 'rgb(var(--primary-500))',
+                    }}
+                  >
+                    {tzBusy ? (
+                      'Menyimpan...'
+                    ) : tzSaved ? (
+                      <>
+                        <Check size={14} /> Tersimpan
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} /> Simpan Zona Waktu
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
           )}
 
+          {/* 4. SECURITY */}
           {activeTab === 'security' && (
-            <div className="space-y-6 animate-fade-in">
-              <SettingsSection title="Password & Authentication" icon={Shield}>
-                <div className="max-w-2xl">
-                  <p className="text-sm text-slate-400 mb-8">
-                    Ensure your account is using a long, random password to stay secure.
-                  </p>
-                  
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Current Password</label>
-                      <input
-                        type="password"
-                        className="input-field bg-slate-900/50"
-                        placeholder="••••••••"
-                        value={passwordForm.current_password}
-                        onChange={e => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
-                      />
-                    </div>
-                    
-                    <div className="pt-4 border-t border-slate-700/30">
-                      <label className="block text-sm font-medium text-slate-300 mb-2">New Password</label>
-                      <input
-                        type="password"
-                        className="input-field bg-slate-900/50"
-                        placeholder="••••••••"
-                        value={passwordForm.password}
-                        onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-end">
+            <SectionCard
+              title="Kata Sandi & Keamanan"
+              subtitle="Gunakan kata sandi minimal 8 karakter untuk menjaga keamanan akun Anda."
+            >
+              <form onSubmit={handleSavePassword} className="max-w-xl space-y-4">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="current-password"
+                    className="block text-xs font-semibold"
+                    style={{ color: 'rgb(var(--surface-200))' }}
+                  >
+                    Kata Sandi Saat Ini
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="current-password"
+                      type={showCurrentPw ? 'text' : 'password'}
+                      placeholder="Masukkan kata sandi saat ini"
+                      value={passwordForm.current_password}
+                      onChange={(e) =>
+                        setPasswordForm({ ...passwordForm, current_password: e.target.value })
+                      }
+                      className="w-full min-h-[40px] pl-3 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                      style={fieldStyle}
+                    />
                     <button
-                      onClick={handleSavePassword}
-                      disabled={!passwordForm.current_password || !passwordForm.password}
-                      className={`flex items-center gap-2 transition-all px-6 py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed
-                        ${passSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+                      type="button"
+                      onClick={() => setShowCurrentPw((v) => !v)}
+                      aria-label={showCurrentPw ? 'Sembunyikan kata sandi' : 'Lihat kata sandi'}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded flex items-center justify-center"
+                      style={{ color: 'rgb(var(--surface-400))' }}
                     >
-                      {passSaved ? <><Check size={16} /> Password Updated</> : <><Shield size={16} /> Update Password</>}
+                      {showCurrentPw ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                 </div>
-              </SettingsSection>
-            </div>
-          )}
 
-          {activeTab === 'api' && (
-            <div className="space-y-6 animate-fade-in">
-              <SettingsSection title="Platform API Token" icon={Key}>
-                <div className="max-w-3xl">
-                  <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
-                    <div className="flex gap-3">
-                      <div className="text-orange-400 flex-shrink-0 mt-0.5"><Shield size={18} /></div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-slate-100 mb-1">Keep your token secure</h4>
-                        <p className="text-xs text-slate-400">
-                          This token grants full access to your devices via API. Do not share it or expose it in client-side code.
-                        </p>
-                      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="new-password"
+                      className="block text-xs font-semibold"
+                      style={{ color: 'rgb(var(--surface-200))' }}
+                    >
+                      Kata Sandi Baru
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="new-password"
+                        type={showNewPw ? 'text' : 'password'}
+                        placeholder="Minimal 8 karakter"
+                        value={passwordForm.password}
+                        onChange={(e) =>
+                          setPasswordForm({ ...passwordForm, password: e.target.value })
+                        }
+                        className="w-full min-h-[40px] pl-3 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                        style={fieldStyle}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPw((v) => !v)}
+                        aria-label={showNewPw ? 'Sembunyikan kata sandi baru' : 'Lihat kata sandi baru'}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: 'rgb(var(--surface-400))' }}
+                      >
+                        {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="confirm-password"
+                      className="block text-xs font-semibold"
+                      style={{ color: 'rgb(var(--surface-200))' }}
+                    >
+                      Konfirmasi Kata Sandi
+                    </label>
+                    <input
+                      id="confirm-password"
+                      type={showNewPw ? 'text' : 'password'}
+                      placeholder="Ulangi kata sandi baru"
+                      value={passwordForm.password_confirmation}
+                      onChange={(e) =>
+                        setPasswordForm({
+                          ...passwordForm,
+                          password_confirmation: e.target.value,
+                        })
+                      }
+                      className="w-full min-h-[40px] px-3 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary-500)/0.3)]"
+                      style={fieldStyle}
+                    />
+                  </div>
+                </div>
+
+                {passError && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 px-3 py-2.5 rounded-lg border text-xs font-medium"
+                    style={{
+                      backgroundColor: 'rgb(244 63 94 / 0.08)',
+                      borderColor: 'rgb(244 63 94 / 0.3)',
+                      color: 'rgb(251 113 133)',
+                    }}
+                  >
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span>{passError}</span>
+                  </div>
+                )}
+
+                <div
+                  className="pt-4 border-t flex justify-end"
+                  style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
+                >
+                  <button
+                    type="submit"
+                    disabled={passBusy}
+                    className="min-h-[40px] px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+                    style={{
+                      backgroundColor: passSaved
+                        ? 'rgb(16 185 129)'
+                        : 'rgb(var(--primary-500))',
+                    }}
+                  >
+                    {passBusy ? (
+                      'Memperbarui...'
+                    ) : passSaved ? (
+                      <>
+                        <Check size={14} /> Kata Sandi Diperbarui
+                      </>
+                    ) : (
+                      'Perbarui Kata Sandi'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </SectionCard>
+          )}
+
+          {/* 5. API KEYS */}
+          {activeTab === 'api' && (
+            <SectionCard
+              title="Token API Platform"
+              subtitle="Gunakan Bearer token sesi aktif ini untuk menguji integrasi REST API."
+            >
+              <div className="max-w-2xl space-y-4">
+                <div
+                  className="px-3.5 py-3 rounded-lg border flex items-start gap-2.5 text-xs"
+                  style={{
+                    backgroundColor: 'rgb(245 158 11 / 0.07)',
+                    borderColor: 'rgb(245 158 11 / 0.25)',
+                    color: 'rgb(var(--surface-300))',
+                  }}
+                >
+                  <Shield size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                  <span style={{ textWrap: 'pretty' }}>
+                    Token ini memberikan akses penuh ke perangkat dan data bucket akun Anda. Jangan simpan di repositori publik atau kode sisi klien.
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="api-token-field"
+                    className="block text-xs font-semibold"
+                    style={{ color: 'rgb(var(--surface-200))' }}
+                  >
+                    Bearer Token
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
-                      <label className="block text-sm font-medium text-slate-300 mb-2">Bearer Token</label>
                       <input
                         id="api-token-field"
                         type={showToken ? 'text' : 'password'}
                         readOnly
-                        value={token}
-                        className="input-field pr-12 font-mono text-sm bg-slate-900/80 border-slate-700 focus:ring-0"
+                        value={token || 'Token tidak tersedia'}
+                        className="w-full min-h-[40px] pl-3 pr-10 rounded-lg border font-mono text-xs focus:outline-none"
+                        style={fieldStyle}
                       />
                       <button
-                        onClick={() => setShowToken(!showToken)}
-                        className="absolute right-4 top-[34px] text-slate-500 hover:text-slate-300 transition-colors"
+                        type="button"
+                        onClick={() => setShowToken((v) => !v)}
+                        aria-label={showToken ? 'Sembunyikan token' : 'Tampilkan token'}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded flex items-center justify-center"
+                        style={{ color: 'rgb(var(--surface-400))' }}
                       >
-                        {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
+
                     <button
                       id="btn-copy-token"
-                      onClick={handleCopyToken}
-                      className={`btn-primary flex items-center gap-2 px-5 py-2.5 h-[42px] transition-all ${copied ? '!bg-emerald-500 !border-emerald-500' : ''}`}
+                      type="button"
+                      disabled={!token}
+                      onClick={() => handleCopyText('token', token)}
+                      className="min-h-[40px] px-3.5 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1.5 shrink-0 transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+                      style={{
+                        backgroundColor:
+                          copiedType === 'token' ? 'rgb(16 185 129)' : 'rgb(var(--primary-500))',
+                      }}
                     >
-                      {copied ? <Check size={16} /> : <Copy size={16} />}
-                      {copied ? 'Copied' : 'Copy'}
+                      {copiedType === 'token' ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedType === 'token' ? 'Tersalin' : 'Salin Token'}
                     </button>
-                    <button className="btn-secondary flex items-center justify-center w-[42px] h-[42px] px-0" title="Regenerate token">
-                      <RefreshCw size={16} />
+
+                    <button
+                      type="button"
+                      disabled={!token}
+                      onClick={() => handleCopyText('header', `Authorization: Bearer ${token}`)}
+                      className="min-h-[40px] px-3.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0 transition-[background-color] duration-150 disabled:opacity-50"
+                      style={{
+                        borderColor: 'rgb(var(--surface-700) / 0.7)',
+                        color:
+                          copiedType === 'header'
+                            ? 'rgb(52 211 153)'
+                            : 'rgb(var(--surface-200))',
+                      }}
+                    >
+                      {copiedType === 'header' ? <Check size={13} /> : <Copy size={13} />}
+                      {copiedType === 'header' ? 'Header Tersalin' : 'Salin Header'}
                     </button>
                   </div>
                 </div>
-              </SettingsSection>
-            </div>
+              </div>
+            </SectionCard>
           )}
 
+          {/* 6. NOTIFICATIONS */}
           {activeTab === 'notifications' && (
-            <div className="space-y-6 animate-fade-in">
-              <SettingsSection title="Notification Preferences" icon={Bell}>
-                <div className="max-w-3xl space-y-2">
-                  {[
-                    { key: 'deviceOffline',   label: 'Device goes offline',     desc: 'Get notified when a device loses connection to the broker' },
-                    { key: 'deviceOnline',    label: 'Device comes online',      desc: 'Get notified when a device successfully connects' },
-                    { key: 'highTemperature', label: 'Threshold alerts',   desc: 'Receive alerts when metric thresholds are exceeded' },
-                    { key: 'endpointTrigger', label: 'Endpoint activations',       desc: 'Notify when a scheduled endpoint is triggered' },
-                    { key: 'weeklyReport',    label: 'Weekly summary report',            desc: 'Receive a weekly email summary of your platform usage' },
-                  ].map(({ key, label, desc }) => (
-                    <div key={key} className="flex items-center justify-between p-4 rounded-xl hover:bg-slate-800/30 transition-colors border border-transparent hover:border-slate-700/50">
-                      <div>
-                        <p className="text-sm font-medium text-slate-200">{label}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+            <SectionCard
+              title="Preferensi Notifikasi"
+              subtitle="Perubahan tersimpan otomatis per akun ke server."
+            >
+              <div
+                className="divide-y"
+                style={{ borderColor: 'rgb(var(--surface-700) / 0.4)' }}
+              >
+                {NOTIFICATION_ITEMS.map(({ key, label, desc }) => {
+                  const enabled = Boolean(notifications[key]);
+                  return (
+                    <div
+                      key={key}
+                      className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <div
+                          className="text-sm font-semibold"
+                          style={{ color: 'rgb(var(--surface-100))' }}
+                        >
+                          {label}
+                        </div>
+                        <p
+                          className="text-xs"
+                          style={{ color: 'rgb(var(--surface-400))', textWrap: 'pretty' }}
+                        >
+                          {desc}
+                        </p>
                       </div>
+
                       <button
-                        onClick={() => setNotifications(prev => ({ ...prev, [key]: !prev[key] }))}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                          notifications[key] ? 'bg-primary-500' : 'bg-slate-700'
-                        }`}
+                        type="button"
+                        role="switch"
+                        aria-checked={enabled}
+                        aria-label={label}
+                        onClick={() => handleToggleNotification(key)}
+                        className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-[background-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--primary-500))]"
+                        style={{
+                          backgroundColor: enabled
+                            ? 'rgb(var(--primary-500))'
+                            : 'rgb(var(--surface-700))',
+                        }}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            notifications[key] ? 'translate-x-6' : 'translate-x-1'
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                            enabled ? 'translate-x-6' : 'translate-x-1'
                           }`}
                         />
                       </button>
                     </div>
-                  ))}
-                </div>
-              </SettingsSection>
-            </div>
+                  );
+                })}
+              </div>
+            </SectionCard>
           )}
         </div>
       </div>

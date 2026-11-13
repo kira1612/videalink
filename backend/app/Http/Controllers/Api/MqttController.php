@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\Device;
 use Illuminate\Http\Request;
 
 class MqttController extends Controller
@@ -46,6 +48,23 @@ class MqttController extends Controller
             $command = "MQTT_BROKER_URL={$brokerUrl} \"{$nodeBin}\" \"{$scriptPath}\" {$topic} {$message} 2>&1";
         }
         $output = shell_exec($command);
+
+        if ($request->user()) {
+            $device = Device::where('user_id', $request->user()->id)
+                ->where(function ($q) use ($validated) {
+                    $q->where('broker_config->topic', $validated['topic'])
+                      ->orWhere('broker_config->command_topic', $validated['topic']);
+                })->first();
+
+            $targetName = $device ? $device->name : $validated['topic'];
+            ActivityLog::create([
+                'user_id'     => $request->user()->id,
+                'device_id'   => $device?->id,
+                'device_name' => $targetName,
+                'event'       => "Kontrol saklar/aktuator: {$validated['message']} ({$targetName})",
+                'type'        => 'info',
+            ]);
+        }
 
         return response()->json([
             'success' => true,

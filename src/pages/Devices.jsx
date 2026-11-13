@@ -1,14 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Cpu, MoreVertical, X, Shuffle, Check,
   Settings2, Info, RefreshCw, LayoutGrid, List,
   MapPin, Clock, Zap, Signal, ChevronRight, ArrowUpRight,
-  Activity, Wifi, WifiOff, AlertTriangle, Home,
+  Activity, Wifi, WifiOff, AlertTriangle, Home, Lock,
 } from 'lucide-react';
 import { devicesApi, roomsApi } from '../services/api';
 import Swal from 'sweetalert2';
 import { TypeBadge } from '../components/UI/Badge';
+import { useBillingQuota } from '../hooks/useBillingQuota';
+import QuotaNoticeBanner, {
+  handleQuotaError,
+  promptQuotaUpgrade,
+} from '../components/Billing/QuotaNoticeBanner';
 
 /* ────────────────────────────────────────────────────────────────────────
    Status config — all inline, no Tailwind color classes
@@ -211,6 +216,7 @@ function DeviceRow({ device, onDelete, activeDropdown, setActiveDropdown }) {
    ADD DEVICE MODAL
 ──────────────────────────────────────────────────────────────────────── */
 function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
+  const navigate = useNavigate();
   const [protocol, setProtocol] = useState('http');
   const [creds, setCreds]       = useState('');
   const [busy, setBusy]         = useState(false);
@@ -248,7 +254,9 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
       onSuccess(); onClose();
       Swal.fire({ title: 'Device added!', text: 'Device successfully registered to platform.', icon: 'success', background: '#1e293b', color: '#f8fafc' });
     } catch (err) {
-      Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' });
+      if (!handleQuotaError(err, navigate, onClose)) {
+        Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' });
+      }
     } finally { setBusy(false); }
   };
 
@@ -395,6 +403,9 @@ function FieldSection({ icon: Icon, title, accent = false, children }) {
    MAIN PAGE
 ════════════════════════════════════════════════════════════════════════ */
 export default function Devices() {
+  const navigate = useNavigate();
+  const { refreshQuota, getResourceQuota } = useBillingQuota();
+  const deviceQuota = getResourceQuota('devices');
   const [devices, setDevices]           = useState([]);
   const [rooms, setRooms]               = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -416,6 +427,7 @@ export default function Devices() {
       ]);
       setDevices(devRes.data);
       setRooms(roomRes.data);
+      refreshQuota();
     }
     catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
@@ -448,6 +460,20 @@ export default function Devices() {
     { key: 'offline', label: 'Offline', color: '#64748b' },
   ];
 
+  const handleOpenAddDevice = () => {
+    if (deviceQuota.blocked) {
+      promptQuotaUpgrade({
+        navigate,
+        resourceLabel: deviceQuota.label,
+        planName: deviceQuota.planName,
+        current: deviceQuota.current,
+        limit: deviceQuota.limit,
+      });
+      return;
+    }
+    setShowAdd(true);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in max-w-[1400px]">
 
@@ -464,13 +490,23 @@ export default function Devices() {
           <p className="text-[13px] text-slate-500 ml-4">Manage and monitor your connected IoT fleet</p>
         </div>
         <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 text-[13px] font-bold px-5 py-2.5 rounded-xl text-white self-start transition-all hover:scale-[1.02]"
-          style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}
+          onClick={handleOpenAddDevice}
+          title={deviceQuota.blocked ? `Kuota perangkat penuh (${deviceQuota.current}/${deviceQuota.limit}). Upgrade paket untuk menambah.` : undefined}
+          className={`flex items-center gap-2 text-[13px] font-bold px-5 py-2.5 rounded-xl self-start transition-all ${
+            deviceQuota.blocked ? 'border text-rose-300 hover:bg-rose-500/15' : 'text-white hover:scale-[1.02]'
+          }`}
+          style={
+            deviceQuota.blocked
+              ? { backgroundColor: 'rgb(244 63 94 / 0.1)', borderColor: 'rgb(244 63 94 / 0.35)' }
+              : { background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }
+          }
         >
-          <Plus size={16} /> Add Device
+          {deviceQuota.blocked ? <Lock size={15} /> : <Plus size={16} />}
+          {deviceQuota.blocked ? 'Kuota Penuh • Upgrade' : 'Add Device'}
         </button>
       </div>
+
+      <QuotaNoticeBanner quota={deviceQuota} />
 
       {/* ── STAT CARDS (Vision UI Style) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -561,8 +597,9 @@ export default function Devices() {
           <p className="text-[15px] font-black text-slate-500 mb-1">{search ? `No results for "${search}"` : 'No devices found'}</p>
           <p className="text-[13px] text-slate-600 max-w-xs mb-6">{search ? 'Try a different keyword.' : 'Get started by adding your first device.'}</p>
           {!search && (
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-[13px] font-bold px-6 py-2.5 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}>
-              <Plus size={15} /> Add First Device
+            <button onClick={handleOpenAddDevice} className="flex items-center gap-2 text-[13px] font-bold px-6 py-2.5 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}>
+              {deviceQuota.blocked ? <Lock size={15} /> : <Plus size={15} />}
+              {deviceQuota.blocked ? 'Upgrade Paket' : 'Add First Device'}
             </button>
           )}
         </div>

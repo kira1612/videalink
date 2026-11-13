@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { roomsApi } from '../services/api';
-import { Home, Plus, Edit2, Trash2, X, Loader2, LayoutGrid, Box, Pin } from 'lucide-react';
+import { Home, Plus, Edit2, Trash2, X, Loader2, LayoutGrid, Box, Pin, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
 import FloorPlan from './FloorPlan';
+import { PREF_KEYS, getUserJsonPref, setUserJsonPref } from '../utils/dashboardPrefs';
+import { useBillingQuota } from '../hooks/useBillingQuota';
+import QuotaNoticeBanner, {
+  handleQuotaError,
+  promptQuotaUpgrade,
+} from '../components/Billing/QuotaNoticeBanner';
 
 export default function Rooms() {
+  const navigate = useNavigate();
+  const { refreshQuota, getResourceQuota } = useBillingQuota();
+  const roomQuota = getResourceQuota('rooms');
   const [activeTab, setActiveTab] = useState('list'); // 'list' | '3d'
   const [selectedRoomId, setSelectedRoomId] = useState(null); // ID ruangan yang sedang di-edit 3D-nya
   const [rooms, setRooms] = useState([]);
@@ -12,17 +22,9 @@ export default function Rooms() {
   const [pinnedRoomIds, setPinnedRoomIds] = useState(() => {
     try {
       const set = new Set();
-      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
-      if (rawPinned) {
-        JSON.parse(rawPinned).forEach((r) => set.add(String(r.id)));
-      }
-      const rawLayout = localStorage.getItem('iot_dashboard_layout');
-      if (rawLayout) {
-        JSON.parse(rawLayout).forEach((w) => {
-          if (w.type === 'room_widget' && w.visible !== false && w.roomId != null) {
-            set.add(String(w.roomId));
-          }
-        });
+      const pinned = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+      if (Array.isArray(pinned)) {
+        pinned.forEach((r) => set.add(String(r.id ?? r)));
       }
       return set;
     } catch {
@@ -33,17 +35,9 @@ export default function Rooms() {
   const syncPinnedRooms = useCallback(() => {
     try {
       const set = new Set();
-      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
-      if (rawPinned) {
-        JSON.parse(rawPinned).forEach((r) => set.add(String(r.id)));
-      }
-      const rawLayout = localStorage.getItem('iot_dashboard_layout');
-      if (rawLayout) {
-        JSON.parse(rawLayout).forEach((w) => {
-          if (w.type === 'room_widget' && w.visible !== false && w.roomId != null) {
-            set.add(String(w.roomId));
-          }
-        });
+      const pinned = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+      if (Array.isArray(pinned)) {
+        pinned.forEach((r) => set.add(String(r.id ?? r)));
       }
       setPinnedRoomIds(set);
     } catch {}
@@ -51,55 +45,36 @@ export default function Rooms() {
 
   useEffect(() => {
     window.addEventListener('rooms-widgets-updated', syncPinnedRooms);
+    window.addEventListener('dashboard-prefs-updated', syncPinnedRooms);
     window.addEventListener('storage', syncPinnedRooms);
     return () => {
       window.removeEventListener('rooms-widgets-updated', syncPinnedRooms);
+      window.removeEventListener('dashboard-prefs-updated', syncPinnedRooms);
       window.removeEventListener('storage', syncPinnedRooms);
     };
   }, [syncPinnedRooms]);
 
   const handleTogglePinRoom = (room) => {
-    const rId = String(room.id);
-    const cardId = `room_widget_${rId}`;
+    const rId = String(room?.id ?? room?.roomId);
+    if (!rId || rId === 'undefined') return;
     const isCurrentlyPinned = pinnedRoomIds.has(rId);
+    const safeName = (room?.name && !room.name.includes('undefined')) ? room.name : 'Ruangan 3D';
 
     try {
-      // 1. Update iot_dashboard_pinned_rooms
-      const rawPinned = localStorage.getItem('iot_dashboard_pinned_rooms');
-      let pinnedList = rawPinned ? JSON.parse(rawPinned) : [];
+      // Hanya kirim / lepas dari daftar Sidebar Widget (tidak langsung taruh di Dashboard utama)
+      let pinnedList = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+      if (!Array.isArray(pinnedList)) pinnedList = [];
       if (isCurrentlyPinned) {
-        pinnedList = pinnedList.filter((r) => String(r.id) !== rId);
-      } else if (!pinnedList.some((r) => String(r.id) === rId)) {
+        pinnedList = pinnedList.filter((r) => String(r.id ?? r) !== rId);
+      } else if (!pinnedList.some((r) => String(r.id ?? r) === rId)) {
         pinnedList.push({
-          id: room.id,
-          name: room.name,
-          icon: room.icon || 'home',
-          devices_count: room.devices_count || 0,
+          id: rId,
+          name: safeName,
+          icon: room?.icon || 'home',
+          devices_count: room?.devices_count || 0,
         });
       }
-      localStorage.setItem('iot_dashboard_pinned_rooms', JSON.stringify(pinnedList));
-
-      // 2. Update iot_dashboard_layout so it directly appears/disappears on Dashboard
-      const rawLayout = localStorage.getItem('iot_dashboard_layout');
-      let layoutList = rawLayout ? JSON.parse(rawLayout) : [];
-      if (isCurrentlyPinned) {
-        layoutList = layoutList.filter(
-          (w) => w.id !== cardId && String(w.roomId) !== rId
-        );
-      } else if (!layoutList.some((w) => w.id === cardId || String(w.roomId) === rId)) {
-        layoutList.push({
-          id: cardId,
-          type: 'room_widget',
-          roomId: room.id,
-          roomName: room.name,
-          roomIcon: room.icon || 'home',
-          title: `Ruangan: ${room.name}`,
-          cols: 4,
-          height: 'normal',
-          visible: true,
-        });
-      }
-      localStorage.setItem('iot_dashboard_layout', JSON.stringify(layoutList));
+      setUserJsonPref(PREF_KEYS.PINNED_ROOMS, pinnedList);
     } catch (e) {
       console.error(e);
     }
@@ -112,8 +87,8 @@ export default function Rooms() {
       position: 'top-end',
       icon: isCurrentlyPinned ? 'info' : 'success',
       title: isCurrentlyPinned
-        ? `Ruangan "${room.name}" dilepas dari Dashboard`
-        : `Ruangan "${room.name}" disematkan ke Dashboard!`,
+        ? `Ruangan "${safeName}" dilepas dari Sidebar Widget`
+        : `Ruangan "${safeName}" dikirim ke Sidebar Widget!`,
       showConfirmButton: false,
       timer: 2000,
       background: '#0f172a',
@@ -135,6 +110,7 @@ export default function Rooms() {
     try {
       const res = await roomsApi.list();
       setRooms(res.data);
+      refreshQuota();
     } catch (e) {
       console.error(e);
     } finally {
@@ -147,6 +123,16 @@ export default function Rooms() {
       setEditingRoom(room);
       setFormData({ name: room.name, icon: room.icon || 'home' });
     } else {
+      if (roomQuota.blocked) {
+        promptQuotaUpgrade({
+          navigate,
+          resourceLabel: roomQuota.label,
+          planName: roomQuota.planName,
+          current: roomQuota.current,
+          limit: roomQuota.limit,
+        });
+        return;
+      }
       setEditingRoom(null);
       setFormData({ name: '', icon: 'home' });
     }
@@ -181,14 +167,16 @@ export default function Rooms() {
         iconColor: '#10b981'
       });
     } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Oops...',
-        text: 'Gagal menyimpan data.',
-        background: '#0f172a',
-        color: '#f1f5f9',
-        confirmButtonColor: '#3b82f6'
-      });
+      if (!handleQuotaError(err, navigate, handleCloseModal)) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Oops...',
+          text: err?.response?.data?.message || 'Gagal menyimpan data.',
+          background: '#0f172a',
+          color: '#f1f5f9',
+          confirmButtonColor: '#3b82f6'
+        });
+      }
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -255,7 +243,12 @@ export default function Rooms() {
             <LayoutGrid size={15} /> Data Ruangan
           </button>
           <button 
-            onClick={() => setActiveTab('3d')}
+            onClick={() => {
+              if (!selectedRoomId && rooms.length > 0) {
+                setSelectedRoomId(rooms[0].id);
+              }
+              setActiveTab('3d');
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === '3d' ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' : 'text-slate-400 hover:text-slate-200'}`}
           >
             <Box size={15} /> 3D Floor Plan
@@ -264,17 +257,49 @@ export default function Rooms() {
       </div>
 
       {activeTab === '3d' ? (
-        <div className="vision-card overflow-hidden relative" style={{ height: 'calc(100vh - 180px)' }}>
-          {selectedRoomId ? (
-            <div className="absolute inset-0 overflow-y-auto">
-              <FloorPlan hideHeader={true} roomId={selectedRoomId} roomName={rooms.find(r => r.id === selectedRoomId)?.name} key={selectedRoomId} />
+        <div className="vision-card overflow-hidden relative flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+          {rooms.length > 0 && (
+            <div className="p-3 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0 z-20">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xs font-bold text-slate-400 shrink-0">Ruangan Aktif:</span>
+                <select
+                  value={selectedRoomId || rooms[0]?.id || ''}
+                  onChange={(e) => setSelectedRoomId(Number(e.target.value) || e.target.value)}
+                  className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs font-extrabold text-slate-100 focus:outline-none focus:border-primary-500 cursor-pointer"
+                >
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.devices_count || 0} Perangkat)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setActiveTab('list'); fetchRooms(); }}
+                className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Daftar Ruangan →
+              </button>
+            </div>
+          )}
+
+          {(selectedRoomId || (rooms.length > 0 ? rooms[0].id : null)) ? (
+            <div className="flex-1 relative overflow-hidden">
+              <FloorPlan
+                hideHeader={true}
+                roomId={selectedRoomId || rooms[0].id}
+                roomName={rooms.find(r => r.id === (selectedRoomId || rooms[0].id))?.name || 'Ruangan 3D'}
+                key={selectedRoomId || rooms[0].id}
+              />
             </div>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
               <div className="vision-icon-box w-14 h-14 rounded-2xl mb-4">
                 <Box size={28} />
               </div>
-              <p className="text-sm">Silakan pilih ruangan dari tab <strong className="text-slate-100">Data Ruangan</strong> terlebih dahulu.</p>
+              <p className="text-sm">Silakan buat ruangan dari tab <strong className="text-slate-100">Data Ruangan</strong> terlebih dahulu.</p>
               <button 
                 onClick={() => setActiveTab('list')}
                 className="mt-4 btn-primary text-xs"
@@ -286,13 +311,17 @@ export default function Rooms() {
         </div>
       ) : (
         <>
+          <QuotaNoticeBanner quota={roomQuota} />
+
           <div className="flex justify-end">
             <button 
               onClick={() => handleOpenModal()}
-              className="btn-primary flex items-center gap-2 text-xs"
+              className={roomQuota.blocked
+                ? 'flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl border text-rose-300 bg-rose-500/10 border-rose-500/35 hover:bg-rose-500/15 transition-colors'
+                : 'btn-primary flex items-center gap-2 text-xs'}
             >
-              <Plus size={16} />
-              <span>Tambah Ruangan</span>
+              {roomQuota.blocked ? <Lock size={15} /> : <Plus size={16} />}
+              <span>{roomQuota.blocked ? (roomQuota.unavailable ? 'Fitur Terkunci • Upgrade' : 'Kuota Penuh • Upgrade') : 'Tambah Ruangan'}</span>
             </button>
           </div>
 
@@ -336,7 +365,7 @@ export default function Rooms() {
                       <button
                         type="button"
                         onClick={() => handleTogglePinRoom(room)}
-                        title={isPinned ? 'Lepas Ruangan dari Dashboard' : 'Pin Ruangan ke Dashboard'}
+                        title={isPinned ? 'Lepas Ruangan dari Sidebar Widget' : 'Kirim Ruangan ke Sidebar Widget'}
                         className={`p-2 rounded-xl border transition-all ${
                           isPinned
                             ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20 hover:bg-amber-500/30'

@@ -56,7 +56,7 @@ export default function ThermostatWidget({
 
   return (
     <div
-      className={`vision-card p-6 w-full relative overflow-hidden flex flex-col justify-between transition-all duration-300 ${className}`}
+      className={`vision-card p-4 sm:p-6 w-full min-w-0 max-w-full relative overflow-hidden flex flex-col justify-between transition-all duration-300 ${className}`}
       style={
         isOn
           ? {
@@ -102,8 +102,8 @@ export default function ThermostatWidget({
       </div>
 
       {/* ── Center Vision UI Semi-Circular Gauge + Tick Dial ── */}
-      <div className="relative flex flex-col items-center justify-center my-1 z-10">
-        <svg width="180" height="102" viewBox="0 0 180 102" className="overflow-visible">
+      <div className="relative flex flex-col items-center justify-center my-1 z-10 w-full min-w-0">
+        <svg viewBox="0 0 180 102" className="overflow-visible w-[150px] sm:w-[180px] h-auto max-w-full">
           <defs>
             <linearGradient id="thermostatArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="rgb(var(--primary-600))" stopOpacity="0.3" />

@@ -1,4 +1,3 @@
-/** Sequential scale CSS variables for heatmaps, choropleths, and binned data (01 = lowest, 05 = highest). */
 export const CHART_SCALE_VARS = [
   "var(--chart-scale-01)",
   "var(--chart-scale-02)",

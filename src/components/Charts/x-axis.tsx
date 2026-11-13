@@ -83,6 +83,8 @@ const XAxisLabel = memo(function XAxisLabel({
   opacity,
   animatePosition,
 }: XAxisLabelProps) {
+  // If x is near the left edge (< 24px), clamp shift rightward so "Sep 1" or first label never clips
+  const transform = x < 24 ? "translateX(0%)" : "translateX(-50%)";
   return (
     <div
       className="absolute"
@@ -91,7 +93,7 @@ const XAxisLabel = memo(function XAxisLabel({
         bottom: 12,
         width: 0,
         display: "flex",
-        justifyContent: "center",
+        justifyContent: "flex-start",
         transition: animatePosition
           ? `left ${X_AXIS_POSITION_TWEEN_MS}ms cubic-bezier(${LINE_LOADING_PULSE_EASE.join(", ")})`
           : undefined,
@@ -100,6 +102,7 @@ const XAxisLabel = memo(function XAxisLabel({
       <span
         className="whitespace-nowrap text-chart-label text-xs"
         style={{
+          transform,
           opacity,
           transition: "opacity 0.4s ease-in-out",
         }}

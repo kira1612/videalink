@@ -24,7 +24,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
 import { chartCssVars } from "./chart-context";
 import {
@@ -455,17 +455,13 @@ function SparklineFrame<T>({
       {width > 0 ? (
         <svg
           aria-label={label}
-          className="block overflow-visible w-full max-w-full"
+          className="block overflow-visible"
           height={height}
           onPointerLeave={interactive ? handlePointerLeave : undefined}
           onPointerMove={interactive ? handlePointerMove : undefined}
           role="img"
-          style={{
-            maxWidth: '100%',
-            ...(interactive ? { touchAction: "pan-y" } : {}),
-          }}
-          viewBox={`0 0 ${width} ${height}`}
-          width={widthProp ?? "100%"}
+          style={interactive ? { touchAction: "pan-y" } : undefined}
+          width={width}
         >
           {children({
             width,

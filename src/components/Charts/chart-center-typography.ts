@@ -1,9 +1,3 @@
-/**
- * Fluid typography for pie / ring / gauge center labels.
- *
- * Uses CSS container query units (`cqw`) so values scale with the center
- * hole — not the viewport — which keeps stat text readable on small charts.
- */
 export const chartCenterContainerClassName =
   "@container/chart-center size-full min-w-0";
 

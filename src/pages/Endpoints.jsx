@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Webhook, Plus, ToggleLeft, ToggleRight, Play, Clock, Hash, ExternalLink, Mail, MessageSquare, Globe, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Webhook, Plus, ToggleLeft, ToggleRight, Play, Clock, Hash, ExternalLink, Mail, MessageSquare, Globe, MessageCircle, Lock } from 'lucide-react';
 import { endpointsApi } from '../services/api';
 import { StatusBadge } from '../components/UI/Badge';
+import { useBillingQuota } from '../hooks/useBillingQuota';
+import QuotaNoticeBanner, { promptQuotaUpgrade } from '../components/Billing/QuotaNoticeBanner';
 
 const typeIcons = {
   EMAIL: Mail,
@@ -21,6 +24,9 @@ function formatDate(iso) {
 }
 
 export default function Endpoints() {
+  const navigate = useNavigate();
+  const { refreshQuota, getResourceQuota } = useBillingQuota();
+  const endpointQuota = getResourceQuota('endpoints');
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +38,7 @@ export default function Endpoints() {
     try {
       const res = await endpointsApi.list();
       setEndpoints(res.data);
+      refreshQuota();
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,10 +79,31 @@ export default function Endpoints() {
           <h2 className="text-[22px] font-black text-slate-100 tracking-tight">Endpoints & Webhooks</h2>
           <p className="text-slate-400 text-[13px] mt-0.5">Configure actions and webhooks to trigger external services</p>
         </div>
-        <button className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-          <Plus size={16} /> Create Endpoint
+        <button
+          type="button"
+          onClick={() => {
+            if (endpointQuota.blocked) {
+              promptQuotaUpgrade({
+                navigate,
+                resourceLabel: endpointQuota.label,
+                planName: endpointQuota.planName,
+                current: endpointQuota.current,
+                limit: endpointQuota.limit,
+              });
+            }
+          }}
+          className={
+            endpointQuota.blocked
+              ? 'flex items-center gap-2 w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl text-xs font-bold border border-rose-500/35 bg-rose-500/10 text-rose-300 hover:bg-rose-500/15 transition-colors'
+              : 'btn-primary flex items-center gap-2 w-full sm:w-auto justify-center'
+          }
+        >
+          {endpointQuota.blocked ? <Lock size={15} /> : <Plus size={16} />}
+          {endpointQuota.blocked ? 'Kuota Penuh • Upgrade' : 'Create Endpoint'}
         </button>
       </div>
+
+      <QuotaNoticeBanner quota={endpointQuota} />
 
       {/* Vision UI Stat Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">

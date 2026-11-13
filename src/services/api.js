@@ -106,4 +106,15 @@ export const automationsApi = {
   delete: (id) => api.delete(`/automations/${id}`),
 };
 
+// Subscription & Billing
+export const billingApi = {
+  plans: () => api.get('/billing/plans'),
+  current: () => api.get('/billing/current'),
+  subscribe: (data) => api.post('/billing/subscribe', data),
+  cancel: (reason) => api.post('/billing/cancel', { reason }),
+  resume: () => api.post('/billing/resume'),
+  invoices: () => api.get('/billing/invoices'),
+  invoiceDetail: (id) => api.get(`/billing/invoices/${id}`),
+};
+
 export default api;

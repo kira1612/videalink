@@ -8,12 +8,14 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\AutomationController;
+use App\Http\Controllers\Api\BillingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/register', [AuthController::class, 'register']);
+    Route::get('/billing/plans', [BillingController::class, 'plans']);
     // Terapkan Rate Limiting khusus untuk perangkat (contoh: 60 request per menit) agar tidak rentan DDoS
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('/devices/{device}/telemetry', [DeviceController::class, 'telemetry']);
@@ -66,4 +68,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::delete('/endpoints/{endpoint}', [EndpointController::class, 'destroy']);
     Route::patch('/endpoints/{endpoint}/toggle', [EndpointController::class, 'toggle']);
     Route::post('/endpoints/{endpoint}/trigger', [EndpointController::class, 'trigger']);
+
+    // Subscription & Billing
+    Route::prefix('billing')->group(function () {
+        Route::get('/current', [BillingController::class, 'current']);
+        Route::post('/subscribe', [BillingController::class, 'subscribe'])->middleware('throttle:20,1');
+        Route::post('/cancel', [BillingController::class, 'cancel']);
+        Route::post('/resume', [BillingController::class, 'resume']);
+        Route::get('/invoices', [BillingController::class, 'invoices']);
+        Route::get('/invoices/{invoice}', [BillingController::class, 'showInvoice']);
+    });
 });

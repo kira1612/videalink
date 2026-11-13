@@ -1,6 +1,3 @@
-// Legend context and hooks
-
-// Legend components
 export { Legend, type LegendProps } from "./legend";
 export {
   type LegendContextValue,

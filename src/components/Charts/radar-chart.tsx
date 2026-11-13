@@ -4,7 +4,7 @@ import { scaleLinear } from "d3-scale";
 import type { Transition } from "motion/react";
 import { domAnimation, LazyMotion } from "motion/react";
 import { type ReactNode, useCallback, useState } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { ParentSize } from "./chart-parent-size";
 import {
   defaultRadarColors,

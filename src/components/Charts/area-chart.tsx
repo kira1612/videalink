@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { Area, type AreaProps } from "./area";
 import { AreaValueLabels } from "./area-value-labels";
 import { type LineConfig, type Margin, useStableMargin } from "./chart-context";

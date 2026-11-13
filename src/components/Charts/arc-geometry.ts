@@ -1,10 +1,3 @@
-/**
- * Dependency-free polar helpers shared by the ring and radial charts.
- * Angles are radians, 0 at 12 o'clock, increasing clockwise (the d3 / visx
- * `arc` convention).
- */
-
-/** Full turn in radians. */
 export const TAU = Math.PI * 2;
 
 /** Point on a circle where angle 0 is 12 o'clock and angles run clockwise. */

@@ -11,6 +11,7 @@ import {
   Boxes, FolderInput, LogOut, ExternalLink, Pin, PinOff
 } from 'lucide-react';
 import { bucketsApi, mqttApi } from '../services/api';
+import { PREF_KEYS, getUserJsonPref, setUserJsonPref } from '../utils/dashboardPrefs';
 import { StatusBadge } from '../components/UI/Badge';
 import {
   LineChart, Line,
@@ -72,6 +73,7 @@ import {
   XAxis as BklitXAxis,
   ChartTooltip as BklitChartTooltip,
   curveNatural,
+  curveMonotoneX,
   curveStep,
   curveLinear,
 } from '../components/Charts/bklit';
@@ -104,7 +106,8 @@ const getColor = (i) => COLORS[i % COLORS.length];
 
 export const MULTI_SERIES_TYPES = [
   'line', 'area', 'bar', 'radar', 'radial', 'scatter', 'composed',
-  'barsquares', 'band', 'patternarea', 'projection', 'donut',
+  'barsquares', 'band', 'patternarea', 'projection', 'donut', 'pie',
+  'candlestick', 'liveline', 'sparkline', 'funnel',
 ];
 export const NUMERIC_TYPES = [
   'stat', 'gauge', 'line', 'bar', 'area', 'barsquares', 'band',
@@ -518,44 +521,56 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
   const h = isTall ? 290 : isCompact ? 135 : 200;
   const unit = widget?.unit || '';
 
-  // 1. Ensure chartData is safely formatted with valid Date objects, numeric fields, and chronological order
+  // 1. Ensure chartData is safely formatted with valid Date objects, numeric fields, and strictly chronological order
   const chartData = useMemo(() => {
     if (!rawChartData || !Array.isArray(rawChartData) || rawChartData.length === 0) return [];
 
-    const nowMs = Date.now();
-    // Raw records from API are newest-first (descending), charts need oldest-first (ascending)
-    const needsReverse =
-      rawChartData.length > 1 &&
-      ((rawChartData[0]?.id && rawChartData[rawChartData.length - 1]?.id && rawChartData[0].id > rawChartData[rawChartData.length - 1].id) ||
-       (rawChartData[0]?.recorded_at && rawChartData[rawChartData.length - 1]?.recorded_at && new Date(rawChartData[0].recorded_at) > new Date(rawChartData[rawChartData.length - 1].recorded_at)));
+    const getMs = (item) => {
+      if (item?.date instanceof Date && !isNaN(item.date.getTime())) return item.date.getTime();
+      const raw = item?.timestamp || item?.recorded_at || item?.created_at;
+      if (raw) {
+        const t = new Date(raw).getTime();
+        if (!isNaN(t)) return t;
+      }
+      return null;
+    };
 
-    const list = needsReverse ? [...rawChartData].reverse() : [...rawChartData];
+    // Sort strictly chronological (oldest to newest) to avoid reverse oscillations and loops
+    const list = [...rawChartData].sort((a, b) => {
+      const ta = getMs(a);
+      const tb = getMs(b);
+      if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+      if (a?.id && b?.id && a.id !== b.id) return a.id - b.id;
+      return 0;
+    });
 
-    const targetFields = widget?.config?.fields?.length > 0 ? widget.config.fields : [widget?.field].filter(Boolean);
+    const lastItem = list[list.length - 1];
+    const lastRaw = lastItem?.timestamp || lastItem?.recorded_at || lastItem?.created_at;
+    const parsedLast = lastRaw ? new Date(lastRaw).getTime() : NaN;
+    const endMs = !isNaN(parsedLast)
+      ? parsedLast
+      : (lastItem?.date instanceof Date && !isNaN(lastItem.date.getTime()) ? lastItem.date.getTime() : Date.now());
+    const intervalMs = 60000; // 1-minute uniform spacing avoids multi-hour gaps compressing points into vertical line spikes
 
     const result = list.map((r, idx) => {
-      let d = r?.date;
-      if (!(d instanceof Date) || isNaN(d.getTime())) {
-        const rawTime = r?.timestamp || r?.recorded_at || r?.created_at;
-        const parsed = rawTime ? new Date(rawTime) : null;
-        if (parsed && !isNaN(parsed.getTime())) {
-          d = new Date(parsed.getTime() + idx * 1000);
-        } else {
-          d = new Date(nowMs - (list.length - 1 - idx) * 60000 + idx * 1000);
-        }
-      }
+      // Equidistant date across width prevents clustering and vertical tail drops
+      const d = new Date(endMs - (list.length - 1 - idx) * intervalMs);
 
       const point = {
         ...r,
         date: d,
-        timestamp: r?.timestamp || r?.created_at || `#${idx + 1}`,
+        timestamp: r?.timestamp || r?.recorded_at || r?.created_at || `#${idx + 1}`,
       };
 
-      // Ensure fields are numerical for chart series
-      targetFields.forEach((f) => {
-        if (f && point[f] !== undefined && point[f] !== null) {
-          const num = parseFloat(point[f]);
-          point[f] = isNaN(num) ? 0 : num;
+      // Ensure ALL numeric telemetry fields are converted to float numbers (no string parsing drops to 0)
+      Object.keys(point).forEach((k) => {
+        if (!['id', 'bucket_id', 'date', 'timestamp', 'created_at', 'updated_at', 'recorded_at', 'is_mock'].includes(k)) {
+          if (point[k] !== undefined && point[k] !== null && typeof point[k] !== 'object') {
+            const num = parseFloat(point[k]);
+            if (!isNaN(num)) {
+              point[k] = num;
+            }
+          }
         }
       });
 
@@ -596,12 +611,38 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     );
   }
 
-  const rawFields = (widget?.config?.fields?.length > 0 ? widget.config.fields : [widget?.field]).filter(Boolean);
-  const renderFields = rawFields.length > 0 ? rawFields : (
-    chartData.length > 0
-      ? Object.keys(chartData[0]).filter(k => !['id', 'bucket_id', 'date', 'timestamp', 'created_at', 'updated_at', 'recorded_at'].includes(k))
-      : ['value']
-  );
+  const isMulti = MULTI_SERIES_TYPES.includes(widget?.type);
+
+  // Available telemetry sensor keys in chartData (ignoring system timestamps and IDs)
+  const availableSensorFields = useMemo(() => {
+    if (!chartData || chartData.length === 0) return [];
+    return Object.keys(chartData[0]).filter(k =>
+      !['id', 'bucket_id', 'date', 'timestamp', 'created_at', 'updated_at', 'recorded_at', 'is_mock'].includes(k) &&
+      typeof chartData[0][k] !== 'object'
+    );
+  }, [chartData]);
+
+  // For charts (MULTI_SERIES_TYPES): Combine all available sensors unless user explicitly checked specific fields
+  // For sensor widgets: Strictly single target field
+  const renderFields = useMemo(() => {
+    if (isMulti) {
+      if (widget?.config?.fields && Array.isArray(widget.config.fields) && widget.config.fields.length > 0) {
+        return widget.config.fields;
+      }
+      if (availableSensorFields.length > 0) {
+        return availableSensorFields;
+      }
+      if (widget?.field && widget.field !== 'multi') {
+        return [widget.field];
+      }
+      return ['value'];
+    }
+    // Single sensor widget
+    const singleField = (widget?.field && widget.field !== 'multi')
+      ? widget.field
+      : (availableSensorFields[0] || 'value');
+    return [singleField];
+  }, [isMulti, widget?.config?.fields, widget?.field, availableSensorFields]);
 
   const primaryField = widget?.field !== 'multi' && widget?.field ? widget.field : renderFields[0];
   const latestVal = chartData[chartData.length - 1]?.[primaryField] ?? '-';
@@ -622,6 +663,35 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
   const getFieldColor = (f, i) => {
     if (widget?.config?.fieldColors?.[f]) return widget.config.fieldColors[f];
     return renderFields.length > 1 ? getColor(i) : activeColor;
+  };
+
+  // Compact multi-sensor legend pills for charts
+  const renderMultiLegend = () => {
+    if (!isMulti || renderFields.length <= 1) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1 mb-1.5 rounded-xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-sm shrink-0">
+        {renderFields.map((f, i) => {
+          const c = getFieldColor(f, i);
+          const rawV = chartData[chartData.length - 1]?.[f];
+          const valDisplay = typeof rawV === 'number' ? rawV.toLocaleString() : (rawV ?? '-');
+          return (
+            <div
+              key={f}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-extrabold border"
+              style={{
+                backgroundColor: `${c}15`,
+                borderColor: `${c}40`,
+                color: '#f8fafc',
+              }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: c }} />
+              <span className="text-slate-300 font-semibold">{f}:</span>
+              <span className="font-mono text-white">{valDisplay}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (widget.type === 'stat') {
@@ -1129,7 +1199,7 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
             dataKey="value"
             stroke={activeColor}
             strokeWidth={2.5}
-            curve={variant === 'step' ? curveStep : curveNatural}
+            curve={variant === 'step' ? curveStep : curveMonotoneX}
             pulse={true}
             badge={true}
           />
@@ -1206,88 +1276,94 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
   if (widget.type === 'bar') {
     const variant = overrideVariant || widget.config?.variant || 'rounded';
     return (
-      <div className="vision-inner-box p-3 w-full transition-[height] duration-300 ease-out" style={{ height: h }}>
-        <BklitBarChart
-          data={chartData}
-          xDataKey="timestamp"
-          aspectRatio=""
-          className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
-          barGap={0.25}
-        >
-          <BklitGrid stroke="rgba(148,163,184,0.08)" />
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            if (variant === 'squares') {
-              return (
-                <BklitBarSquares
-                  key={f}
-                  dataKey={f}
-                  fill={c}
-                  squareGap={2.5}
-                  squareRadius={0.25}
-                />
-              );
-            }
-            if (variant === 'perspective') {
-              return (
-                <BklitBar
-                  key={f}
-                  dataKey={f}
-                  fill={c}
-                  perspective={true}
-                  lineCap="round"
-                />
-              );
-            }
-            if (variant === 'minimal') {
-              return (
-                <BklitBar
-                  key={f}
-                  dataKey={f}
-                  fill={c}
-                  lineCap="butt"
-                />
-              );
-            }
-            return <BklitBar key={f} dataKey={f} fill={c} lineCap="round" />;
-          })}
-          <BklitChartTooltip />
-        </BklitBarChart>
+      <div className="vision-inner-box p-3 w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitBarChart
+            data={chartData}
+            xDataKey="timestamp"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
+            barGap={0.25}
+          >
+            <BklitGrid stroke="rgba(148,163,184,0.08)" />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              if (variant === 'squares') {
+                return (
+                  <BklitBarSquares
+                    key={f}
+                    dataKey={f}
+                    fill={c}
+                    squareGap={2.5}
+                    squareRadius={0.25}
+                  />
+                );
+              }
+              if (variant === 'perspective') {
+                return (
+                  <BklitBar
+                    key={f}
+                    dataKey={f}
+                    fill={c}
+                    perspective={true}
+                    lineCap="round"
+                  />
+                );
+              }
+              if (variant === 'minimal') {
+                return (
+                  <BklitBar
+                    key={f}
+                    dataKey={f}
+                    fill={c}
+                    lineCap="butt"
+                  />
+                );
+              }
+              return <BklitBar key={f} dataKey={f} fill={c} lineCap="round" />;
+            })}
+            <BklitChartTooltip />
+          </BklitBarChart>
+        </div>
       </div>
     );
   }
 
   if (widget.type === 'area') {
     const variant = overrideVariant || widget.config?.variant || 'smooth';
-    const curve = variant === 'stepped' ? curveStep : variant === 'linear' ? curveLinear : curveNatural;
+    const curve = variant === 'stepped' ? curveStep : variant === 'linear' ? curveLinear : curveMonotoneX;
     return (
-      <div style={{ height: h }} className="w-full transition-[height] duration-300 ease-out">
-        <BklitAreaChart
-          data={chartData}
-          xDataKey="date"
-          aspectRatio=""
-          className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
-        >
-          <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            return (
-              <BklitArea
-                key={f}
-                dataKey={f}
-                stroke={c}
-                strokeWidth={2.5}
-                fill={c}
-                fillOpacity={0.35}
-                curve={curve}
-              />
-            );
-          })}
-          <BklitXAxis />
-          <BklitChartTooltip />
-        </BklitAreaChart>
+      <div className="w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitAreaChart
+            data={chartData}
+            xDataKey="date"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 12, left: 20, bottom: 20 }}
+          >
+            <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return (
+                <BklitArea
+                  key={f}
+                  dataKey={f}
+                  stroke={c}
+                  strokeWidth={2.5}
+                  fill={c}
+                  fillOpacity={0.35}
+                  curve={curve}
+                />
+              );
+            })}
+            <BklitXAxis />
+            <BklitChartTooltip />
+          </BklitAreaChart>
+        </div>
       </div>
     );
   }
@@ -1296,30 +1372,33 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     const variant = overrideVariant || widget.config?.variant || 'matrix';
     const sqGap = variant === 'compact' ? 1.5 : 2.5;
     return (
-      <div className="vision-inner-box p-3 w-full transition-[height] duration-300 ease-out" style={{ height: h }}>
-        <BklitBarChart
-          data={chartData}
-          xDataKey="timestamp"
-          aspectRatio=""
-          className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
-          barGap={0.25}
-        >
-          <BklitGrid stroke="rgba(148,163,184,0.08)" />
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            return (
-              <BklitBarSquares
-                key={f}
-                dataKey={f}
-                fill={c}
-                squareGap={sqGap}
-                squareRadius={0.25}
-              />
-            );
-          })}
-          <BklitChartTooltip />
-        </BklitBarChart>
+      <div className="vision-inner-box p-3 w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitBarChart
+            data={chartData}
+            xDataKey="timestamp"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
+            barGap={0.25}
+          >
+            <BklitGrid stroke="rgba(148,163,184,0.08)" />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return (
+                <BklitBarSquares
+                  key={f}
+                  dataKey={f}
+                  fill={c}
+                  squareGap={sqGap}
+                  squareRadius={0.25}
+                />
+              );
+            })}
+            <BklitChartTooltip />
+          </BklitBarChart>
+        </div>
       </div>
     );
   }
@@ -1340,13 +1419,15 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     });
 
     return (
-      <div style={{ height: h }} className="w-full transition-[height] duration-300 ease-out">
-        <BklitLineChart
-          data={bandData}
-          xDataKey="date"
-          aspectRatio=""
-          className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
+      <div className="w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitLineChart
+            data={bandData}
+            xDataKey="date"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 12, left: 20, bottom: 20 }}
         >
           <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
           {renderFields.map((f, i) => {
@@ -1359,7 +1440,7 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
                 fill={c}
                 fillOpacity={0.25}
                 fillType={fillType}
-                curve={curveNatural}
+                curve={curveMonotoneX}
               />
             );
           })}
@@ -1371,7 +1452,7 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
                 dataKey={f}
                 stroke={c}
                 strokeWidth={2.5}
-                curve={curveNatural}
+                curve={curveMonotoneX}
                 glow={{ blur: 6, opacity: 0.6 }}
               />
             );
@@ -1379,6 +1460,7 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
           <BklitXAxis />
           <BklitChartTooltip />
         </BklitLineChart>
+        </div>
       </div>
     );
   }
@@ -1387,56 +1469,59 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     const variant = overrideVariant || widget.config?.variant || 'diagonal';
     const presetId = variant === 'dots' ? 'dots' : variant === 'grid' ? 'grid' : 'diagonal-up';
     return (
-      <div style={{ height: h }} className="w-full transition-[height] duration-300 ease-out">
-        <BklitAreaChart
-          data={chartData}
-          xDataKey="date"
-          aspectRatio=""
-          className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
-        >
-          <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            const patId = `pat_${widget.id}_${f}`;
-            return (
-              <BklitPatternPreset
-                key={`preset_${f}`}
-                id={patId}
-                preset={presetId}
-                color={c}
-              />
-            );
-          })}
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            const patId = `pat_${widget.id}_${f}`;
-            return (
-              <BklitPatternArea
-                key={`pat_${f}`}
-                dataKey={f}
-                fill={`url(#${patId})`}
-                curve={curveNatural}
-                fillOpacity={0.75}
-              />
-            );
-          })}
-          {renderFields.map((f, i) => {
-            const c = getFieldColor(f, i);
-            return (
-              <BklitArea
-                key={f}
-                dataKey={f}
-                stroke={c}
-                strokeWidth={2.5}
-                fillOpacity={0}
-                curve={curveNatural}
-              />
-            );
-          })}
-          <BklitXAxis />
-          <BklitChartTooltip />
-        </BklitAreaChart>
+      <div className="w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitAreaChart
+            data={chartData}
+            xDataKey="date"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 12, left: 20, bottom: 20 }}
+          >
+            <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              const patId = `pat_${widget.id}_${f}`;
+              return (
+                <BklitPatternPreset
+                  key={`preset_${f}`}
+                  id={patId}
+                  preset={presetId}
+                  color={c}
+                />
+              );
+            })}
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              const patId = `pat_${widget.id}_${f}`;
+              return (
+                <BklitPatternArea
+                  key={`pat_${f}`}
+                  dataKey={f}
+                  fill={`url(#${patId})`}
+                  curve={curveMonotoneX}
+                  fillOpacity={0.75}
+                />
+              );
+            })}
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return (
+                <BklitArea
+                  key={f}
+                  dataKey={f}
+                  stroke={c}
+                  strokeWidth={2.5}
+                  fillOpacity={0}
+                  curve={curveMonotoneX}
+                />
+              );
+            })}
+            <BklitXAxis />
+            <BklitChartTooltip />
+          </BklitAreaChart>
+        </div>
       </div>
     );
   }
@@ -1462,13 +1547,60 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     }
 
     return (
-      <div style={{ height: h }} className="w-full transition-[height] duration-300 ease-out">
+      <div className="w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+        {renderMultiLegend()}
+        <div className="w-full flex-1 min-h-0">
+          <BklitLineChart
+            data={chartData}
+            xDataKey="date"
+            aspectRatio=""
+            className="w-full h-full"
+            margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
+          >
+            <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
+            {renderFields.map((f, i) => {
+              const c = getFieldColor(f, i);
+              return (
+                <BklitLine
+                  key={f}
+                  dataKey={f}
+                  stroke={c}
+                  strokeWidth={2.5}
+                  curve={curveMonotoneX}
+                />
+              );
+            })}
+            {projPoints.length > 0 && (
+              <BklitProjectionLine
+                data={projPoints}
+                stroke="rgb(var(--primary-400))"
+                strokeDasharray="6,4"
+                showEndMarker={true}
+                strokeWidth={2}
+              />
+            )}
+            <BklitXAxis />
+            <BklitChartTooltip />
+          </BklitLineChart>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: Line
+  const lineVariant = overrideVariant || widget.config?.variant || 'glow';
+  const lineCurve = lineVariant === 'stepped' ? curveStep : lineVariant === 'linear' ? curveLinear : curveMonotoneX;
+  const isGlow = lineVariant === 'glow';
+  return (
+    <div className="w-full flex flex-col justify-between transition-[height] duration-300 ease-out" style={{ height: h }}>
+      {renderMultiLegend()}
+      <div className="w-full flex-1 min-h-0">
         <BklitLineChart
           data={chartData}
           xDataKey="date"
           aspectRatio=""
           className="w-full h-full"
-          margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
+          margin={{ top: 8, right: 12, left: 20, bottom: 20 }}
         >
           <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
           {renderFields.map((f, i) => {
@@ -1479,56 +1611,15 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
                 dataKey={f}
                 stroke={c}
                 strokeWidth={2.5}
-                curve={curveNatural}
+                curve={lineCurve}
+                glow={isGlow ? { blur: 8, opacity: 0.75 } : false}
               />
             );
           })}
-          {projPoints.length > 0 && (
-            <BklitProjectionLine
-              data={projPoints}
-              stroke="rgb(var(--primary-400))"
-              strokeDasharray="6,4"
-              showEndMarker={true}
-              strokeWidth={2}
-            />
-          )}
           <BklitXAxis />
           <BklitChartTooltip />
         </BklitLineChart>
       </div>
-    );
-  }
-
-  // Default: Line
-  const lineVariant = overrideVariant || widget.config?.variant || 'glow';
-  const lineCurve = lineVariant === 'stepped' ? curveStep : lineVariant === 'linear' ? curveLinear : curveNatural;
-  const isGlow = lineVariant === 'glow';
-  return (
-    <div style={{ height: h }} className="w-full transition-[height] duration-300 ease-out">
-      <BklitLineChart
-        data={chartData}
-        xDataKey="date"
-        aspectRatio=""
-        className="w-full h-full"
-        margin={{ top: 8, right: 10, left: 10, bottom: 20 }}
-      >
-        <BklitGrid stroke="rgba(148,163,184,0.08)" strokeDasharray="4,4" />
-        {renderFields.map((f, i) => {
-          const c = getFieldColor(f, i);
-          return (
-            <BklitLine
-              key={f}
-              dataKey={f}
-              stroke={c}
-              strokeWidth={2.5}
-              curve={lineCurve}
-              glow={isGlow ? { blur: 8, opacity: 0.75 } : false}
-            />
-          );
-        })}
-        <BklitXAxis />
-        <BklitChartTooltip />
-      </BklitLineChart>
     </div>
   );
 }
@@ -1736,11 +1827,17 @@ function SortableWidget({
     window.addEventListener('pointercancel', handlePointerUp);
   };
 
+  const colSpanClass =
+    localW === '3'
+      ? 'col-span-1 md:col-span-2 xl:col-span-3'
+      : localW === '2'
+      ? 'col-span-1 md:col-span-2'
+      : 'col-span-1';
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition ? `${transition}, min-height 0.3s cubic-bezier(0.16, 1, 0.3, 1)` : 'min-height 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
     opacity: isDragging ? 0.5 : 1,
-    gridColumn: localW === '3' ? 'span 3' : localW === '2' ? 'span 2' : 'span 1',
     minWidth: 0,
     maxWidth: '100%',
   };
@@ -1749,7 +1846,7 @@ function SortableWidget({
     <div
       ref={setNodeRef}
       style={style}
-      className={`vision-card p-6 relative group flex flex-col justify-between transition-all duration-300 ease-out overflow-hidden min-w-0 max-w-full ${localH === 'tall' ? 'h-[420px] min-h-[420px]' : 'h-[320px] min-h-[320px]'}`}
+      className={`vision-card p-6 relative group flex flex-col justify-between transition-all duration-300 ease-out overflow-hidden min-w-0 max-w-full ${colSpanClass} ${localH === 'tall' ? 'h-[420px] min-h-[420px]' : 'h-[320px] min-h-[320px]'}`}
     >
       {/* Ghost Resize Box with target dimension indicator */}
       {ghostSize && (
@@ -1806,8 +1903,18 @@ function SortableWidget({
           )}
           <div className="min-w-0">
             <h4 className="text-[15px] font-extrabold text-slate-100 leading-tight truncate">{widget.title}</h4>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-              {CHART_TYPES.find(c => c.value === widget.type)?.label || widget.type} • <span className="font-mono text-primary-400">{widget.field}</span>
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate flex items-center gap-1">
+              <span>{CHART_TYPES.find(c => c.value === widget.type)?.label || widget.type}</span>
+              {widget.type !== 'container' && (
+                <>
+                  <span>•</span>
+                  <span className="font-mono text-primary-400">
+                    {MULTI_SERIES_TYPES.includes(widget.type)
+                      ? (widget.config?.fields?.length > 0 ? widget.config.fields.join(' + ') : (widget.field || 'all'))
+                      : `${widget.field || 'field'}${widget.unit ? ` (${widget.unit})` : ''}`}
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -2090,7 +2197,11 @@ function SortableContainerChild({ widget, index, chartData, onDelete, onEdit, on
           </div>
           <div className="min-w-0">
             <h5 className="text-xs font-bold text-slate-200 truncate">{widget.title}</h5>
-            <p className="text-[10px] text-slate-400 font-mono truncate">{widget.field}</p>
+            <p className="text-[10px] text-slate-400 font-mono truncate">
+              {MULTI_SERIES_TYPES.includes(widget.type)
+                ? (widget.config?.fields?.length > 0 ? widget.config.fields.join(' + ') : (widget.field || 'all'))
+                : `${widget.field || 'field'}${widget.unit ? ` (${widget.unit})` : ''}`}
+            </p>
           </div>
         </div>
 
@@ -2232,11 +2343,17 @@ function ContainerWidget({
       ? 'flex flex-wrap gap-3.5'
       : 'grid grid-cols-1 md:grid-cols-2 gap-3.5';
 
+  const colSpanClass =
+    localW === '3'
+      ? 'col-span-1 md:col-span-2 xl:col-span-3'
+      : localW === '2'
+      ? 'col-span-1 md:col-span-2'
+      : 'col-span-1';
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition ? `${transition}, min-height 0.3s cubic-bezier(0.16, 1, 0.3, 1)` : 'min-height 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
     opacity: isDragging ? 0.5 : 1,
-    gridColumn: localW === '3' ? 'span 3' : localW === '2' ? 'span 2' : 'span 1',
     minWidth: 0,
     maxWidth: '100%',
   };
@@ -2320,7 +2437,7 @@ function ContainerWidget({
         setDroppableRef(node);
       }}
       style={style}
-      className={`vision-card p-5 sm:p-6 relative group flex flex-col gap-3.5 transition-all duration-300 ease-out overflow-hidden min-w-0 max-w-full ${localH === 'tall' ? 'min-h-[460px]' : 'min-h-[340px]'} ${
+      className={`vision-card p-5 sm:p-6 relative group flex flex-col gap-3.5 transition-all duration-300 ease-out overflow-hidden min-w-0 max-w-full ${colSpanClass} ${localH === 'tall' ? 'min-h-[460px]' : 'min-h-[340px]'} ${
         isCardOver ? 'ring-2 ring-primary-400 border-primary-500 shadow-[0_0_30px_rgba(var(--primary-500),0.3)] bg-primary-500/5' : ''
       }`}
     >
@@ -2592,12 +2709,11 @@ export default function BucketDetail() {
   const lastUpdateRef = useRef(0);
   const resizeSaveTimerRef = useRef(null);
 
-  // ── Pinned Bucket Widgets (Synced with Dashboard Right Sidebar) ──
+  // ── Pinned Bucket Widgets (Synced with Dashboard Right Sidebar, Per-User) ──
   const [pinnedWidgetIds, setPinnedWidgetIds] = useState(() => {
     try {
-      const raw = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-      const list = raw ? JSON.parse(raw) : [];
-      return new Set(list.map(i => i.widgetId));
+      const list = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+      return new Set(Array.isArray(list) ? list.map(i => i.widgetId) : []);
     } catch {
       return new Set();
     }
@@ -2606,15 +2722,16 @@ export default function BucketDetail() {
   useEffect(() => {
     const syncPinned = () => {
       try {
-        const raw = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-        const list = raw ? JSON.parse(raw) : [];
-        setPinnedWidgetIds(new Set(list.map(i => i.widgetId)));
+        const list = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+        setPinnedWidgetIds(new Set(Array.isArray(list) ? list.map(i => i.widgetId) : []));
       } catch {}
     };
     window.addEventListener('bucket-widgets-updated', syncPinned);
+    window.addEventListener('dashboard-prefs-updated', syncPinned);
     window.addEventListener('storage', syncPinned);
     return () => {
       window.removeEventListener('bucket-widgets-updated', syncPinned);
+      window.removeEventListener('dashboard-prefs-updated', syncPinned);
       window.removeEventListener('storage', syncPinned);
     };
   }, []);
@@ -2622,8 +2739,8 @@ export default function BucketDetail() {
   const handleTogglePinToDashboard = (widget) => {
     try {
       const pinId = `${bucket?.id || id}_${widget.id}`;
-      const raw = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-      const list = raw ? JSON.parse(raw) : [];
+      let list = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+      if (!Array.isArray(list)) list = [];
       const exists = list.some(item => item.id === pinId);
       let updated;
       if (exists) {
@@ -2669,7 +2786,7 @@ export default function BucketDetail() {
           iconColor: '#34d399',
         });
       }
-      localStorage.setItem('iot_dashboard_pinned_bucket_widgets', JSON.stringify(updated));
+      setUserJsonPref(PREF_KEYS.PINNED_BUCKETS, updated);
       setPinnedWidgetIds(new Set(updated.map(i => i.widgetId)));
       window.dispatchEvent(new CustomEvent('bucket-widgets-updated'));
     } catch (e) {
@@ -2682,19 +2799,21 @@ export default function BucketDetail() {
     const defaultVariant = CHART_VARIANTS[newType]?.[0]?.id || 'glow';
     setFormVariant(defaultVariant);
     const isCont = newType === 'container';
+    const isMulti = MULTI_SERIES_TYPES.includes(newType);
     setPreviewWidget(prev => ({
       ...(prev || {}),
       id: 'preview',
       type: newType,
-      field: isCont ? 'container' : (prev?.field || bucket?.fields?.[0] || 'field'),
-      title: prev?.title || (isCont ? 'Container Group' : `${bucket?.fields?.[0] || 'Sensor'} ${newType}`),
-      w: isCont ? '3' : (prev?.w || '1'),
+      field: isCont ? 'container' : isMulti ? 'multi' : (prev?.field && prev.field !== 'multi' ? prev.field : (bucket?.fields?.[0] || 'field')),
+      title: prev?.title || (isCont ? 'Container Group' : isMulti ? 'Gabungan Data Sensor' : `${bucket?.fields?.[0] || 'Sensor'} ${newType}`),
+      w: isCont ? '3' : isMulti ? '2' : (prev?.w || '1'),
       h: prev?.h || 'normal',
       config: {
         ...(prev?.config || {}),
         variant: defaultVariant,
         color: formColor || undefined,
         layout: isCont ? 'grid-2' : undefined,
+        fields: isMulti ? (prev?.config?.fields?.length > 0 ? prev.config.fields : (bucket?.fields || [])) : undefined,
       }
     }));
   };
@@ -2772,22 +2891,42 @@ export default function BucketDetail() {
 
   // ── Format data for charts ──
   const formatChartData = (recs) => {
-    if (!bucket?.fields) return [];
-    const reversed = [...recs].reverse();
-    const nowMs = Date.now();
-    return reversed.map((r, idx) => {
-      const parsedDate = r.timestamp ? new Date(r.timestamp) : null;
-      const validDate = parsedDate && !isNaN(parsedDate.getTime())
-        ? parsedDate
-        : new Date(nowMs - (reversed.length - 1 - idx) * 60000);
+    if (!Array.isArray(recs) || recs.length === 0) return [];
+    // Sort strictly chronological (oldest to newest) to avoid reverse oscillations
+    const sorted = [...recs].sort((a, b) => {
+      const ta = a.timestamp || a.recorded_at || a.created_at;
+      const tb = b.timestamp || b.recorded_at || b.created_at;
+      const da = ta ? new Date(ta).getTime() : NaN;
+      const db = tb ? new Date(tb).getTime() : NaN;
+      if (!isNaN(da) && !isNaN(db) && da !== db) return da - db;
+      if (a.id && b.id && a.id !== b.id) return a.id - b.id;
+      return 0;
+    });
+
+    const lastRec = sorted[sorted.length - 1];
+    const lastRawTime = lastRec?.timestamp || lastRec?.recorded_at || lastRec?.created_at;
+    const parsedLastTime = lastRawTime ? new Date(lastRawTime).getTime() : NaN;
+    const endMs = !isNaN(parsedLastTime) ? parsedLastTime : Date.now();
+    const intervalMs = 60000; // 1-minute uniform spacing prevents points from bunching into a vertical line
+
+    return sorted.map((r, idx) => {
+      // Equidistant date across width
+      const syntheticDate = new Date(endMs - (sorted.length - 1 - idx) * intervalMs);
       const point = {
-        timestamp: r.timestamp || `#${idx + 1}`,
-        // Ensure strictly monotonic unique timestamps (+idx*1000ms) so d3 scaleTime domain never collapses to 0 width
-        date: new Date(validDate.getTime() + idx * 1000),
+        ...r,
+        timestamp: r.timestamp || r.recorded_at || `#${idx + 1}`,
+        date: syntheticDate,
       };
-      bucket.fields.forEach(f => {
-        const parsed = r[f] !== undefined && r[f] !== null ? parseFloat(r[f]) : 0;
-        point[f] = isNaN(parsed) ? 0 : parsed;
+      // Ensure all fields are numerical float values
+      Object.keys(point).forEach((k) => {
+        if (!['id', 'bucket_id', 'date', 'timestamp', 'created_at', 'updated_at', 'recorded_at', 'is_mock'].includes(k)) {
+          if (point[k] !== undefined && point[k] !== null && typeof point[k] !== 'object') {
+            const num = parseFloat(point[k]);
+            if (!isNaN(num)) {
+              point[k] = num;
+            }
+          }
+        }
       });
       return point;
     });
@@ -2948,15 +3087,15 @@ export default function BucketDetail() {
       id: 'preview',
       type: currentType,
       field: data.field || (isCont ? 'container' : isMulti ? 'multi' : bucket?.fields?.[0]),
-      title: data.title || (isCont ? 'Container Group' : isMulti ? `Multi ${currentType}` : `${data.field || bucket?.fields?.[0] || 'Field'} ${currentType}`),
-      w: data.w || (isCont ? '3' : '1'),
+      title: data.title || (isCont ? 'Container Group' : isMulti ? 'Gabungan Data Sensor' : `${data.field || bucket?.fields?.[0] || 'Sensor'} ${currentType}`),
+      w: data.w || (isCont ? '3' : isMulti ? '2' : '1'),
       h: data.h || 'normal',
       unit: data.unit || null,
       config: isCont ? {
         layout: data.layout || 'grid-2',
         color: data.color || formColor || null,
       } : {
-        fields: isMulti ? (multiFields.length > 0 ? multiFields : [bucket?.fields?.[0]]) : undefined,
+        fields: isMulti ? (multiFields.length > 0 ? multiFields : (bucket?.fields || [])) : undefined,
         fieldColors: isMulti ? fieldColors : undefined,
         min: data.min || 0,
         max: data.max || 100,
@@ -2994,8 +3133,8 @@ export default function BucketDetail() {
       const widgetPayload = {
         type: data.type,
         field: data.field || (isCont ? 'container' : isMulti ? 'multi' : ''),
-        title: data.title || (isCont ? 'Container Group' : isMulti ? `Multi ${data.type}` : `${data.field} ${data.type}`),
-        w: data.w || previewWidget?.w || editingWidget?.w || (isCont ? '3' : '1'),
+        title: data.title || (isCont ? 'Container Group' : isMulti ? 'Gabungan Data Sensor' : `${data.field} ${data.type}`),
+        w: data.w || previewWidget?.w || editingWidget?.w || (isCont ? '3' : isMulti ? '2' : '1'),
         h: data.h || previewWidget?.h || editingWidget?.h || 'normal',
         unit: data.unit || null,
         containerId: targetContainerId || (editingWidget ? editingWidget.containerId : null),
@@ -3004,7 +3143,7 @@ export default function BucketDetail() {
           color: data.color || null,
           variant: data.layout || 'grid-2',
         } : {
-          fields: isMulti ? (multiFields.length > 0 ? multiFields : [bucket?.fields?.[0]]) : undefined,
+          fields: isMulti ? (multiFields.length > 0 ? multiFields : (bucket?.fields || [])) : undefined,
           fieldColors: isMulti ? fieldColors : undefined,
           min: data.min || 0,
           max: data.max || 100,
@@ -3096,11 +3235,10 @@ export default function BucketDetail() {
         return w;
       });
 
-      // Also sync pinned widget cache in localStorage if pinned
+      // Also sync pinned widget cache in per-user storage if pinned
       try {
-        const rawPinned = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-        if (rawPinned) {
-          const pinnedList = JSON.parse(rawPinned);
+        const pinnedList = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+        if (Array.isArray(pinnedList) && pinnedList.length > 0) {
           let changed = false;
           const nextPinned = pinnedList.map(item => {
             if (item.widgetId === widgetId || item.id === `${id}_${widgetId}`) {
@@ -3118,7 +3256,7 @@ export default function BucketDetail() {
             return item;
           });
           if (changed) {
-            localStorage.setItem('iot_dashboard_pinned_bucket_widgets', JSON.stringify(nextPinned));
+            setUserJsonPref(PREF_KEYS.PINNED_BUCKETS, nextPinned);
             window.dispatchEvent(new CustomEvent('bucket-widgets-updated'));
           }
         }
@@ -3157,9 +3295,14 @@ export default function BucketDetail() {
     setPreviewWidget({
       id: 'preview',
       type: 'line',
-      field: bucket?.fields?.[0] || 'field',
-      title: 'Preview Widget',
-      w: '1', h: 'normal', config: { variant: 'glow' }
+      field: 'multi',
+      title: 'Gabungan Data Sensor',
+      w: '2',
+      h: 'normal',
+      config: {
+        variant: 'glow',
+        fields: bucket?.fields || [],
+      }
     });
     setShowWidgetModal(true);
   };
@@ -3295,7 +3438,7 @@ export default function BucketDetail() {
           {widgets.length > 0 ? (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <SortableContext items={rootWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
-                <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', alignItems: 'start' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
                   {rootWidgets.map((widget, i) => {
                     if (widget.type === 'container') {
                       const childWidgets = widgets.filter(w => w.containerId === widget.id);
@@ -3548,10 +3691,12 @@ export default function BucketDetail() {
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                     {[
                       { id: 'all',          label: 'Semua', count: CHART_TYPES.length },
+                      { id: 'charts',       label: 'Grafik Telemetri', count: CHART_TYPES.filter(c => c.category === 'chart').length },
+                      { id: 'sensors',      label: 'Kontrol & IoT', count: CHART_TYPES.filter(c => c.category === 'widget' && c.value !== 'container').length },
+                      { id: 'container',    label: 'Container Group', count: CHART_TYPES.filter(c => c.value === 'container').length },
                       { id: 'curves',       label: 'Kurva & Aliran', count: CHART_TYPES.filter(c => c.group === 'curves').length },
                       { id: 'bars',         label: 'Batang & Hybrid', count: CHART_TYPES.filter(c => c.group === 'bars').length },
                       { id: 'distribution', label: 'Polar & Distribusi', count: CHART_TYPES.filter(c => c.group === 'distribution').length },
-                      { id: 'controls',     label: 'Kontrol & IoT', count: CHART_TYPES.filter(c => c.group === 'controls').length },
                     ].map(f => (
                       <button
                         key={f.id}
@@ -3576,10 +3721,17 @@ export default function BucketDetail() {
                   {/* Cards Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                     {CHART_TYPES
-                      .filter(ct => typeFilter === 'all' || ct.group === typeFilter)
+                      .filter(ct => {
+                        if (typeFilter === 'all') return true;
+                        if (typeFilter === 'charts') return ct.category === 'chart';
+                        if (typeFilter === 'sensors') return ct.category === 'widget' && ct.value !== 'container';
+                        if (typeFilter === 'container') return ct.value === 'container';
+                        return ct.group === typeFilter;
+                      })
                       .map(ct => {
                         const Icon = ct.icon;
                         const isSelected = formType === ct.value;
+                        const isChartMulti = MULTI_SERIES_TYPES.includes(ct.value);
                         return (
                           <div
                             key={ct.value}
@@ -3846,13 +3998,15 @@ export default function BucketDetail() {
                           <label className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center justify-between mb-2">
                             <span className="flex items-center gap-2">
                               <Database size={14} className="text-primary-400" />
-                              Pilih Multi-Sensor Fields
+                              Pilih Field Telemetri
                             </span>
-                            <span className="text-[10px] font-normal text-slate-400">Centang field yang ingin digabung</span>
+                            <span className="text-[10px] font-normal text-slate-400">Centang field yang ingin ditampilkan</span>
                           </label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                             {bucket.fields?.map((f, idx) => {
-                              const isChecked = (previewWidget || editingWidget)?.config?.fields?.includes(f) || false;
+                              const isCheckedByDefault = editingWidget
+                                ? (editingWidget.config?.fields?.includes(f) ?? (editingWidget.field === f))
+                                : true;
                               return (
                                 <div key={f} className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors">
                                   <label className="flex items-center gap-2 text-xs font-bold text-slate-300 cursor-pointer flex-1">
@@ -3860,20 +4014,18 @@ export default function BucketDetail() {
                                       type="checkbox"
                                       name="multiFields"
                                       value={f}
-                                      defaultChecked={editingWidget?.config?.fields?.includes(f) || false}
+                                      defaultChecked={isCheckedByDefault}
                                       className="w-4 h-4 rounded bg-slate-800 border-slate-600 text-primary-500 focus:ring-primary-500/50"
                                     />
                                     <span className="truncate">{f}</span>
                                   </label>
-                                  {isChecked && (
-                                    <input
-                                      type="color"
-                                      name={`color_${f}`}
-                                      defaultValue={editingWidget?.config?.fieldColors?.[f] || getColor(idx)}
-                                      className="w-6 h-6 rounded-md cursor-pointer border-0 p-0 bg-transparent shrink-0"
-                                      title={`Warna untuk ${f}`}
-                                    />
-                                  )}
+                                  <input
+                                    type="color"
+                                    name={`color_${f}`}
+                                    defaultValue={editingWidget?.config?.fieldColors?.[f] || getColor(idx)}
+                                    className="w-6 h-6 rounded-md cursor-pointer border-0 p-0 bg-transparent shrink-0"
+                                    title={`Warna untuk ${f}`}
+                                  />
                                 </div>
                               );
                             })}
@@ -3888,7 +4040,7 @@ export default function BucketDetail() {
                           <select
                             name="field"
                             defaultValue={editingWidget?.field || bucket.fields?.[0] || ''}
-                            className="input-field w-full"
+                            className="input-field w-full text-sm font-semibold"
                             required={formType !== 'container'}
                           >
                             {bucket.fields?.map(f => (
@@ -4257,7 +4409,9 @@ export default function BucketDetail() {
                             {previewWidget.title || `${previewWidget.field || 'Field'} ${previewWidget.type}`}
                           </h4>
                           <p className="text-[10px] text-slate-400 font-mono">
-                            field: {previewWidget.field || bucket?.fields?.[0] || 'telemetry'}
+                            {MULTI_SERIES_TYPES.includes(previewWidget.type)
+                              ? (previewWidget.config?.fields?.length > 0 ? previewWidget.config.fields.join(' + ') : 'Multi-Series')
+                              : `field: ${previewWidget.field || bucket?.fields?.[0] || 'telemetry'}`}
                           </p>
                         </div>
                         <div

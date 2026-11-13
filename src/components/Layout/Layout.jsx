@@ -18,6 +18,7 @@ const pageMeta = {
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
   const key = Object.keys(pageMeta).find(k => location.pathname.startsWith(k)) || '/app/dashboard';
@@ -50,15 +51,32 @@ export default function Layout() {
         />
       </div>
 
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      {/* Mobile Backdrop Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
 
       <div
-        className={`relative flex-1 flex flex-col min-h-screen transition-all duration-300 ${
-          collapsed ? 'ml-[78px]' : 'ml-[256px]'
-        }`}
+        className={`relative flex-1 flex flex-col min-h-screen transition-all duration-300 w-full min-w-0 ${
+          collapsed ? 'lg:ml-[78px]' : 'lg:ml-[256px]'
+        } ml-0`}
       >
-        <Navbar title={resolvedTitle} subtitle={resolvedSubtitle} />
-        <main className="flex-1 px-6 pb-8 pt-2 overflow-auto">
+        <Navbar
+          title={resolvedTitle}
+          subtitle={resolvedSubtitle}
+          onOpenMobileNav={() => setMobileOpen(true)}
+        />
+        <main className="flex-1 px-3 sm:px-6 pb-8 pt-2 overflow-x-hidden overflow-y-auto">
           <Outlet />
         </main>
       </div>

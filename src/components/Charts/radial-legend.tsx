@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { intFmt } from "./chart-formatters";
 import { Legend } from "./legend/legend";
 import { useLegendItem } from "./legend/legend-context";

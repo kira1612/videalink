@@ -37,20 +37,29 @@ class DashboardController extends Controller
 
     public function activity(Request $request)
     {
-        $deviceIds = Device::where('user_id', $request->user()->id)->pluck('id');
+        $userId = $request->user()->id;
+        $deviceIds = Device::where('user_id', $userId)->pluck('id');
 
-        $logs = ActivityLog::whereIn('device_id', $deviceIds)
-            ->orWhereNull('device_id')
+        \Carbon\Carbon::setLocale('id');
+
+        $logs = ActivityLog::where(function ($q) use ($userId, $deviceIds) {
+                $q->where('user_id', $userId)
+                  ->orWhereIn('device_id', $deviceIds);
+            })
             ->latest()
             ->limit(20)
             ->get()
-            ->map(fn($log) => [
-                'id' => $log->id,
-                'device' => $log->device_name ?? 'System',
-                'event' => $log->event,
-                'type' => $log->type,
-                'time' => $log->created_at->format('H:i:s'),
-            ]);
+            ->map(function ($log) {
+                $timeDiff = $log->created_at ? $log->created_at->diffForHumans() : 'Baru saja';
+                return [
+                    'id' => $log->id,
+                    'device' => $log->device_name ?? 'Sistem',
+                    'event' => $log->event,
+                    'type' => $log->type ?? 'info',
+                    'time' => $timeDiff,
+                    'created_at' => $log->created_at?->toISOString(),
+                ];
+            });
 
         return response()->json($logs);
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Shield, ChevronLeft, Cpu, Sparkles } from 'lucide-react';
 import { authApi } from '../services/api';
+import { hydratePrefsFromUser, clearPendingPrefsSync, clearLegacyGlobalPrefs } from '../utils/dashboardPrefs';
 import ParticleTunnel from '../components/ParticleTunnel';
 import GameLoginTransition from '../components/GameLoginTransition';
 
@@ -77,8 +78,11 @@ export default function Login() {
       } else {
         res = await authApi.register(name, email, password);
       }
+      clearPendingPrefsSync();
+      clearLegacyGlobalPrefs();
       localStorage.setItem('iot_token', res.data.token);
       localStorage.setItem('iot_user', JSON.stringify(res.data.user));
+      hydratePrefsFromUser(res.data.user, { force: true });
 
       // Trigger AAA Game-style Hyperdrive Launch Transition
       setTransitionUser(res.data.user);

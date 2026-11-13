@@ -203,7 +203,7 @@
     --ring: oklch(0.708 0 0);
     --chart-1: oklch(0.585 0.233 277.117);
     --chart-2: oklch(0.852 0.199 91.936);
-    --chart-3: oklch(0.667 0.295 322.15);
+    --chart-3: oklch(0.459 0.156 302.679);
     --chart-4: oklch(0.56 0.021 213.5);
     --chart-5: oklch(0 0 0);
     --radius: 0.625rem;
@@ -215,41 +215,46 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
-    --chart-positive: oklch(0.765 0.177 163.223);
-    --chart-negative: oklch(0.704 0.191 22.216);
-    --chart-background: rgb(var(--surface-900));
-    --chart-foreground: rgb(var(--surface-100));
-    --chart-foreground-muted: rgb(var(--surface-400));
-    --chart-line-primary: rgb(var(--primary-400));
-    --chart-line-secondary: #22d3ee;
-    --chart-crosshair: rgb(var(--primary-400));
-    --chart-grid: rgba(148, 163, 184, 0.14);
+    --chart-positive: oklch(0.696 0.17 162.48);
+    --chart-negative: oklch(0.637 0.237 25.331);
+    --chart-background: oklch(1 0 0);
+    --chart-foreground: oklch(0.145 0.004 285);
+    --chart-foreground-muted: oklch(0.55 0.014 260);
+    --chart-line-primary: var(--chart-1);
+    --chart-line-secondary: var(--chart-2);
+    --chart-crosshair: oklch(0.4 0.1828 274.34);
+    --chart-grid: oklch(0.9 0 0);
     --chart-brush-border: var(--chart-grid);
-    --chart-tooltip-background: rgb(var(--surface-800));
-    --chart-tooltip-foreground: rgb(var(--surface-50));
-    --chart-tooltip-muted: rgb(var(--surface-400));
-    --chart-marker-background: rgb(var(--surface-800));
-    --chart-marker-border: rgb(var(--primary-500) / 0.4);
-    --chart-marker-foreground: rgb(var(--surface-100));
-    --chart-label: rgb(var(--surface-300));
-    --chart-scale-mix: rgb(var(--surface-900));
-    --chart-scale-01: rgb(var(--surface-800));
+    --chart-tooltip-background: var(--popover);
+    --chart-tooltip-foreground: var(--popover-foreground);
+    --chart-tooltip-muted: var(--muted-foreground);
+    --chart-marker-background: oklch(0.97 0.005 260);
+    --chart-marker-border: oklch(0.85 0.01 260);
+    --chart-marker-foreground: oklch(0.3 0.01 260);
+    --chart-label: oklch(0.45 0.01 260);
+    --chart-scale-mix: oklch(1 0 0);
+    --chart-scale-01: oklch(0.922 0 0);
     --chart-scale-02: color-mix(in oklab, var(--chart-1) 35%, var(--chart-scale-mix));
     --chart-scale-03: color-mix(in oklab, var(--chart-1) 55%, var(--chart-scale-mix));
     --chart-scale-04: color-mix(in oklab, var(--chart-1) 78%, var(--chart-scale-mix));
     --chart-scale-05: var(--chart-1);
-    --chart-scale-pattern-color: rgb(var(--surface-900));
-    --chart-indicator-color: rgb(var(--primary-400));
-    --chart-indicator-secondary-color: rgb(var(--surface-700));
-    --chart-marker-badge-background: rgb(var(--primary-500));
-    --chart-marker-badge-foreground: #ffffff;
-    --chart-segment-background: rgb(var(--primary-500) / 0.12);
-    --chart-segment-line: rgb(var(--primary-400) / 0.35);
+    --chart-scale-pattern-color: oklch(1 0 0);
+    --chart-indicator-color: oklch(0.21 0.006 285);
+    --chart-indicator-secondary-color: oklch(0.913 0 0);
+    --chart-marker-badge-background: oklch(0 0 0);
+    --chart-marker-badge-foreground: oklch(0.84 0 0);
+    --chart-segment-background: oklch(0.756 0 0 / 0.06);
+    --chart-segment-line: oklch(0.5 0 0 / 0.25);
     --foreground: rgb(var(--surface-50));
     --muted-foreground: rgb(var(--surface-400));
     --popover: rgb(var(--surface-800));
     --popover-foreground: rgb(var(--surface-50));
     --border: rgba(148, 163, 184, 0.18);
+    --legend: oklch(1 0 0);
+    --legend-foreground: oklch(0.141 0.005 285.823);
+    --legend-muted: oklch(0.967 0.001 286.375);
+    --legend-muted-foreground: oklch(0.552 0.016 285.938);
+    --legend-track: oklch(0.92 0.004 286.32);
   }
   .dark {
     --background: oklch(0.145 0 0);
@@ -272,7 +277,7 @@
     --ring: oklch(0.556 0 0);
     --chart-1: oklch(0.585 0.233 277.117);
     --chart-2: oklch(0.852 0.199 91.936);
-    --chart-3: oklch(0.667 0.295 322.15);
+    --chart-3: oklch(0.459 0.156 302.679);
     --chart-4: oklch(0.56 0.021 213.5);
     --chart-5: oklch(1 0 0);
     --sidebar: oklch(0.205 0 0);
@@ -308,6 +313,11 @@
     --chart-marker-badge-foreground: oklch(0.15 0 0);
     --chart-segment-background: oklch(0.41 0.0127 248.14 / 0.25);
     --chart-segment-line: oklch(1 0 0 / 0.25);
+    --legend: oklch(0.21 0.006 285.885);
+    --legend-foreground: oklch(0.985 0 0);
+    --legend-muted: oklch(0.274 0.006 286.033);
+    --legend-muted-foreground: oklch(0.705 0.015 286.067);
+    --legend-track: oklch(0.274 0.006 286.033);
   }
   html {
     @apply font-sans;
@@ -481,6 +491,41 @@
   div:where(.swal2-container) .swal2-icon.swal2-info {
     border-color: rgb(var(--primary-500)) !important;
     color: rgb(var(--primary-400)) !important;
+  }
+
+  .billing-plan-featured {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--primary-500) / 0.08) 0%,
+      rgb(var(--surface-900)) 55%
+    );
+    border: 1.5px solid rgb(var(--primary-500) / 0.75);
+    box-shadow: 0 4px 16px -4px rgb(var(--primary-500) / 0.14);
+  }
+  [data-mode="light"] .billing-plan-featured {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--primary-50) / 0.65) 0%,
+      #ffffff 55%
+    );
+    border: 1.5px solid rgb(var(--primary-500) / 0.7);
+    box-shadow: 0 4px 16px -4px rgb(var(--primary-500) / 0.12);
+  }
+  .billing-btn-featured {
+    background-color: rgb(var(--primary-500));
+  }
+
+  /* Clean Matte Operational Surface (anti-slop: crisp 1px border, no backdrop blur/gradient noise) */
+  .ops-surface {
+    background-color: rgb(var(--surface-900));
+    border: 1px solid rgb(var(--surface-700) / 0.55);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  }
+  [data-mode="light"] .ops-surface {
+    background-color: #ffffff;
+    border: 1px solid rgb(var(--surface-700) / 0.8);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
   }
 }
 

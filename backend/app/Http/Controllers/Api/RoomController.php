@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 
 class RoomController extends Controller
@@ -18,6 +19,8 @@ class RoomController extends Controller
 
     public function store(Request $request)
     {
+        app(\App\Services\BillingService::class)->assertQuotaAvailable($request->user(), 'rooms');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'icon' => 'nullable|string|max:50',
@@ -26,6 +29,14 @@ class RoomController extends Controller
         $room = Room::create([
             ...$validated,
             'user_id' => $request->user()->id,
+        ]);
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => null,
+            'device_name' => $room->name,
+            'event' => "Menambahkan ruangan baru: {$room->name}",
+            'type' => 'success',
         ]);
 
         return response()->json($room, 201);
@@ -49,6 +60,15 @@ class RoomController extends Controller
         ]);
 
         $room->update($validated);
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => null,
+            'device_name' => $room->name,
+            'event' => "Memperbarui data ruangan: {$room->name}",
+            'type' => 'info',
+        ]);
+
         return response()->json($room);
     }
 
@@ -56,7 +76,17 @@ class RoomController extends Controller
     {
         if ($room->user_id !== $request->user()->id) abort(403, 'Unauthorized');
         
+        $roomName = $room->name;
         $room->delete();
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => null,
+            'device_name' => $roomName,
+            'event' => "Menghapus ruangan: {$roomName}",
+            'type' => 'warning',
+        ]);
+
         return response()->json(['message' => 'Room deleted']);
     }
 }

@@ -17,10 +17,11 @@ export function computeSeriesPathPoints(
 ): SeriesPathPoint[] {
   return data.map((datum, index) => {
     const xValue = xAccessor(datum);
-    const yValue = datum[dataKey];
+    const rawY = datum[dataKey];
+    const yValue = typeof rawY === "number" ? rawY : (rawY != null ? parseFloat(String(rawY)) : NaN);
     return {
       x: xScale(xValue) ?? 0,
-      y: typeof yValue === "number" ? (yScale(yValue) ?? 0) : 0,
+      y: !isNaN(yValue) ? (yScale(yValue) ?? 0) : (yScale(0) ?? 0),
       key: String(xValue.getTime?.() ?? index),
     };
   });

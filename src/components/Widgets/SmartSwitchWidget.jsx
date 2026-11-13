@@ -37,7 +37,7 @@ export default function SmartSwitchWidget({
 
   return (
     <div
-      className={`vision-card relative overflow-hidden p-6 flex flex-col justify-between transition-all duration-300 group w-full ${className}`}
+      className={`vision-card relative overflow-hidden p-4 sm:p-6 flex flex-col justify-between transition-all duration-300 group w-full min-w-0 max-w-full ${className}`}
       style={
         isOn
           ? {
@@ -88,10 +88,10 @@ export default function SmartSwitchWidget({
       </div>
 
       {/* ── Body: Left Stacked Inner Boxes + Right Circular Power Gauge ── */}
-      <div className="flex items-center justify-between gap-4 my-auto pt-4 relative z-10">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3.5 sm:gap-4 my-auto pt-2 sm:pt-4 relative z-10 w-full min-w-0">
         {/* Left Stacked Vision Inner Boxes */}
-        <div className="flex flex-col gap-3 w-[48%]">
-          <div className="vision-inner-box p-3.5">
+        <div className="flex flex-col gap-2.5 sm:gap-3 w-full sm:w-[48%] min-w-0">
+          <div className="vision-inner-box p-3 sm:p-3.5">
             <p className="text-[11px] font-medium text-slate-400">Status Perangkat</p>
             <div className="flex items-center gap-2 mt-1">
               <span
@@ -99,15 +99,15 @@ export default function SmartSwitchWidget({
                   isOn ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
                 }`}
               />
-              <p className="text-[15px] font-extrabold text-slate-100">
+              <p className="text-[14px] sm:text-[15px] font-extrabold text-slate-100">
                 {isOn ? 'Menyala' : 'Mati'}
               </p>
             </div>
           </div>
 
-          <div className="vision-inner-box p-3.5">
+          <div className="vision-inner-box p-3 sm:p-3.5">
             <p className="text-[11px] font-medium text-slate-400">Daya & Topik</p>
-            <p className="text-[14px] font-extrabold text-slate-100 mt-1 truncate">
+            <p className="text-[13px] sm:text-[14px] font-extrabold text-slate-100 mt-1 truncate">
               {isOn ? `${powerWatt} Watt` : '0 Watt'}
             </p>
             <p className="text-[10px] font-mono text-slate-500 truncate mt-0.5" title={topic}>
@@ -117,8 +117,8 @@ export default function SmartSwitchWidget({
         </div>
 
         {/* Right Interactive Circular Arc Power Button */}
-        <div className="relative flex items-center justify-center flex-1">
-          <svg width="146" height="146" viewBox="0 0 146 146" className="transform rotate-[135deg]">
+        <div className="relative flex items-center justify-center flex-shrink-0 w-[130px] h-[130px] sm:w-[146px] sm:h-[146px] mx-auto sm:mx-0">
+          <svg viewBox="0 0 146 146" className="w-full h-full transform rotate-[135deg]">
             <defs>
               <linearGradient id={`swGrad-${title.replace(/\s+/g, '')}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="rgb(var(--primary-500))" stopOpacity="0.25" />

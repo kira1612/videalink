@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import {
   chartCenterContainerClassName,
   chartCenterLabelClassName,

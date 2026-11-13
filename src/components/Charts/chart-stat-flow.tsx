@@ -2,7 +2,7 @@
 
 import NumberFlow from "@number-flow/react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Subset of `Intl.NumberFormatOptions` supported by NumberFlow */
 export interface ChartStatFlowFormat {
@@ -37,7 +37,7 @@ function formatStatValue(
   return `${prefix ?? ""}${formatted}${suffix ?? ""}`;
 }
 
-function useNumberFlowElementReady(): boolean {
+export function useNumberFlowElementReady(): boolean {
   const [ready, setReady] = useState(
     () =>
       typeof customElements !== "undefined" &&

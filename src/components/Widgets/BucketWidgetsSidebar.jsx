@@ -24,28 +24,18 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  Power,
+  Loader2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { bucketsApi, roomsApi } from '../../services/api';
+import { bucketsApi, roomsApi, mqttApi } from '../../services/api';
+import { PREF_KEYS, getUserJsonPref, setUserJsonPref } from '../../utils/dashboardPrefs';
 import { Gauge as BklitGauge, AreaSparkline as BklitAreaSparkline } from '../Charts/bklit';
+import { WidgetChart, CHART_TYPES, MULTI_SERIES_TYPES } from '../../pages/BucketDetail';
 import SmartSwitchWidget from './SmartSwitchWidget';
 import ThermostatWidget from './ThermostatWidget';
 import FloorPlan from '../../pages/FloorPlan';
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Fallback Data for Live Previews in Sidebar
-───────────────────────────────────────────────────────────────────────── */
-const FALLBACK_DEVICES = [
-  { id: 'd1', name: 'ESP32-Sensor-Lab-01', protocol: 'MQTT', ip: '192.168.1.101', status: 'online' },
-  { id: 'd2', name: 'Smart-Gateway-Floor2', protocol: 'MQTT', ip: '192.168.1.104', status: 'online' },
-  { id: 'd3', name: 'HVAC-Controller-Node', protocol: 'HTTP', ip: '192.168.1.112', status: 'warning' },
-];
-
-const FALLBACK_ACTIVITY = [
-  { id: 'a1', event: 'Payload MQTT Diterima (QoS 1)', device: 'ESP32-Sensor-Lab-01', time: 'Baru saja', type: 'success' },
-  { id: 'a2', event: 'Sinkronisasi Data Bucket Aktif', device: 'Telemetry Stream', time: '2 mnt lalu', type: 'info' },
-  { id: 'a3', event: 'Peringatan Ambang Suhu (>32°C)', device: 'HVAC-Controller-Node', time: '8 mnt lalu', type: 'warning' },
-];
 
 /* ─────────────────────────────────────────────────────────────────────────
    Actual Visual Widget Card for Built-In Dashboard Widgets
@@ -59,11 +49,11 @@ function BuiltInWidgetCard({
   currentUser,
 }) {
   const isVisible = widget.visible !== false;
-  const totalDev = stats?.total_devices ?? 2;
-  const onlineDev = stats?.online_devices ?? 1;
-  const totalPoints = stats?.total_data_points ?? 9013;
-  const activeEndpoints = stats?.active_endpoints ?? 1;
-  const totalEndpoints = stats?.total_endpoints ?? 2;
+  const totalDev = stats?.total_devices ?? 0;
+  const onlineDev = stats?.online_devices ?? 0;
+  const totalPoints = stats?.total_data_points ?? 0;
+  const activeEndpoints = stats?.active_endpoints ?? 0;
+  const totalEndpoints = stats?.total_endpoints ?? 0;
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -73,16 +63,7 @@ function BuiltInWidgetCard({
     switch (widget.id) {
       case 'metrik':
         return (
-          <div className="vision-card p-4 space-y-2.5 border border-slate-800/90">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-300">
-                  Metrik Telemetri IoT
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-primary-400">4 Stat Cards</span>
-            </div>
+          <div className="vision-card p-4 border border-slate-800/90">
             <div className="grid grid-cols-2 gap-2.5">
               <div className="vision-inner-box p-3 rounded-xl flex items-center justify-between">
                 <div>
@@ -182,7 +163,7 @@ function BuiltInWidgetCard({
         );
 
       case 'devices_table': {
-        const rows = (recentDevices && recentDevices.length > 0 ? recentDevices : FALLBACK_DEVICES).slice(0, 3);
+        const rows = (recentDevices || []).slice(0, 3);
         return (
           <div className="vision-card p-4 border border-slate-800/90 space-y-3">
             <div className="flex items-center justify-between">
@@ -191,56 +172,78 @@ function BuiltInWidgetCard({
                   Connected IoT Devices
                 </h4>
                 <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                  <CheckCircle2 size={12} className="text-emerald-400" />
-                  <span>{onlineDev} perangkat online</span>
+                  {onlineDev > 0 ? (
+                    <CheckCircle2 size={12} className="text-emerald-400" />
+                  ) : (
+                    <AlertCircle size={12} className="text-slate-400" />
+                  )}
+                  <span>{onlineDev} perangkat online dari {totalDev} terdaftar</span>
                 </p>
               </div>
               <span className="text-[10px] font-bold text-primary-400">Lihat Semua →</span>
             </div>
 
-            <div className="divide-y divide-slate-800/70">
-              {rows.map((dev, i) => {
-                const isOnline = dev.status === 'online';
-                const pct = isOnline ? 100 : dev.status === 'warning' ? 60 : 20;
-                return (
-                  <div key={dev.id || i} className="py-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-primary-500/20 text-primary-400 flex items-center justify-center shrink-0">
-                        <Cpu size={13} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-100 truncate">{dev.name}</p>
-                        <p className="text-[10px] font-mono text-slate-400">{dev.ip || 'MQTT Node'}</p>
-                      </div>
-                    </div>
-                    <div className="w-24 shrink-0">
-                      <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="font-bold text-slate-300">{pct}%</span>
-                        <span
-                          className={`font-extrabold uppercase ${
-                            isOnline ? 'text-emerald-400' : 'text-slate-400'
+            {rows.length > 0 ? (
+              <div className="divide-y divide-slate-800/70">
+                {rows.map((dev, i) => {
+                  const isOnline = dev.status === 'online';
+                  const isWarning = dev.status === 'warning';
+                  const pct = isOnline ? 100 : isWarning ? 60 : 0;
+                  return (
+                    <div key={dev.id || i} className="py-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            isOnline
+                              ? 'bg-primary-500/20 text-primary-400'
+                              : 'bg-slate-800 text-slate-400'
                           }`}
                         >
-                          {dev.status || 'offline'}
-                        </span>
+                          <Cpu size={13} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-100 truncate">{dev.name}</p>
+                          <p className="text-[10px] font-mono text-slate-400">
+                            {dev.ip || (isOnline ? 'MQTT Node' : '-')}
+                          </p>
+                        </div>
                       </div>
-                      <div className="w-full h-1 rounded-full bg-slate-800 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary-500"
-                          style={{ width: `${pct}%` }}
-                        />
+                      <div className="w-24 shrink-0">
+                        <div className="flex items-center justify-between text-[10px] mb-1">
+                          <span className="font-bold text-slate-300">{pct}%</span>
+                          <span
+                            className={`font-extrabold uppercase ${
+                              isOnline ? 'text-emerald-400' : isWarning ? 'text-amber-400' : 'text-rose-400'
+                            }`}
+                          >
+                            {dev.status || 'offline'}
+                          </span>
+                        </div>
+                        <div className="w-full h-1 rounded-full bg-slate-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              isOnline ? 'bg-primary-500' : isWarning ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-5 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/30">
+                <p className="text-xs font-bold text-slate-300">Belum ada perangkat terdaftar</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Tambahkan device pada menu Perangkat</p>
+              </div>
+            )}
           </div>
         );
       }
 
       case 'recent_activity': {
-        const logs = (recentActivity && recentActivity.length > 0 ? recentActivity : FALLBACK_ACTIVITY).slice(0, 3);
+        const logs = (recentActivity || []).slice(0, 3);
         const iconMap = {
           info: { Icon: Activity, color: 'rgb(var(--primary-400))' },
           warning: { Icon: AlertCircle, color: '#fbbf24' },
@@ -253,31 +256,38 @@ function BuiltInWidgetCard({
               <h4 className="text-[14px] font-extrabold text-slate-100 leading-tight">Recent Activity</h4>
               <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                 <CheckCircle2 size={12} className="text-emerald-400" />
-                <span>Live Log aktivitas sistem & sensor</span>
+                <span>Aktivitas riil sistem & pengguna</span>
               </p>
             </div>
-            <div className="space-y-2.5">
-              {logs.map((item, idx) => {
-                const cfg = iconMap[item.type] || iconMap.info;
-                const Icon = cfg.Icon;
-                return (
-                  <div key={item.id || idx} className="flex items-start gap-2.5 relative">
-                    <div
-                      className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center shrink-0"
-                      style={{ color: cfg.color }}
-                    >
-                      <Icon size={12} />
+            {logs.length > 0 ? (
+              <div className="space-y-2.5">
+                {logs.map((item, idx) => {
+                  const cfg = iconMap[item.type] || iconMap.info;
+                  const Icon = cfg.Icon;
+                  return (
+                    <div key={item.id || idx} className="flex items-start gap-2.5 relative">
+                      <div
+                        className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center shrink-0"
+                        style={{ color: cfg.color }}
+                      >
+                        <Icon size={12} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-100 truncate">{item.event}</p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {item.device} • <span className="text-slate-500">{item.time}</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-100 truncate">{item.event}</p>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {item.device} • <span className="text-slate-500">{item.time}</span>
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-5 text-center border border-dashed border-slate-800 rounded-xl bg-slate-950/30">
+                <p className="text-xs font-bold text-slate-300">Belum ada aktivitas tercatat</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Aktivitas Anda akan muncul otomatis di sini</p>
+              </div>
+            )}
           </div>
         );
       }
@@ -411,23 +421,16 @@ function PinnedWidgetItem({
   onRemoveFromDashboard,
 }) {
   const { widget, bucketId, bucketName } = item;
-  const primaryField =
-    widget?.field !== 'multi' && widget?.field
-      ? widget.field
-      : widget?.config?.fields?.[0] || 'telemetry';
-  const latestRecord = records && records.length > 0 ? records[records.length - 1] : null;
-  const rawValue = latestRecord ? latestRecord[primaryField] : undefined;
-  const numVal = parseFloat(rawValue) || 0;
-  const unit = widget?.unit || '';
-  const color = widget?.color || widget?.config?.color || 'rgb(var(--primary-400))';
+  const isMulti = Array.isArray(MULTI_SERIES_TYPES) && MULTI_SERIES_TYPES.includes(widget?.type);
+  const typeInfo = CHART_TYPES.find((c) => c.value === widget?.type);
+  const typeLabel = typeInfo?.label || widget?.type || 'Widget';
 
-  // Format sparkline data
-  const sparkData = useMemo(() => {
-    if (!records || records.length === 0) return [];
-    return records.slice(-15).map((r) => ({
-      val: parseFloat(r[primaryField]) || 0,
-    }));
-  }, [records, primaryField]);
+  const fieldSubtitle = isMulti
+    ? (widget?.config?.fields?.length > 0 ? widget.config.fields.join(' + ') : (widget?.field !== 'multi' ? widget?.field : 'Multi-Series'))
+    : `${widget?.field || 'telemetry'}${widget?.unit ? ` (${widget.unit})` : ''}`;
+
+  const latestRecord = records && records.length > 0 ? records[records.length - 1] : null;
+  const color = widget?.color || widget?.config?.color || 'rgb(var(--primary-400))';
 
   return (
     <div className="vision-card p-4 relative overflow-hidden group hover:border-primary-500/40 transition-all duration-300 flex flex-col justify-between">
@@ -439,20 +442,23 @@ function PinnedWidgetItem({
         }}
       />
 
-      {/* Header: Bucket Badge, Title, and Action Controls */}
-      <div className="flex items-start justify-between gap-2 mb-2.5">
+      {/* Header: Bucket Badge, Title, Field, and Action Controls */}
+      <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
             <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-primary-500/10 text-primary-300 border border-primary-500/20 truncate max-w-[140px]">
               {bucketName || 'Data Bucket'}
             </span>
-            <span className="text-[10px] text-slate-500 font-mono">
-              • {widget.field}
+            <span className="text-[10px] text-slate-400 font-mono">
+              • {typeLabel}
             </span>
           </div>
-          <h4 className="text-[13px] font-extrabold text-slate-100 truncate group-hover:text-primary-300 transition-colors">
+          <h4 className="text-[14px] font-extrabold text-slate-100 truncate group-hover:text-primary-300 transition-colors">
             {widget.title}
           </h4>
+          <p className="text-[11px] text-primary-400 font-mono mt-0.5 truncate">
+            {fieldSubtitle}
+          </p>
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -474,104 +480,14 @@ function PinnedWidgetItem({
         </div>
       </div>
 
-      {/* Widget Body Visual Based on Type */}
-      <div className="my-1.5">
-        {widget.type === 'gauge' ? (
-          <div className="flex flex-col items-center justify-center py-1">
-            <div className="w-[170px]">
-              <BklitGauge
-                value={Math.min(
-                  100,
-                  Math.max(
-                    0,
-                    Math.round(
-                      ((numVal - (widget.config?.min || 0)) /
-                        ((widget.config?.max || 100) - (widget.config?.min || 0) || 1)) *
-                        100
-                    )
-                  )
-                )}
-                centerValue={numVal}
-                totalNotches={30}
-                defaultLabel={widget.field}
-                suffix={unit ? ` ${unit}` : ''}
-                activeFill={color}
-                glow={true}
-                height={125}
-              />
-            </div>
-            <div className="flex items-center justify-between w-full text-[10px] text-slate-400 px-2 mt-1">
-              <span>Min: {widget.config?.min ?? 0}</span>
-              <span className="font-extrabold text-emerald-400">Live</span>
-              <span>Max: {widget.config?.max ?? 100}</span>
-            </div>
-          </div>
-        ) : widget.type === 'stat' ? (
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between px-1">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-black text-slate-100 tracking-tight">
-                  <AnimatedSidebarNumber value={rawValue ?? '-'} />
-                </span>
-                {unit && (
-                  <span className="text-sm font-bold text-primary-400">
-                    {unit}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                Live
-              </span>
-            </div>
-
-            {sparkData.length > 1 && (
-              <div className="h-8 w-full pt-1">
-                <BklitAreaSparkline
-                  data={sparkData}
-                  dataKey="val"
-                  color={color}
-                  height={30}
-                  endDot={true}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Default Line / Area / Generic Visual */
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between px-1">
-              <span className="text-2xl font-black text-slate-100">
-                <AnimatedSidebarNumber value={rawValue ?? '-'} />
-                {unit && <span className="text-xs font-bold text-primary-400 ml-1">{unit}</span>}
-              </span>
-              <span className="text-[10px] font-mono text-slate-400 uppercase">
-                {widget.type}
-              </span>
-            </div>
-            {sparkData.length > 1 ? (
-              <div className="h-10 w-full pt-1">
-                <BklitAreaSparkline
-                  data={sparkData}
-                  dataKey="val"
-                  color={color}
-                  height={38}
-                  endDot={true}
-                />
-              </div>
-            ) : (
-              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mt-2">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, Math.max(10, numVal))}%`,
-                    background: color,
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
+      {/* Widget Body Visual Render using authentic WidgetChart */}
+      <div className="my-1 w-full min-h-[145px] overflow-hidden flex flex-col justify-center">
+        <WidgetChart
+          widget={{ ...widget, h: 'compact' }}
+          chartData={records}
+          color={color}
+          overrideVariant={widget.config?.variant}
+        />
       </div>
 
       {/* Footer Info */}
@@ -621,6 +537,170 @@ function PinnedWidgetItem({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Sidebar Room Widget Card (Unified 3D Design matching Dashboard Card)
+───────────────────────────────────────────────────────────────────────── */
+function SidebarRoomWidgetCard({
+  room,
+  recentDevices = [],
+  isRoomPlaced = false,
+  onPlaceRoomWidget,
+  onRemoveRoomWidget,
+  onUnpinRoom,
+  onClose,
+}) {
+  const roomId = room.id ?? room.roomId;
+  const displayName = room.name || room.roomName || room.title || 'Ruangan IoT';
+
+  const roomDevices = useMemo(
+    () => (recentDevices || []).filter((d) => Number(d.room_id) === Number(roomId)),
+    [recentDevices, roomId]
+  );
+
+  const onlineCount = useMemo(
+    () => roomDevices.filter((d) => d.status === 'online').length,
+    [roomDevices]
+  );
+
+  return (
+    <div
+      className={`vision-card p-4 relative overflow-hidden transition-all duration-300 flex flex-col justify-between border ${
+        isRoomPlaced
+          ? 'border-amber-500/40 bg-slate-900/95'
+          : 'border-slate-800/90 bg-slate-900/70 hover:border-slate-700'
+      }`}
+    >
+      {/* Top Amber Accent */}
+      <div
+        className="absolute inset-x-0 top-0 h-[1.5px] opacity-80 pointer-events-none"
+        style={{
+          background: 'linear-gradient(90deg, transparent, #f59e0b, transparent)',
+        }}
+      />
+
+      {/* Room Header - Identik dengan Dashboard Utama */}
+      <div className="flex items-start justify-between gap-2.5 mb-2 shrink-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Home size={11} /> Ruangan 3D
+            </span>
+          </div>
+          <h4
+            className="text-[15px] font-black text-slate-100 leading-tight truncate tracking-tight"
+            title={displayName}
+          >
+            {displayName}
+          </h4>
+          <p className="text-[11px] text-slate-400 mt-0.5 truncate flex items-center gap-1.5">
+            <span className="font-mono font-bold text-amber-400">
+              {roomDevices.length || (room.devices_count ?? 0)} Perangkat
+            </span>
+            <span className="text-slate-600">•</span>
+            <span
+              className={`font-mono font-bold ${
+                onlineCount > 0 ? 'text-emerald-400' : 'text-slate-500'
+              }`}
+            >
+              {onlineCount} Aktif
+            </span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Link
+            to="/app/rooms"
+            onClick={onClose}
+            className="p-1.5 rounded-lg border bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-300 border-slate-700/60 transition-all cursor-pointer"
+            title="Kelola Ruangan di Manajemen Ruangan"
+          >
+            <ExternalLink size={13} />
+          </Link>
+
+          {onUnpinRoom && (
+            <button
+              type="button"
+              onClick={() => onUnpinRoom(roomId)}
+              className="p-1.5 rounded-lg border bg-slate-800/80 hover:bg-rose-500/15 text-slate-400 hover:text-rose-400 border-slate-700/60 hover:border-rose-500/30 transition-all cursor-pointer"
+              title="Lepas ruangan dari daftar sematan"
+            >
+              <PinOff size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Body: Dedicated 3D Top-Down View (Clean Canvas Preview) */}
+      <div className="my-2 h-[185px] w-full rounded-2xl overflow-hidden relative bg-slate-950 border border-slate-800/80">
+        <div className="w-full h-full pointer-events-none">
+          <FloorPlan
+            hideHeader={true}
+            isWidget={true}
+            isSidebarPreview={true}
+            roomId={roomId}
+            roomName={displayName}
+            initialDevices={roomDevices}
+          />
+        </div>
+      </div>
+
+      {/* Action: Taruh di Dashboard Utama / Lepas dari Dashboard */}
+      {isRoomPlaced ? (
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex-1 py-1.5 px-3 rounded-xl text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-1.5 shadow-sm">
+            <Check size={13} className="text-emerald-400 stroke-[3]" />
+            <span>Terpasang di Dashboard</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemoveRoomWidget && onRemoveRoomWidget(roomId)}
+            className="py-1.5 px-3 rounded-xl text-[11px] font-bold text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-700/70 hover:border-rose-500/30 transition-all cursor-pointer"
+            title="Lepas card ruangan ini dari Dashboard Utama"
+          >
+            Lepas
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onPlaceRoomWidget && onPlaceRoomWidget(room)}
+          className="mt-1 w-full py-2 px-3 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 shadow-md shadow-amber-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+          title="Tempatkan widget ruangan ini ke Grid Dashboard Utama"
+        >
+          <Plus size={14} className="stroke-[3]" />
+          <span>Taruh di Dashboard Utama</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Helper: Synchronous Pinned Rooms Hydration from Per-User Storage
+───────────────────────────────────────────────────────────────────────── */
+const getInitialPinnedRooms = () => {
+  try {
+    const localPinnedList = [];
+    const parsedPinned = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+    if (Array.isArray(parsedPinned)) {
+      parsedPinned.forEach((item) => {
+        if (typeof item === 'object' && item !== null) {
+          localPinnedList.push({
+            ...item,
+            id: item.id ?? item.roomId,
+            name: item.name || item.roomName || item.title || 'Ruangan 3D',
+            icon: item.icon || item.roomIcon || 'home',
+            devices_count: item.devices_count || 0,
+          });
+        }
+      });
+    }
+    return localPinnedList;
+  } catch {
+    return [];
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
    Main Component: BucketWidgetsSidebar (Redesigned 2-Tab Widget Library)
 ───────────────────────────────────────────────────────────────────────── */
 export default function BucketWidgetsSidebar({
@@ -643,15 +723,11 @@ export default function BucketWidgetsSidebar({
   const [activeTab, setActiveTab] = useState('builtin');
 
   const [pinnedWidgets, setPinnedWidgets] = useState(() => {
-    try {
-      const raw = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    const list = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+    return Array.isArray(list) ? list : [];
   });
 
-  const [rooms, setRooms] = useState([]);
+  const [rooms, setRooms] = useState(getInitialPinnedRooms);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [bucketRecords, setBucketRecords] = useState({});
   const [refreshing, setRefreshing] = useState(false);
@@ -663,28 +739,125 @@ export default function BucketWidgetsSidebar({
   const [activePickerBucketId, setActivePickerBucketId] = useState(null);
   const [loadingBuckets, setLoadingBuckets] = useState(false);
 
-  // Sync pinned bucket widgets
+  // Sync pinned bucket widgets (per active user)
   const loadPinnedWidgets = useCallback(() => {
-    try {
-      const raw = localStorage.getItem('iot_dashboard_pinned_bucket_widgets');
-      setPinnedWidgets(raw ? JSON.parse(raw) : []);
-    } catch {}
+    const list = getUserJsonPref(PREF_KEYS.PINNED_BUCKETS, []);
+    setPinnedWidgets(Array.isArray(list) ? list : []);
   }, []);
 
-  // Fetch rooms list
+  // Fetch rooms list (filtered to ONLY pinned rooms owned by current user)
   const fetchRoomsList = useCallback(async () => {
-    setLoadingRooms(true);
+    setRooms((current) => {
+      if (!current || current.length === 0) {
+        setLoadingRooms(true);
+      }
+      return current;
+    });
     try {
-      const res = await roomsApi.list();
-      const apiRooms = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      setRooms(apiRooms);
-    } catch {
+      // 1. Gather all pinned room IDs from current user's pinned rooms list
+      const pinnedIds = new Set();
+      let localPinnedList = [];
       try {
-        const raw = localStorage.getItem('iot_dashboard_pinned_rooms');
-        if (raw) setRooms(JSON.parse(raw));
-      } catch {}
+        const parsed = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+        if (Array.isArray(parsed)) {
+          localPinnedList = parsed;
+          parsed.forEach((item) => {
+            const id = typeof item === 'object' && item !== null ? (item.id ?? item.roomId) : item;
+            if (id != null) pinnedIds.add(String(id));
+          });
+        }
+      } catch (e) {
+        console.error('Failed reading pinned rooms:', e);
+      }
+
+      if (pinnedIds.size === 0) {
+        setRooms([]);
+        setLoadingRooms(false);
+        return;
+      }
+
+      // 2. Fetch full room info from API and filter ONLY pinned rooms owned by this user
+      let combined = [];
+      let apiSucceeded = false;
+      try {
+        const res = await roomsApi.list();
+        const apiRooms = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        combined = apiRooms.filter((r) => pinnedIds.has(String(r.id)));
+        apiSucceeded = true;
+      } catch (err) {
+        console.warn('Could not fetch rooms list from API:', err);
+      }
+
+      // Only merge fallback from local cache if API request failed
+      if (!apiSucceeded) {
+        pinnedIds.forEach((pId) => {
+          if (!combined.some((c) => String(c.id) === String(pId))) {
+            const fromLocal = localPinnedList.find((lp) => String(lp.id ?? lp.roomId) === String(pId));
+            if (fromLocal) {
+              combined.push({
+                id: fromLocal.id ?? fromLocal.roomId ?? pId,
+                name: fromLocal.name || fromLocal.roomName || fromLocal.title || 'Ruangan IoT',
+                icon: fromLocal.icon || fromLocal.roomIcon || 'home',
+                devices_count: fromLocal.devices_count || 0,
+              });
+            }
+          }
+        });
+      }
+
+      const normalized = combined.map((r) => ({
+        ...r,
+        id: r.id ?? r.roomId,
+        name: r.name || r.roomName || r.title || 'Ruangan IoT',
+        icon: r.icon || r.roomIcon || 'home',
+        devices_count: r.devices_count || 0,
+      }));
+      setRooms(normalized);
+    } catch {
+      const list = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+      setRooms(
+        Array.isArray(list)
+          ? list.map((r) => ({
+              ...r,
+              id: r.id ?? r.roomId,
+              name: r.name || r.roomName || r.title || 'Ruangan IoT',
+            }))
+          : []
+      );
     } finally {
       setLoadingRooms(false);
+    }
+  }, []);
+
+  // Unpin room from sidebar
+  const handleUnpinRoom = useCallback((roomId) => {
+    const targetId = String(roomId);
+    try {
+      // Update per-user pinned rooms (only removes from sidebar list)
+      const currentPinned = getUserJsonPref(PREF_KEYS.PINNED_ROOMS, []);
+      if (Array.isArray(currentPinned)) {
+        const nextPinned = currentPinned.filter((r) => {
+          const id = typeof r === 'object' && r !== null ? (r.id ?? r.roomId) : r;
+          return String(id) !== targetId;
+        });
+        setUserJsonPref(PREF_KEYS.PINNED_ROOMS, nextPinned);
+      }
+
+      setRooms((prev) => prev.filter((r) => String(r.id) !== targetId));
+      window.dispatchEvent(new CustomEvent('rooms-widgets-updated'));
+
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'info',
+        title: 'Ruangan dilepas dari daftar sematan',
+        showConfirmButton: false,
+        timer: 1600,
+        background: '#0f172a',
+        color: '#f8fafc',
+      });
+    } catch (err) {
+      console.error('Failed to unpin room:', err);
     }
   }, []);
 
@@ -693,11 +866,19 @@ export default function BucketWidgetsSidebar({
     fetchRoomsList();
     window.addEventListener('bucket-widgets-updated', loadPinnedWidgets);
     window.addEventListener('rooms-widgets-updated', fetchRoomsList);
-    window.addEventListener('storage', loadPinnedWidgets);
+    const handleSync = () => {
+      loadPinnedWidgets();
+      fetchRoomsList();
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('dashboard-prefs-updated', handleSync);
+    window.addEventListener('user-updated', handleSync);
     return () => {
       window.removeEventListener('bucket-widgets-updated', loadPinnedWidgets);
       window.removeEventListener('rooms-widgets-updated', fetchRoomsList);
-      window.removeEventListener('storage', loadPinnedWidgets);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('dashboard-prefs-updated', handleSync);
+      window.removeEventListener('user-updated', handleSync);
     };
   }, [loadPinnedWidgets, fetchRoomsList]);
 
@@ -737,10 +918,11 @@ export default function BucketWidgetsSidebar({
   );
 
   useEffect(() => {
+    if (!isOpen) return;
     fetchBucketTelemetry();
-    const iv = setInterval(() => fetchBucketTelemetry(false), 6000);
+    const iv = setInterval(() => fetchBucketTelemetry(false), 8000);
     return () => clearInterval(iv);
-  }, [fetchBucketTelemetry]);
+  }, [isOpen, fetchBucketTelemetry]);
 
   // Open Bucket Widget Picker Modal
   const handleOpenBucketPicker = async () => {
@@ -784,9 +966,7 @@ export default function BucketWidgetsSidebar({
           },
         ];
       }
-      try {
-        localStorage.setItem('iot_dashboard_pinned_bucket_widgets', JSON.stringify(next));
-      } catch {}
+      setUserJsonPref(PREF_KEYS.PINNED_BUCKETS, next);
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('bucket-widgets-updated'));
       }, 0);
@@ -803,9 +983,7 @@ export default function BucketWidgetsSidebar({
         const pWid = String(p.widgetId || '');
         return pId !== targetId && pWid !== targetId;
       });
-      try {
-        localStorage.setItem('iot_dashboard_pinned_bucket_widgets', JSON.stringify(next));
-      } catch {}
+      setUserJsonPref(PREF_KEYS.PINNED_BUCKETS, next);
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('bucket-widgets-updated'));
       }, 0);
@@ -855,16 +1033,16 @@ export default function BucketWidgetsSidebar({
     <>
       {/* Backdrop overlay */}
       <div
-        className={`fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 transition-opacity duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        className={`fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 transition-all duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
         }`}
         onClick={onClose}
       />
 
       {/* Slide-Over Drawer Container */}
       <aside
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[430px] max-w-[95vw] flex flex-col bg-slate-900/98 border-l border-slate-700/80 shadow-[-25px_0_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl transition-transform duration-300 ease-out overflow-hidden ${
-          isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
+        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[430px] max-w-[95vw] flex flex-col bg-slate-900/98 border-l border-slate-700/80 backdrop-blur-2xl transition-all duration-300 ease-out overflow-hidden ${
+          isOpen ? 'translate-x-0 shadow-[-20px_0_40px_rgba(0,0,0,0.45)] visible' : 'translate-x-full shadow-none pointer-events-none invisible'
         }`}
       >
         {/* Top Laser Glow Accent */}
@@ -919,22 +1097,24 @@ export default function BucketWidgetsSidebar({
           </div>
         </div>
 
-        {/* ── 2 Segmented Tabs: Widget Bawaan vs Dari Bucket ── */}
+        {isOpen && (
+          <>
+            {/* ── 3 Segmented Tabs: Widget Bawaan vs Ruangan 3D vs Dari Bucket ── */}
         <div className="p-3 border-b border-slate-800/80 bg-slate-950/40 shrink-0">
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900 border border-slate-800/90">
+          <div className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800/90">
             <button
               type="button"
               onClick={() => setActiveTab('builtin')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
                 activeTab === 'builtin'
                   ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-500/25'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Layers size={14} />
-              <span>Widget Bawaan</span>
+              <Layers size={13} />
+              <span>Bawaan</span>
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none ${
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-black leading-none ${
                   activeTab === 'builtin'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-800 text-slate-400'
@@ -946,17 +1126,39 @@ export default function BucketWidgetsSidebar({
 
             <button
               type="button"
+              onClick={() => setActiveTab('rooms')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
+                activeTab === 'rooms'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/25'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Box size={13} />
+              <span>Ruangan</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-black leading-none ${
+                  activeTab === 'rooms'
+                    ? 'bg-black/20 text-slate-950'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {rooms.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('bucket')}
-              className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer ${
                 activeTab === 'bucket'
                   ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-500/25'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Database size={14} />
-              <span>Dari Bucket</span>
+              <Database size={13} />
+              <span>Bucket</span>
               <span
-                className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none ${
+                className={`px-1.5 py-0.5 rounded-full text-[9px] font-black leading-none ${
                   activeTab === 'bucket'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-800 text-slate-400'
@@ -969,175 +1171,100 @@ export default function BucketWidgetsSidebar({
         </div>
 
         {/* ═════════════════════════════════════════════════════════════════════
-           TAB 1: WIDGET BAWAAN (ACTUAL WIDGET VISUALS) & RUANGAN 3D (ROOMS)
+           TAB 1: WIDGET BAWAAN DASHBOARD
         ═════════════════════════════════════════════════════════════════════ */}
         {activeTab === 'builtin' ? (
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
-            {/* Section 1: Built-in System Widgets (Rendered with Actual Widget UI) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-primary-400" />
-                  Widget Bawaan Dashboard
-                </span>
-                <span className="text-[10px] font-bold text-slate-500">
-                  {builtInWidgets.filter((w) => w.visible !== false).length}/{builtInWidgets.length} Aktif
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {builtInWidgets.map((w) => (
-                  <BuiltInWidgetCard
-                    key={w.id}
-                    widget={w}
-                    onToggle={onToggleBuiltInWidget}
-                    stats={dashboardStats}
-                    recentDevices={recentDevices}
-                    recentActivity={recentActivity}
-                    currentUser={currentUser}
-                  />
-                ))}
-              </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Sparkles size={12} className="text-primary-400" />
+                Widget Bawaan Dashboard
+              </span>
+              <span className="text-[10px] font-bold text-slate-500">
+                {builtInWidgets.filter((w) => w.visible !== false).length}/{builtInWidgets.length} Aktif
+              </span>
             </div>
 
-            {/* Section 2: Pin Rooms to Dashboard (With Live 3D Floor Plan Preview) */}
-            <div className="space-y-4 pt-3 border-t border-slate-800/80">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Box size={12} className="text-amber-400" />
-                  Ruangan 3D (Rooms)
-                </span>
+            <div className="space-y-4">
+              {builtInWidgets.map((w) => (
+                <BuiltInWidgetCard
+                  key={w.id}
+                  widget={w}
+                  onToggle={onToggleBuiltInWidget}
+                  stats={dashboardStats}
+                  recentDevices={recentDevices}
+                  recentActivity={recentActivity}
+                  currentUser={currentUser}
+                />
+              ))}
+            </div>
+          </div>
+        ) : activeTab === 'rooms' ? (
+          /* ═══════════════════════════════════════════════════════════════════
+             TAB 2: RUANGAN IOT (3D FLOOR PLAN & DEVICE LIST)
+          ═══════════════════════════════════════════════════════════════════ */
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Box size={12} className="text-amber-400" />
+                Ruangan Disematkan ({rooms.length})
+              </span>
+              <Link
+                to="/app/rooms"
+                onClick={onClose}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5"
+              >
+                <span>Kelola Ruangan</span>
+                <ChevronRight size={12} />
+              </Link>
+            </div>
+
+            {loadingRooms ? (
+              <div className="space-y-3">
+                {[1, 2].map((n) => (
+                  <div key={n} className="vision-card h-56 animate-pulse p-4" />
+                ))}
+              </div>
+            ) : rooms.length === 0 ? (
+              <div className="vision-card p-6 text-center space-y-3 border border-dashed border-slate-800">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                  <Pin size={22} className="rotate-45" />
+                </div>
+                <h4 className="text-sm font-extrabold text-slate-100">Belum Ada Ruangan yang Disematkan</h4>
+                <p className="text-xs text-slate-400 leading-relaxed max-w-[260px] mx-auto">
+                  Hanya ruangan yang Anda beri tanda pin yang akan muncul di sini. Buka menu Ruangan lalu klik ikon Pin untuk menyematkan ruangan pilihan Anda.
+                </p>
                 <Link
                   to="/app/rooms"
                   onClick={onClose}
-                  className="text-[11px] font-bold text-primary-400 hover:text-primary-300 flex items-center gap-0.5"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md shadow-amber-500/25 transition-all"
                 >
-                  <span>Kelola 3D</span>
-                  <ChevronRight size={12} />
+                  <Pin size={14} className="stroke-[2.5]" />
+                  <span>Buka Menu Ruangan & Pin</span>
                 </Link>
               </div>
-
-              {loadingRooms ? (
-                <div className="space-y-3">
-                  {[1, 2].map((n) => (
-                    <div key={n} className="vision-card h-56 animate-pulse p-4" />
-                  ))}
-                </div>
-              ) : rooms.length === 0 ? (
-                <div className="vision-card p-5 text-center space-y-2.5 border border-dashed border-slate-800">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800/80 text-slate-400 flex items-center justify-center mx-auto">
-                    <Box size={18} />
-                  </div>
-                  <p className="text-xs font-bold text-slate-300">Belum Ada Ruangan 3D</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Buat ruangan di menu Rooms untuk menyematkan denah 3D ruangan ke Dashboard.
-                  </p>
-                  <Link
-                    to="/app/rooms"
-                    onClick={onClose}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30 hover:bg-primary-500 hover:text-white transition-all"
-                  >
-                    <Plus size={13} />
-                    <span>Buat Ruangan</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {rooms.map((room) => {
-                    const isRoomPlaced =
-                      placedRoomIds.has(String(room.id)) ||
-                      placedRoomIds.has(`room_widget_${room.id}`);
-                    return (
-                      <div key={room.id} className="space-y-2">
-                        <div
-                          className={`vision-card p-4 relative overflow-hidden transition-all duration-200 border ${
-                            isRoomPlaced
-                              ? 'border-amber-500/40 bg-slate-900/95'
-                              : 'border-slate-800/90 bg-slate-900/70 hover:border-slate-700'
-                          }`}
-                        >
-                          {/* Room Header */}
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
-                                  3D FLOOR PLAN
-                                </span>
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  • {room.devices_count ?? 0} Perangkat
-                                </span>
-                              </div>
-                              <h4 className="text-[14px] font-extrabold text-slate-100 truncate mt-1">
-                                {room.name}
-                              </h4>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Link
-                                to="/app/rooms"
-                                onClick={onClose}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
-                                title="Buka di Halaman Rooms"
-                              >
-                                <ExternalLink size={13} />
-                              </Link>
-                              <div
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-950"
-                                style={{
-                                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                                }}
-                              >
-                                <Box size={13} />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Live 3D Floor Plan Preview */}
-                          <div className="w-full h-[200px] rounded-xl overflow-hidden bg-slate-950 relative">
-                            {isOpen && (
-                              <FloorPlan
-                                hideHeader={true}
-                                isWidget={true}
-                                roomId={room.id}
-                                roomName={room.name}
-                              />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Action Bar */}
-                        <div className="flex items-center justify-between gap-2 px-1">
-                          {isRoomPlaced ? (
-                            <div className="flex items-center gap-2 w-full">
-                              <div className="flex-1 py-1.5 px-3 rounded-xl text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center justify-center gap-1.5">
-                                <Check size={13} className="text-emerald-400 stroke-[3]" />
-                                <span>Terpasang di Dashboard</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => onRemoveRoomWidget && onRemoveRoomWidget(room.id)}
-                                className="py-1.5 px-3.5 rounded-xl text-[11px] font-bold text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 border border-slate-700/70 hover:border-rose-500/30 transition-all cursor-pointer"
-                              >
-                                Lepas
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => onPlaceRoomWidget && onPlaceRoomWidget(room)}
-                              className="w-full py-2 px-3 rounded-xl text-xs font-black bg-primary-500 hover:bg-primary-600 text-white shadow-md shadow-primary-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <Plus size={14} className="stroke-[3]" />
-                              <span>Taruh di Dashboard Utama</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {rooms.map((room) => {
+                  const isRoomPlaced =
+                    placedRoomIds.has(String(room.id)) ||
+                    placedRoomIds.has(`room_widget_${room.id}`);
+                  return (
+                    <SidebarRoomWidgetCard
+                      key={room.id}
+                      room={room}
+                      recentDevices={recentDevices}
+                      isRoomPlaced={isRoomPlaced}
+                      onPlaceRoomWidget={onPlaceRoomWidget}
+                      onRemoveRoomWidget={onRemoveRoomWidget}
+                      onUnpinRoom={handleUnpinRoom}
+                      isOpen={isOpen}
+                      onClose={onClose}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           /* ═══════════════════════════════════════════════════════════════════
@@ -1238,13 +1365,22 @@ export default function BucketWidgetsSidebar({
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
-          {activeTab === 'builtin' ? (
+          {activeTab === 'rooms' ? (
             <Link
               to="/app/rooms"
               onClick={onClose}
               className="flex items-center gap-1 text-primary-400 hover:text-primary-300 font-bold transition-colors"
             >
-              <span>Manajemen Ruangan 3D</span>
+              <span>Buka Manajemen Ruangan</span>
+              <ChevronRight size={13} />
+            </Link>
+          ) : activeTab === 'builtin' ? (
+            <Link
+              to="/app/devices"
+              onClick={onClose}
+              className="flex items-center gap-1 text-primary-400 hover:text-primary-300 font-bold transition-colors"
+            >
+              <span>Kelola Perangkat</span>
               <ChevronRight size={13} />
             </Link>
           ) : (
@@ -1262,6 +1398,8 @@ export default function BucketWidgetsSidebar({
             Sinkronisasi Aktif
           </span>
         </div>
+          </>
+        )}
       </aside>
 
       {/* ── Modal Picker: Pilih Widget dari Data Bucket ── */}

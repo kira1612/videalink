@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DataBucket;
 use App\Models\BucketRecord;
 use App\Models\Device;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 
 class BucketController extends Controller
@@ -54,6 +55,8 @@ class BucketController extends Controller
 
     public function store(Request $request)
     {
+        app(\App\Services\BillingService::class)->assertQuotaAvailable($request->user(), 'buckets');
+
         // 1. Validasi awal untuk mendapatkan ID perangkat
         $request->validate([
             'device_id'  => 'required|exists:devices,id',
@@ -89,6 +92,15 @@ class BucketController extends Controller
         }
 
         $bucket = DataBucket::create($validated);
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => $device->id,
+            'device_name' => $bucket->name,
+            'event' => "Menambahkan data bucket baru: {$bucket->name}",
+            'type' => 'success',
+        ]);
+
         return response()->json($bucket, 201);
     }
 
@@ -185,7 +197,18 @@ class BucketController extends Controller
     public function destroy(Request $request, DataBucket $bucket)
     {
         $this->authorizeBucket($request, $bucket);
+        $bucketName = $bucket->name;
+        $deviceId = $bucket->device_id;
         $bucket->delete();
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => $deviceId,
+            'device_name' => $bucketName,
+            'event' => "Menghapus data bucket: {$bucketName}",
+            'type' => 'warning',
+        ]);
+
         return response()->json(['message' => 'Bucket deleted']);
     }
 

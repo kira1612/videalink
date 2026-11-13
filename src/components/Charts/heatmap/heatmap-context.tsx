@@ -13,7 +13,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils";
 import type { Margin } from "../chart-context";
 import type { ChartPhase, ChartStatus } from "../chart-phase";
 import {

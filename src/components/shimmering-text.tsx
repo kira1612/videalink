@@ -2,7 +2,7 @@
 
 import { domAnimation, LazyMotion, m, useReducedMotion } from "motion/react";
 import type { ComponentProps } from "react";
-import { cn } from "../lib/utils";
+import { cn } from "@/lib/utils";
 
 /**
  * Highlight band painted across the text. The gradient is 3× the text width

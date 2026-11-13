@@ -21,6 +21,9 @@ class DeviceController extends Controller
 
     public function store(Request $request)
     {
+        $billingService = app(\App\Services\BillingService::class);
+        $billingService->assertQuotaAvailable($request->user(), 'devices');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'room_id' => 'nullable|exists:rooms,id',
@@ -36,6 +39,10 @@ class DeviceController extends Controller
             'firmware' => 'nullable|string',
             'tags' => 'nullable|array',
         ]);
+
+        if (($validated['protocol'] ?? 'http') === 'mqtt') {
+            $billingService->assertQuotaAvailable($request->user(), 'buckets');
+        }
 
         // Jika room_id dipilih dan location tidak diisi, gunakan nama Room sebagai location otomatis
         $location = $validated['location'] ?? null;
@@ -73,10 +80,11 @@ class DeviceController extends Controller
         }
 
         ActivityLog::create([
+            'user_id' => $request->user()->id,
             'device_id' => $device->id,
             'device_name' => $device->name,
-            'event' => 'Device registered to platform',
-            'type' => 'info',
+            'event' => "Menambahkan perangkat baru: {$device->name}",
+            'type' => 'success',
         ]);
 
         return response()->json($device, 201);
@@ -214,13 +222,31 @@ class DeviceController extends Controller
 
         $device->update($validated);
 
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => $device->id,
+            'device_name' => $device->name,
+            'event' => "Memperbarui konfigurasi perangkat: {$device->name}",
+            'type' => 'info',
+        ]);
+
         return response()->json($device);
     }
 
     public function destroy(Request $request, Device $device)
     {
         $this->authorizeDevice($request, $device);
+        $deviceName = $device->name;
         $device->delete();
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'device_id' => null,
+            'device_name' => $deviceName,
+            'event' => "Menghapus perangkat: {$deviceName}",
+            'type' => 'warning',
+        ]);
+
         return response()->json(['message' => 'Device deleted']);
     }
 

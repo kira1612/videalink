@@ -1,5 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import {
+  PREF_KEYS,
+  getUserStringPref,
+  hydratePrefsFromUser,
+  clearPendingPrefsSync,
+  clearLegacyGlobalPrefs,
+} from './utils/dashboardPrefs';
 import Layout from './components/Layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -15,6 +22,7 @@ import Rooms from './pages/Rooms';
 import Automations from './pages/Automations';
 import FloorPlan from './pages/FloorPlan';
 import Guide from './pages/Guide';
+import Billing from './pages/Billing';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('iot_token');
@@ -27,6 +35,8 @@ const ProtectedRoute = ({ children }) => {
     const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes in milliseconds
 
     const handleLogout = () => {
+      clearPendingPrefsSync();
+      clearLegacyGlobalPrefs();
       localStorage.removeItem('iot_token');
       localStorage.removeItem('iot_user');
       navigate('/login', { replace: true });
@@ -45,15 +55,25 @@ const ProtectedRoute = ({ children }) => {
       document.addEventListener(event, resetTimer);
     });
 
-    // Sync user profile from API (so timezone & other fields are always fresh)
+    // Hydrate from cached user first (and purge any legacy global keys)
+    try {
+      const cachedUser = JSON.parse(localStorage.getItem('iot_user') || 'null');
+      if (cachedUser?.id) {
+        hydratePrefsFromUser(cachedUser);
+      } else {
+        clearLegacyGlobalPrefs();
+      }
+    } catch {}
+
+    // Sync user profile from API (so timezone, theme, & dashboard_preferences are always fresh)
     const syncUserProfile = () => {
       import('./services/api').then(({ authApi }) => {
         authApi.me().then(res => {
           const existing = JSON.parse(localStorage.getItem('iot_user') || '{}');
           const newData = { ...existing, ...res.data };
-          // Only update if there is a change to prevent infinite loops / unnecessary re-renders
           if (JSON.stringify(existing) !== JSON.stringify(newData)) {
             localStorage.setItem('iot_user', JSON.stringify(newData));
+            hydratePrefsFromUser(res.data);
             window.dispatchEvent(new Event('user-updated'));
           }
         }).catch(() => {});
@@ -114,13 +134,19 @@ export default function App() {
       const userStr = localStorage.getItem('iot_user');
       let savedTheme = localStorage.getItem('iot_theme');
       let savedMode = localStorage.getItem('iot_mode');
-      const customHex = localStorage.getItem('iot_custom_primary');
+      let customHex = null;
 
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
-          if (user.theme) savedTheme = user.theme;
-          if (user.mode) savedMode = user.mode;
+          if (user && user.id != null) {
+            savedTheme = user.theme || 'blue';
+            savedMode = user.mode || 'dark';
+            customHex =
+              getUserStringPref(PREF_KEYS.CUSTOM_PRIMARY, null, user.id) ||
+              user.dashboard_preferences?.custom_primary ||
+              null;
+          }
         } catch (e) {}
       }
 
@@ -142,9 +168,11 @@ export default function App() {
     applyTheme();
     window.addEventListener('user-updated', applyTheme);
     window.addEventListener('theme-updated', applyTheme);
+    window.addEventListener('dashboard-prefs-updated', applyTheme);
     return () => {
       window.removeEventListener('user-updated', applyTheme);
       window.removeEventListener('theme-updated', applyTheme);
+      window.removeEventListener('dashboard-prefs-updated', applyTheme);
     };
   }, []);
 
@@ -165,6 +193,7 @@ export default function App() {
           <Route path="automations" element={<Automations />} />
           <Route path="floorplan" element={<FloorPlan />} />
           <Route path="users" element={<Users />} />
+          <Route path="billing" element={<Billing />} />
           <Route path="settings" element={<Settings />} />
           <Route path="guide" element={<Guide />} />
         </Route>

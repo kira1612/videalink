@@ -18,7 +18,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils";
 import { type SpringConfig, useChartConfig } from "../chart-config-context";
 import { chartCssVars, useChartPortalContainer } from "../chart-context";
 import { TOOLTIP_PANEL_CLASS_NAME, TooltipPanel } from "./tooltip-box";

@@ -3,9 +3,15 @@ import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Cpu, Database, Webhook, Settings,
   ChevronLeft, ChevronRight, LogOut, Users,
-  Home, Zap, BookOpen, HelpCircle
+  Home, Zap, BookOpen, HelpCircle, X, CreditCard
 } from 'lucide-react';
 import { authApi } from '../../services/api';
+import {
+  PREF_KEYS,
+  getUserStringPref,
+  clearPendingPrefsSync,
+  clearLegacyGlobalPrefs,
+} from '../../utils/dashboardPrefs';
 import Swal from 'sweetalert2';
 
 const navGroups = [
@@ -23,34 +29,39 @@ const navGroups = [
   {
     label: 'ACCOUNT PAGES',
     items: [
-      { to: '/app/users',    icon: Users,    label: 'Users', adminOnly: true },
-      { to: '/app/settings', icon: Settings, label: 'Settings' },
-      { to: '/app/guide',    icon: BookOpen, label: 'Panduan IoT' },
+      { to: '/app/users',    icon: Users,      label: 'Users', adminOnly: true },
+      { to: '/app/billing',  icon: CreditCard, label: 'Langganan' },
+      { to: '/app/settings', icon: Settings,   label: 'Settings' },
+      { to: '/app/guide',    icon: BookOpen,   label: 'Panduan IoT' },
     ],
   },
 ];
 
-export default function Sidebar({ collapsed, setCollapsed }) {
+export default function Sidebar({ collapsed, setCollapsed, mobileOpen = false, setMobileOpen }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('iot_user');
     return saved ? JSON.parse(saved) : { name: 'Admin', role: 'admin' };
   });
   const [transparentSidebar, setTransparentSidebar] = useState(() => {
-    return localStorage.getItem('iot_transparent_sidebar') !== 'false';
+    const saved = getUserStringPref(PREF_KEYS.TRANSPARENT_SIDEBAR, null);
+    return saved !== 'false';
   });
 
   useEffect(() => {
     const h = () => {
       const s = localStorage.getItem('iot_user');
       if (s) setCurrentUser(JSON.parse(s));
-      setTransparentSidebar(localStorage.getItem('iot_transparent_sidebar') !== 'false');
+      const ts = getUserStringPref(PREF_KEYS.TRANSPARENT_SIDEBAR, null);
+      setTransparentSidebar(ts !== 'false');
     };
     window.addEventListener('user-updated', h);
     window.addEventListener('theme-updated', h);
+    window.addEventListener('dashboard-prefs-updated', h);
     return () => {
       window.removeEventListener('user-updated', h);
       window.removeEventListener('theme-updated', h);
+      window.removeEventListener('dashboard-prefs-updated', h);
     };
   }, []);
 
@@ -66,6 +77,8 @@ export default function Sidebar({ collapsed, setCollapsed }) {
 
     if (result.isConfirmed) {
       try { await authApi.logout(); } catch (e) {}
+      clearPendingPrefsSync();
+      clearLegacyGlobalPrefs();
       localStorage.removeItem('iot_token');
       localStorage.removeItem('iot_user');
       navigate('/');
@@ -81,10 +94,11 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   return (
     <aside
       className={`
-        fixed top-0 left-0 h-full z-40 flex flex-col
+        fixed top-0 left-0 h-full z-50 flex flex-col
         border-r border-slate-800/60
         transition-all duration-300 ease-in-out
-        ${collapsed ? 'w-[78px]' : 'w-[256px]'}
+        ${mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
+        ${collapsed ? 'lg:w-[78px] w-[256px]' : 'w-[256px]'}
       `}
       style={{
         background: transparentSidebar
@@ -131,11 +145,22 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </span>
         )}
 
+        {/* Mobile Close Button */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen?.(false)}
+          aria-label="Tutup navigasi"
+          className="lg:hidden ml-auto flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+        >
+          <X size={16} />
+        </button>
+
+        {/* Desktop Collapse Toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className={`
-            flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg
+            hidden lg:flex flex-shrink-0 w-6 h-6 items-center justify-center rounded-lg
             text-slate-400 hover:text-slate-100 hover:bg-slate-800
             transition-all duration-200
             ${collapsed
@@ -173,6 +198,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                 <NavLink
                   key={to}
                   to={to}
+                  onClick={() => setMobileOpen?.(false)}
                   title={collapsed ? label : undefined}
                   className="block"
                 >

@@ -244,8 +244,9 @@ export function Area({
 
   const getY = useCallback(
     (d: Record<string, unknown>) => {
-      const value = d[dataKey];
-      return typeof value === "number" ? (yScale(value) ?? 0) : 0;
+      const raw = d[dataKey];
+      const value = typeof raw === "number" ? raw : (raw != null ? parseFloat(String(raw)) : NaN);
+      return !isNaN(value) ? (yScale(value) ?? 0) : (yScale.range()[0] ?? 0);
     },
     [dataKey, yScale]
   );

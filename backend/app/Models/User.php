@@ -28,6 +28,7 @@ class User extends Authenticatable
         'theme',
         'mode',
         'avatar',
+        'dashboard_preferences',
     ];
 
     /**
@@ -50,6 +51,27 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'dashboard_preferences' => 'array',
         ];
+    }
+
+    public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function activeSubscription(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('status', 'active')
+            ->where(function ($q) {
+                $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
+            })
+            ->latestOfMany('id');
+    }
+
+    public function invoices(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 }

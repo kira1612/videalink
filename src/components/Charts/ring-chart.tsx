@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { arcPath } from "./arc-path";
 import { ParentSize } from "./chart-parent-size";
 import {

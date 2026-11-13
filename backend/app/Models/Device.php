@@ -33,7 +33,7 @@ class Device extends Model
         }
 
         // Heartbeat timeout threshold: 60 seconds
-        if ($this->last_seen_at->diffInSeconds(now()) > 60) {
+        if ($this->last_seen_at->lt(now()->subSeconds(60))) {
             return 'offline';
         }
 

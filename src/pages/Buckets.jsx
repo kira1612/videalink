@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Database, Plus, Search, Trash2, Clock, HardDrive, X, Cpu,
   MoreVertical, Settings2, ArrowUpRight, Activity, Filter,
-  RefreshCw, LayoutGrid, List, Check, Zap, Server, Network
+  RefreshCw, LayoutGrid, List, Check, Zap, Server, Network, Lock
 } from 'lucide-react';
 import { bucketsApi, devicesApi } from '../services/api';
 import Swal from 'sweetalert2';
+import { useBillingQuota } from '../hooks/useBillingQuota';
+import QuotaNoticeBanner, {
+  handleQuotaError,
+  promptQuotaUpgrade,
+} from '../components/Billing/QuotaNoticeBanner';
 
 /* ────────────────────────────────────────────────────────────────────────
    Status config
@@ -201,6 +206,7 @@ function FieldSection({ icon: Icon, title, color }) {
 }
 
 function AddBucketModal({ onClose, onSuccess, devices }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
@@ -225,7 +231,9 @@ function AddBucketModal({ onClose, onSuccess, devices }) {
       onClose();
       Swal.fire({ title: 'Bucket created!', icon: 'success', background: '#1e293b', color: '#f8fafc' });
     } catch (err) {
-      Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' });
+      if (!handleQuotaError(err, navigate, onClose)) {
+        Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' });
+      }
     } finally {
       setBusy(false);
     }
@@ -297,6 +305,9 @@ function AddBucketModal({ onClose, onSuccess, devices }) {
    MAIN PAGE
 ════════════════════════════════════════════════════════════════════════ */
 export default function Buckets() {
+  const navigate = useNavigate();
+  const { refreshQuota, getResourceQuota } = useBillingQuota();
+  const bucketQuota = getResourceQuota('buckets');
   const [buckets, setBuckets] = useState([]);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -314,6 +325,7 @@ export default function Buckets() {
       const [bRes, dRes] = await Promise.all([bucketsApi.list(), devicesApi.list()]);
       setBuckets(bRes.data);
       setDevices(dRes.data);
+      refreshQuota();
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -329,7 +341,7 @@ export default function Buckets() {
     Swal.fire({ title: 'Delete bucket?', text: 'All recorded data will be lost forever.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#334155', confirmButtonText: 'Delete', background: '#1e293b', color: '#f8fafc' })
       .then(async r => {
         if (!r.isConfirmed) return;
-        try { await bucketsApi.delete(id); setBuckets(buckets.filter(b => b.id !== id)); Swal.fire({ title: 'Deleted!', icon: 'success', background: '#1e293b', color: '#f8fafc' }); }
+        try { await bucketsApi.delete(id); setBuckets(buckets.filter(b => b.id !== id)); refreshQuota(); Swal.fire({ title: 'Deleted!', icon: 'success', background: '#1e293b', color: '#f8fafc' }); }
         catch (err) { Swal.fire({ title: 'Error', text: err.response?.data?.message || err.message, icon: 'error', background: '#1e293b', color: '#f8fafc' }); }
       });
   };
@@ -341,6 +353,20 @@ export default function Buckets() {
 
   const activeCount = buckets.filter(b => b.enabled).length;
   const totalRecords = buckets.reduce((acc, b) => acc + (b.records || 0), 0);
+
+  const handleOpenAddBucket = () => {
+    if (bucketQuota.blocked) {
+      promptQuotaUpgrade({
+        navigate,
+        resourceLabel: bucketQuota.label,
+        planName: bucketQuota.planName,
+        current: bucketQuota.current,
+        limit: bucketQuota.limit,
+      });
+      return;
+    }
+    setShowAdd(true);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in max-w-[1400px]">
@@ -358,13 +384,23 @@ export default function Buckets() {
           <p className="text-[13px] text-slate-500 ml-4">Store, manage, and query time-series data from devices</p>
         </div>
         <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 text-[13px] font-bold px-5 py-2.5 rounded-xl text-white self-start transition-all hover:scale-[1.02]"
-          style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}
+          onClick={handleOpenAddBucket}
+          title={bucketQuota.blocked ? `Kuota data bucket penuh (${bucketQuota.current}/${bucketQuota.limit}). Upgrade paket untuk menambah.` : undefined}
+          className={`flex items-center gap-2 text-[13px] font-bold px-5 py-2.5 rounded-xl self-start transition-all ${
+            bucketQuota.blocked ? 'border text-rose-300 hover:bg-rose-500/15' : 'text-white hover:scale-[1.02]'
+          }`}
+          style={
+            bucketQuota.blocked
+              ? { backgroundColor: 'rgb(244 63 94 / 0.1)', borderColor: 'rgb(244 63 94 / 0.35)' }
+              : { background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }
+          }
         >
-          <Plus size={16} /> Create Bucket
+          {bucketQuota.blocked ? <Lock size={15} /> : <Plus size={16} />}
+          {bucketQuota.blocked ? 'Kuota Penuh • Upgrade' : 'Create Bucket'}
         </button>
       </div>
+
+      <QuotaNoticeBanner quota={bucketQuota} />
 
       {/* ── STAT CARDS (Vision UI Style) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -437,8 +473,9 @@ export default function Buckets() {
           <p className="text-[15px] font-black text-slate-500 mb-1">{search ? `No results for "${search}"` : 'No data buckets yet'}</p>
           <p className="text-[13px] text-slate-600 max-w-xs mb-6">{search ? 'Try a different keyword.' : 'Store and query historical data from your devices.'}</p>
           {!search && (
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 text-[13px] font-bold px-6 py-2.5 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}>
-              <Plus size={15} /> Create Bucket
+            <button onClick={handleOpenAddBucket} className="flex items-center gap-2 text-[13px] font-bold px-6 py-2.5 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))', boxShadow: '0 4px 16px rgb(var(--primary-500)/0.35)' }}>
+              {bucketQuota.blocked ? <Lock size={15} /> : <Plus size={15} />}
+              {bucketQuota.blocked ? 'Upgrade Paket' : 'Create Bucket'}
             </button>
           )}
         </div>

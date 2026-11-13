@@ -2,7 +2,7 @@
 
 import { domAnimation, LazyMotion, m } from "motion/react";
 import { memo, useCallback } from "react";
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils";
 import {
   defaultHeatmapColorScale,
   type HeatmapLevelStyles,

@@ -1,14 +1,3 @@
-/**
- * Cell geometry `@visx/heatmap` 4.0.0 `HeatmapRect` handed its render-prop
- * children, reproduced exactly:
- *
- * - `width = binWidth - gap`, `height = binHeight - gap` (same for every cell)
- * - `x = xScale(column) + x0` (no gap), `y = yScale(row) + gap`
- * - `color = colorScale(count)`, `opacity = opacityScale(count)` (default 1)
- *
- * One array of cells per column, rows in bin order.
- */
-
 export interface HeatmapRectCell<ColumnDatum, BinDatum> {
   bin: BinDatum;
   row: number;

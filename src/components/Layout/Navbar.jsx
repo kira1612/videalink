@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Bell, Search, RefreshCw, Check, Activity, AlertCircle,
-  CheckCircle2, XCircle, Settings, User
+  CheckCircle2, XCircle, Settings, User, Menu
 } from 'lucide-react';
 
 const mockNotifications = [
@@ -18,7 +18,7 @@ const notifType = {
   error:   { Icon: XCircle,      bg: 'bg-rose-500/10',    text: 'text-rose-400',    dot: 'bg-rose-400'   },
 };
 
-export default function Navbar({ title }) {
+export default function Navbar({ title, onOpenMobileNav }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => {
     const s = localStorage.getItem('iot_user');
@@ -71,17 +71,30 @@ export default function Navbar({ title }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 pt-5 pb-3 px-6 flex items-center justify-between gap-4 bg-slate-950/75 backdrop-blur-xl transition-colors duration-300">
-      {/* ── Left: Vision UI Breadcrumb & Page Title ── */}
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-[12px]">
-          <span className="text-slate-400 font-normal">Pages</span>
-          <span className="text-slate-500">/</span>
-          <span className="text-slate-100 font-medium truncate">{title}</span>
+    <header className="sticky top-0 z-30 pt-4 pb-3 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 bg-slate-950/80 backdrop-blur-xl transition-colors duration-300">
+      {/* ── Left: Hamburger (mobile/tablet) + Breadcrumbs ── */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        {onOpenMobileNav && (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            className="lg:hidden p-2 -ml-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+            title="Buka Menu Navigasi"
+            aria-label="Buka Menu Navigasi"
+          >
+            <Menu size={18} />
+          </button>
+        )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[11px] sm:text-[12px]">
+            <span className="text-slate-400 font-normal">Pages</span>
+            <span className="text-slate-500">/</span>
+            <span className="text-slate-100 font-medium truncate">{title}</span>
+          </div>
+          <h1 className="text-[14px] sm:text-[15px] font-extrabold text-slate-100 tracking-tight mt-0.5 truncate">
+            {title}
+          </h1>
         </div>
-        <h1 className="text-[15px] font-extrabold text-slate-100 tracking-tight mt-0.5 truncate">
-          {title}
-        </h1>
       </div>
 
       {/* ── Right: Search Pill + User + Settings + Bell ── */}

@@ -9,7 +9,12 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['device_id', 'device_name', 'event', 'type'];
+    protected $fillable = ['user_id', 'device_id', 'device_name', 'event', 'type'];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function device()
     {

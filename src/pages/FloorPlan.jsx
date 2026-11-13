@@ -1,10 +1,46 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import * as THREE from 'three';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html, useCursor, RoundedBox, Environment, ContactShadows, TransformControls, Text } from '@react-three/drei';
 import { Box as BoxIcon, Info, Edit3, Check, X, MousePointerClick, Cpu, Activity, Power, Move, Maximize, RotateCcw, PlusSquare, Trash2, Save, MousePointer2, Eraser, Copy, Camera, Trash, Maximize2, Minimize2, Layers, Eye, EyeOff, Square, CheckSquare, FolderPlus, FolderOpen, ChevronLeft, ChevronRight, Hand, ZoomIn, ZoomOut, Undo2, Redo2, User, Download, Upload, Image as ImageIcon } from 'lucide-react';
 import { devicesApi, mqttApi } from '../services/api';
+import { getUserScopedKey } from '../utils/dashboardPrefs';
 import Swal from 'sweetalert2';
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Theme Detection Hook (Light / Dark Mode reactive)
+───────────────────────────────────────────────────────────────────────── */
+function useIsLightMode() {
+  const [isLight, setIsLight] = useState(() => {
+    try {
+      if (typeof document !== 'undefined') {
+        return document.documentElement.getAttribute('data-mode') === 'light';
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        const light = document.documentElement.getAttribute('data-mode') === 'light';
+        setIsLight(light);
+      } catch {}
+    };
+    update();
+    window.addEventListener('theme-updated', update);
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode'] });
+    return () => {
+      window.removeEventListener('theme-updated', update);
+      observer.disconnect();
+    };
+  }, []);
+
+  return isLight;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Third Person Avatar (Jelajah Mode)
@@ -442,6 +478,7 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
 const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
   const meshRef = useRef();
   const [hovered, setHovered] = useState(false);
+  const isLightMode = useIsLightMode();
   useCursor(hovered);
 
   return (
@@ -462,11 +499,11 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
         castShadow
       >
         <meshStandardMaterial 
-          color={isSelected ? '#3b82f6' : (hovered ? '#475569' : '#1e293b')} 
-          roughness={0.7} 
-          metalness={0.1}
+          color={isSelected ? '#3b82f6' : (hovered ? (isLightMode ? '#64748b' : '#475569') : (isLightMode ? '#475569' : '#334155'))} 
+          roughness={0.5} 
+          metalness={0.15}
           transparent
-          opacity={isSelected ? 0.8 : 1}
+          opacity={isSelected ? 0.85 : 1}
         />
       </RoundedBox>
     </group>
@@ -478,7 +515,11 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
 ───────────────────────────────────────────────────────────────────────── */
 const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing }, ref) => {
   const [hovered, setHovered] = useState(false);
+  const isLightMode = useIsLightMode();
   useCursor(hovered);
+
+  const labelText = ((wall.text && !wall.text.includes('undefined')) ? wall.text.replace(/^Ruangan:\s*/i, '') : 'RUANGAN').toUpperCase();
+  const calculatedFontSize = wall.fontSize || Math.min(1.6, Math.max(0.85, 12 / (labelText.length || 7)));
 
   return (
     <group 
@@ -492,15 +533,15 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
     >
       <Text
         font={wall.fontFamily || undefined}
-        fontSize={wall.fontSize || 5}
-        color={isCapturing ? '#000000' : (isSelected ? '#3b82f6' : (hovered ? '#cbd5e1' : (wall.color || '#94a3b8')))}
+        fontSize={calculatedFontSize}
+        color={isCapturing ? '#000000' : (isSelected ? '#3b82f6' : (hovered ? '#93c5fd' : (wall.color || (isLightMode ? '#1e293b' : '#f8fafc'))))}
         anchorX="center"
         anchorY="middle"
         fontStyle={wall.italic ? 'italic' : 'normal'}
-        fontWeight={wall.bold || isCapturing ? 'bold' : 'normal'}
-        fillOpacity={isSelected || hovered ? 0.8 : (wall.opacity !== undefined ? wall.opacity : 0.15)}
+        fontWeight={wall.bold || isCapturing ? 'bold' : '800'}
+        fillOpacity={isSelected || hovered ? 0.95 : (wall.opacity !== undefined ? wall.opacity : (isLightMode ? 0.8 : 0.75))}
       >
-        {(wall.text || 'NAMA RUANGAN').toUpperCase()}
+        {labelText}
       </Text>
     </group>
   );
@@ -511,14 +552,15 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
 ───────────────────────────────────────────────────────────────────────── */
 const RoomGroupBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
   const [hovered, setHovered] = useState(false);
+  const isLightMode = useIsLightMode();
   useCursor(hovered);
 
   const matProps = {
-    color: isSelected ? '#3b82f6' : (hovered ? '#475569' : '#1e293b'),
-    roughness: 0.7,
-    metalness: 0.1,
+    color: isSelected ? '#3b82f6' : (hovered ? (isLightMode ? '#64748b' : '#475569') : (isLightMode ? '#475569' : '#334155')),
+    roughness: 0.5,
+    metalness: 0.15,
     transparent: true,
-    opacity: isSelected ? 0.8 : 1
+    opacity: isSelected ? 0.85 : 1
   };
 
   return (
@@ -923,14 +965,15 @@ function ChildInGroupTransform({ child, parentGroup, transformMode, setWalls, or
 ───────────────────────────────────────────────────────────────────────── */
 const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing }, ref) => {
   const [hovered, setHovered] = useState(false);
+  const isLightMode = useIsLightMode();
   useCursor(hovered);
 
   const matProps = {
-    color: isSelected ? '#3b82f6' : (hovered ? '#475569' : '#1e293b'),
-    roughness: 0.7,
-    metalness: 0.1,
+    color: isSelected ? '#3b82f6' : (hovered ? (isLightMode ? '#64748b' : '#475569') : (isLightMode ? '#475569' : '#334155')),
+    roughness: 0.5,
+    metalness: 0.15,
     transparent: true,
-    opacity: isSelected ? 0.8 : 1
+    opacity: isSelected ? 0.85 : 1
   };
 
   // --- Fixed door dimensions in world space ---
@@ -1493,6 +1536,80 @@ function MultiSelectGizmo({ selectedForGroup, walls, transformMode, setWalls, or
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Top-down Camera Controller for Sidebar Widget Preview
+───────────────────────────────────────────────────────────────────────── */
+function TopDownCameraController({ isSidebarPreview, walls, orbitRef }) {
+  const { camera, invalidate } = useThree();
+
+  useEffect(() => {
+    if (!isSidebarPreview) return;
+
+    let minX = -5, maxX = 5, minZ = -5, maxZ = 5;
+    let found = false;
+
+    if (Array.isArray(walls) && walls.length > 0) {
+      walls.forEach((w) => {
+        if (w.position) {
+          const px = w.position[0] || 0;
+          const pz = w.position[2] || 0;
+          const sx = (w.scale?.[0] || 1) / 2;
+          const sz = (w.scale?.[2] || 1) / 2;
+          if (!found) {
+            minX = px - sx; maxX = px + sx;
+            minZ = pz - sz; maxZ = pz + sz;
+            found = true;
+          } else {
+            minX = Math.min(minX, px - sx); maxX = Math.max(maxX, px + sx);
+            minZ = Math.min(minZ, pz - sz); maxZ = Math.max(maxZ, pz + sz);
+          }
+        }
+        if (w.type === 'custom_group' && Array.isArray(w.children)) {
+          w.children.forEach((c) => {
+            if (c.position) {
+              const px = (w.position?.[0] || 0) + (c.position[0] || 0);
+              const pz = (w.position?.[2] || 0) + (c.position[2] || 0);
+              const sx = (c.scale?.[0] || 1) / 2;
+              const sz = (c.scale?.[2] || 1) / 2;
+              if (!found) {
+                minX = px - sx; maxX = px + sx;
+                minZ = pz - sz; maxZ = pz + sz;
+                found = true;
+              } else {
+                minX = Math.min(minX, px - sx); maxX = Math.max(maxX, px + sx);
+                minZ = Math.min(minZ, pz - sz); maxZ = Math.max(maxZ, pz + sz);
+              }
+            }
+          });
+        }
+      });
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const spanX = Math.max(12, maxX - minX);
+    const spanZ = Math.max(12, maxZ - minZ);
+    const maxSpan = Math.max(spanX, spanZ);
+
+    // Framing isometric top-down view so entire room is visible without awkward cuts
+    const targetY = Math.max(20, maxSpan * 1.4);
+    const targetX = centerX + targetY * 0.45;
+    const targetZ = centerZ + targetY * 0.55;
+
+    camera.position.set(targetX, targetY, targetZ);
+    camera.lookAt(centerX, 0, centerZ);
+    camera.updateProjectionMatrix();
+
+    if (orbitRef?.current) {
+      orbitRef.current.target.set(centerX, 0, centerZ);
+      orbitRef.current.update();
+    }
+    invalidate();
+  }, [isSidebarPreview, walls, camera, orbitRef, invalidate]);
+
+  return null;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Room Layout Environment
 ───────────────────────────────────────────────────────────────────────── */
 function RoomLayout({ 
@@ -1506,8 +1623,10 @@ function RoomLayout({
   hiddenDevices = [],
   roomName = '',
   isExploreMode = false,
-  isCapturing = false
+  isCapturing = false,
+  isSidebarPreview = false
 }) {
+  const isLightMode = useIsLightMode();
 
   // Detect if selected object is a child inside a group
   const selectedGroupChild = React.useMemo(() => {
@@ -1677,15 +1796,23 @@ function RoomLayout({
 
   return (
     <>
+      <TopDownCameraController 
+        isSidebarPreview={isSidebarPreview} 
+        walls={walls} 
+        orbitRef={orbitRef} 
+      />
+
       <OrbitControls 
         ref={orbitRef} 
         makeDefault 
+        enabled={!isSidebarPreview}
         minPolarAngle={Math.PI / 8} 
         maxPolarAngle={Math.PI / 2.1} 
         minDistance={2} 
         maxDistance={200} 
-        enablePan={!editMode || transformMode === 'camera'}
-        enableZoom={!editMode || transformMode === 'camera'}
+        enablePan={!isSidebarPreview && (!editMode || transformMode === 'camera')}
+        enableZoom={!isSidebarPreview && (!editMode || transformMode === 'camera')}
+        enableRotate={!isSidebarPreview}
         keyPanSpeed={20}
         screenSpacePanning={false}
       />
@@ -1710,11 +1837,20 @@ function RoomLayout({
             }}
             onPointerOut={() => { document.body.style.cursor = 'auto'; }}
           >
-            <meshStandardMaterial color="#0f172a" roughness={0.8} metalness={0.2} />
+            <meshStandardMaterial 
+              color={isLightMode ? '#f8fafc' : '#1e293b'} 
+              roughness={isLightMode ? 0.35 : 0.5} 
+              metalness={0.08} 
+            />
           </RoundedBox>
         )}
 
-        {!isCapturing && <gridHelper args={[floorSize, floorSize, '#334155', '#1e293b']} position={[0, 0.01, 0]} />}
+        {!isCapturing && (
+          <gridHelper 
+            args={[floorSize, floorSize, isLightMode ? '#94a3b8' : '#0284c7', isLightMode ? '#e2e8f0' : '#334155']} 
+            position={[0, 0.01, 0]} 
+          />
+        )}
 
         {/* Tembok (Walls) */}
         {walls.map((wall) => {
@@ -1783,22 +1919,46 @@ function RoomLayout({
 /* ─────────────────────────────────────────────────────────────────────────
    Main Page
 ───────────────────────────────────────────────────────────────────────── */
-export default function FloorPlan({ hideHeader = false, isWidget = false, roomId = 'default', roomName = '' }) {
-  const [devices, setDevices] = useState([]);
+export default function FloorPlan({ 
+  hideHeader = false, 
+  isWidget = false, 
+  isSidebarPreview = false,
+  roomId = 'default', 
+  roomName = '',
+  initialDevices = null,
+}) {
+  const [devices, setDevices] = useState(() => (Array.isArray(initialDevices) && initialDevices.length > 0 ? initialDevices : []));
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState('walls'); // 'walls' | 'devices'
   
   // Builder State
   const [walls, setWalls] = useState(() => {
-    const saved = localStorage.getItem(`iot_layout_walls_${roomId}`);
+    const saved = localStorage.getItem(getUserScopedKey(`iot_layout_walls_${roomId}`))
+      || (roomId !== 'default' ? localStorage.getItem(`iot_layout_walls_${roomId}`) : null);
     let parsed = saved ? JSON.parse(saved) : [];
+    const cleanRoomName = (roomName && !roomName.includes('undefined') && !roomName.includes('null'))
+      ? roomName.replace(/^Ruangan:\s*/i, '').trim()
+      : 'Ruang Tamu';
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      parsed = parsed.map((w) => {
+        if (w.type === 'text_label') {
+          const currentText = w.text || '';
+          if (!currentText || currentText.includes('undefined') || currentText.includes('null') || currentText === 'NAMA RUANGAN') {
+            return { ...w, text: cleanRoomName };
+          }
+        }
+        return w;
+      });
+    }
+
     // Jika mode widget dan belum pernah disimpan layout 3D-nya, tampilkan struktur ruangan 3D default
     if ((!saved || parsed.length === 0) && isWidget) {
       parsed = [
         {
           id: 'default_room_group',
           type: 'custom_group',
-          name: roomName || 'Ruangan 3D',
+          name: cleanRoomName,
           position: [0, 2, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
@@ -1816,7 +1976,7 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
       parsed.push({
         id: 'room-label',
         type: 'text_label',
-        text: roomName || 'NAMA RUANGAN',
+        text: cleanRoomName,
         position: [0, 0.02, 0],
         rotation: [-Math.PI / 2, 0, 0],
         scale: [1, 1, 1],
@@ -1835,15 +1995,32 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [layersPanelOpen, setLayersPanelOpen] = useState(true);
+  const isLightMode = useIsLightMode();
   const containerRef = useRef();
   const orbitRef = useRef();
 
   // Undo/Redo history stack
   const [wallsHistory, setWallsHistory] = useState(() => {
-    const saved = localStorage.getItem(`iot_layout_walls_${roomId}`);
+    const saved = localStorage.getItem(getUserScopedKey(`iot_layout_walls_${roomId}`))
+      || (roomId !== 'default' ? localStorage.getItem(`iot_layout_walls_${roomId}`) : null);
     return [saved ? JSON.parse(saved) : []];
   });
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Sync label teks saat roomName prop diperbarui
+  useEffect(() => {
+    if (roomName && !roomName.includes('undefined') && !roomName.includes('null')) {
+      const clean = roomName.replace(/^Ruangan:\s*/i, '').trim();
+      setWalls((prev) =>
+        prev.map((w) => {
+          if (w.type === 'text_label' && (w.text?.includes('undefined') || w.text === 'NAMA RUANGAN' || !w.text)) {
+            return { ...w, text: clean };
+          }
+          return w;
+        })
+      );
+    }
+  }, [roomName]);
 
   // Wrap setWalls to auto-push history
   const setWallsWithHistory = (updaterOrValue) => {
@@ -1881,18 +2058,32 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
   const canRedo = historyIndex < wallsHistory.length - 1;
 
   useEffect(() => {
+    // If FloorPlan is rendered as a widget or sidebar preview, avoid redundant interval polling
+    if (isWidget || isSidebarPreview) {
+      if (initialDevices !== undefined && initialDevices !== null) {
+        setDevices(Array.isArray(initialDevices) ? initialDevices : []);
+        return;
+      }
+      devicesApi.list().then(res => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setDevices(list);
+      }).catch(console.error);
+      return;
+    }
+
     const fetchDevices = () => {
       devicesApi.list().then(res => {
-        setDevices(res.data);
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setDevices(list);
       }).catch(console.error);
     };
     fetchDevices();
-    const iv = setInterval(fetchDevices, 10000);
+    const iv = setInterval(fetchDevices, 12000);
     return () => clearInterval(iv);
-  }, []);
+  }, [isWidget, isSidebarPreview, initialDevices]);
 
   const saveLayout = () => {
-    localStorage.setItem(`iot_layout_walls_${roomId}`, JSON.stringify(walls));
+    localStorage.setItem(getUserScopedKey(`iot_layout_walls_${roomId}`), JSON.stringify(walls));
     setEditMode(false);
     setSelectedObj(null);
     Swal.fire({
@@ -2425,7 +2616,7 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
           )}
 
           {/* Floating Actions (Top Right) untuk Embedded Mode / Fullscreen */}
-          {(hideHeader || isFullscreen) && (
+          {(hideHeader || isFullscreen) && !isSidebarPreview && (
             <div className={`absolute ${isWidget && !isFullscreen ? 'top-2.5 right-2.5' : 'top-4 right-4'} z-20 flex gap-2`}>
               {editMode && (
                 <>
@@ -2823,14 +3014,75 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
           </div>
           )}
 
-          <Canvas shadows gl={{ preserveDrawingBuffer: true, antialias: true, pixelRatio: isCapturing ? 3 : window.devicePixelRatio }} camera={{ position: [15, 20, 15], fov: 45 }}>
-            <color attach="background" args={[isCapturing ? '#ffffff' : '#020617']} />
-            <ambientLight intensity={isCapturing ? 1.5 : 0.4} />
-            <directionalLight castShadow={!isCapturing} position={[5, 15, 5]} intensity={isCapturing ? 0 : 0.8} shadow-mapSize={[2048, 2048]} />
+          <Canvas 
+            shadows={!isSidebarPreview}
+            frameloop={isSidebarPreview ? "demand" : "always"}
+            gl={{ 
+              preserveDrawingBuffer: isCapturing, 
+              antialias: !isSidebarPreview,
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: isLightMode ? 1.05 : 1.25,
+            }} 
+            camera={{ 
+              position: isSidebarPreview ? [15, 22, 18] : [15, 20, 15], 
+              fov: isSidebarPreview ? 40 : 45 
+            }}
+          >
+            <color attach="background" args={[isCapturing ? '#ffffff' : (isLightMode ? '#f1f5f9' : '#0b1120')]} />
+            
+            {/* Primary Ambient Studio Lighting */}
+            <ambientLight 
+              intensity={isCapturing ? 1.8 : (isLightMode ? 1.6 : 1.35)} 
+              color={isLightMode ? '#ffffff' : '#f8fafc'} 
+            />
+
+            {/* Sun Key Directional Light with Soft Shadows */}
+            <directionalLight 
+              castShadow={!isCapturing && !isSidebarPreview} 
+              position={[15, 25, 12]} 
+              intensity={isCapturing ? 0.6 : (isLightMode ? 1.7 : 1.45)} 
+              shadow-mapSize={isWidget ? [512, 512] : [2048, 2048]} 
+              shadow-camera-left={-25}
+              shadow-camera-right={25}
+              shadow-camera-top={25}
+              shadow-camera-bottom={-25}
+              shadow-bias={-0.0001}
+              color={isLightMode ? '#ffffff' : '#fffbeb'}
+            />
+
+            {/* Secondary Sky Fill Light (Soft cool bounce from opposite corner) */}
+            <directionalLight 
+              position={[-15, 18, -12]} 
+              intensity={isLightMode ? 0.85 : 0.7} 
+              color="#bae6fd" 
+            />
+
+            {/* Front Fill Light (Prevent dark front-facing walls) */}
+            <directionalLight 
+              position={[-10, 14, 15]} 
+              intensity={isLightMode ? 0.6 : 0.5} 
+              color="#ffffff" 
+            />
+
+            {/* Overhead Room Point Light (Interior room illumination) */}
+            <pointLight 
+              position={[0, 16, 0]} 
+              intensity={isLightMode ? 0.7 : 0.6} 
+              distance={70} 
+              decay={2} 
+              color="#ffffff" 
+            />
+
+            {/* Hemisphere Bounce Light (Sky & Floor bounce) */}
+            <hemisphereLight 
+              skyColor={isLightMode ? '#ffffff' : '#e0f2fe'} 
+              groundColor={isLightMode ? '#cbd5e1' : '#334155'} 
+              intensity={isLightMode ? 0.9 : 0.8} 
+            />
             
             <Suspense fallback={null}>
               <RoomLayout 
-                devices={roomId === 'default' ? devices : devices.filter(d => Number(d.room_id) === Number(roomId))} 
+                devices={roomId === 'default' ? (Array.isArray(devices) ? devices : []) : (Array.isArray(devices) ? devices : []).filter(d => Number(d?.room_id) === Number(roomId))} 
                 editMode={editMode} 
                 activeTab={activeTab}
                 walls={walls} setWalls={setWallsWithHistory}
@@ -2843,9 +3095,11 @@ export default function FloorPlan({ hideHeader = false, isWidget = false, roomId
                 roomName={roomName}
                 isExploreMode={isExploreMode}
                 isCapturing={isCapturing}
+                isSidebarPreview={isSidebarPreview}
               />
-              {!isCapturing && <ContactShadows position={[0, -1.05, 0]} opacity={0.6} scale={30} blur={2.5} far={4} color="#000000" />}
-              <Environment preset="city" />
+              {!isCapturing && !isSidebarPreview && (
+                <ContactShadows position={[0, -1.05, 0]} opacity={0.6} scale={30} blur={2.5} far={4} color="#000000" />
+              )}
             </Suspense>
           </Canvas>
 

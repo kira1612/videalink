@@ -80,13 +80,25 @@ class UserController extends Controller
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'sometimes|string|max:255',
-            'email'    => 'sometimes|email|unique:users,email,' . $request->user()->id,
-            'timezone' => 'sometimes|string|timezone',
-            'theme'    => 'sometimes|string|max:50',
-            'mode'     => 'sometimes|in:light,dark',
-            'avatar'   => 'sometimes|string|nullable',
+            'name'                  => 'sometimes|string|max:255',
+            'email'                 => 'sometimes|email|unique:users,email,' . $request->user()->id,
+            'timezone'              => 'sometimes|string|timezone',
+            'theme'                 => 'sometimes|string|max:50',
+            'mode'                  => 'sometimes|in:light,dark',
+            'avatar'                => 'sometimes|string|nullable',
+            'dashboard_preferences' => 'sometimes|array|nullable',
         ]);
+
+        if (array_key_exists('dashboard_preferences', $validated)) {
+            $incoming = $validated['dashboard_preferences'];
+            if (is_null($incoming)) {
+                $validated['dashboard_preferences'] = null;
+            } else {
+                $current = $request->user()->dashboard_preferences;
+                $base = is_array($current) ? $current : [];
+                $validated['dashboard_preferences'] = array_merge($base, $incoming);
+            }
+        }
 
         $request->user()->update($validated);
 

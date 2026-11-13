@@ -50,6 +50,8 @@ class EndpointController extends Controller
 
     public function store(Request $request)
     {
+        app(\App\Services\BillingService::class)->assertQuotaAvailable($request->user(), 'endpoints');
+
         $validated = $request->validate([
             'device_id'   => 'required|exists:devices,id',
             'name'        => 'required|string|max:255',
@@ -64,6 +66,15 @@ class EndpointController extends Controller
             ->firstOrFail();
 
         $endpoint = Endpoint::create($validated);
+
+        ActivityLog::create([
+            'user_id'     => $request->user()->id,
+            'device_id'   => $validated['device_id'],
+            'device_name' => $endpoint->name,
+            'event'       => "Menambahkan endpoint integrasi baru: {$endpoint->name}",
+            'type'        => 'success',
+        ]);
+
         return response()->json($endpoint, 201);
     }
 
@@ -86,9 +97,10 @@ class EndpointController extends Controller
         $endpoint->update(['last_triggered_at' => now()]);
 
         ActivityLog::create([
+            'user_id'     => $request->user()->id,
             'device_id'   => $endpoint->device_id,
             'device_name' => $endpoint->device->name ?? 'Unknown',
-            'event'       => "Endpoint \"{$endpoint->name}\" triggered manually",
+            'event'       => "Pemicu manual endpoint: {$endpoint->name}",
             'type'        => 'info',
         ]);
 
@@ -102,7 +114,18 @@ class EndpointController extends Controller
     public function destroy(Request $request, Endpoint $endpoint)
     {
         $this->authorizeEndpoint($request, $endpoint);
+        $endpointName = $endpoint->name;
+        $deviceId = $endpoint->device_id;
         $endpoint->delete();
+
+        ActivityLog::create([
+            'user_id'     => $request->user()->id,
+            'device_id'   => $deviceId,
+            'device_name' => $endpointName,
+            'event'       => "Menghapus endpoint: {$endpointName}",
+            'type'        => 'warning',
+        ]);
+
         return response()->json(['message' => 'Endpoint deleted']);
     }
 }

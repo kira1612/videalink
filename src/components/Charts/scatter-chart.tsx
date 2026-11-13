@@ -9,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "@/lib/utils";
 import { DEFAULT_CHART_ENTER_TRANSITION } from "./animation";
 import {
   defaultScatterColors,
