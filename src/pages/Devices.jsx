@@ -333,13 +333,13 @@ function AddDeviceModal({ onClose, onSuccess, rooms = [] }) {
                 <Field label="Broker Host">
                   <input name="broker_host" type="text" defaultValue="test.mosquitto.org" placeholder="e.g. test.mosquitto.org / broker.hivemq.com" className="input-field font-mono text-[12px]" required />
                 </Field>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-1">
                     <Field label="Port">
                       <input name="broker_port" type="number" defaultValue="1883" className="input-field font-mono text-[12px]" required />
                     </Field>
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <Field label="MQTT Topic (Optional)">
                       <input name="broker_topic" type="text" placeholder="videalink/devices/node-01" className="input-field font-mono text-[12px]" />
                     </Field>
@@ -509,38 +509,38 @@ export default function Devices() {
       <QuotaNoticeBanner quota={deviceQuota} />
 
       {/* ── STAT CARDS (Vision UI Style) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Total Devices', count: counts.all,     dot: 'rgb(var(--primary-400))', icon: Cpu },
           { label: 'Online Now',    count: counts.online,  dot: '#34d399',                 icon: Wifi },
           { label: 'Warning',       count: counts.warning, dot: '#fbbf24',                 icon: AlertTriangle },
           { label: 'Offline',       count: counts.offline, dot: '#64748b',                 icon: WifiOff },
         ].map(s => (
-          <div key={s.label} className="vision-card px-5 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-[12px] font-medium text-slate-400">{s.label}</p>
+          <div key={s.label} className="vision-card px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-[12px] font-medium text-slate-400 truncate">{s.label}</p>
               {loading
                 ? <div className="h-7 w-12 bg-slate-800 rounded-lg animate-pulse mt-1" />
-                : <p className="text-[22px] font-extrabold text-slate-100 leading-tight mt-1">{s.count}</p>
+                : <p className="text-[20px] sm:text-[22px] font-extrabold text-slate-100 leading-tight mt-1 tabular-nums">{s.count}</p>
               }
             </div>
             <div
-              className="w-[42px] h-[42px] rounded-xl flex items-center justify-center text-white flex-shrink-0"
+              className="w-9 h-9 sm:w-[42px] sm:h-[42px] rounded-xl flex items-center justify-center text-white flex-shrink-0"
               style={{
                 background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
                 boxShadow: '0 4px 14px rgb(var(--primary-500) / 0.4)',
               }}
             >
-              <s.icon size={18} />
+              <s.icon size={17} />
             </div>
           </div>
         ))}
       </div>
 
       {/* ── TOOLBAR ── */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
         {/* Search */}
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1 md:max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           <input
             type="search" value={search} onChange={e => setSearch(e.target.value)}
@@ -551,12 +551,12 @@ export default function Devices() {
         </div>
 
         {/* Status tabs */}
-        <div className="flex items-center gap-0.5 bg-slate-800/60 border border-slate-700/60 rounded-xl p-1">
+        <div className="flex items-center gap-0.5 bg-slate-800/60 border border-slate-700/60 rounded-xl p-1 overflow-x-auto no-scrollbar max-w-full">
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap shrink-0"
               style={tab === t.key ? { background: 'rgb(var(--surface-800))', color: 'rgb(var(--surface-100))' } : { color: 'rgb(100,116,139)' }}
             >
               {t.color && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: t.color }} />}
@@ -566,7 +566,7 @@ export default function Devices() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0 self-end md:self-auto md:ml-auto">
           {[{ v: 'grid', I: LayoutGrid }, { v: 'list', I: List }].map(({ v, I }) => (
             <button key={v} onClick={() => setView(v)}
               className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"

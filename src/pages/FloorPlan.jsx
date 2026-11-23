@@ -2576,30 +2576,30 @@ export default function FloorPlan({
   }, []);
 
   return (
-    <div ref={containerRef} className={`flex flex-col bg-slate-950 w-full max-w-[1600px] mx-auto ${hideHeader ? (isFullscreen ? 'p-0 w-screen h-screen' : 'p-0 h-full') : 'p-6 h-[calc(100vh-2rem)]'}`}>
+    <div ref={containerRef} className={`flex flex-col bg-slate-950 w-full max-w-[1600px] mx-auto ${hideHeader ? (isFullscreen ? 'p-0 w-screen h-[100dvh]' : 'p-0 h-full') : 'p-2 sm:p-5 h-[calc(100dvh-8rem)] lg:h-[calc(100dvh-5.5rem)]'}`}>
       
       {!hideHeader && !isFullscreen ? (
-        <div className="mb-6 flex justify-between items-end flex-shrink-0">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-              <BoxIcon className="text-primary-400" /> Interactive 3D Floor Plan
+        <div className="mb-3 sm:mb-5 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 flex-shrink-0">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-100 flex items-center gap-2">
+              <BoxIcon className="text-primary-400 shrink-0" size={20} /> Interactive 3D Floor Plan
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
               {editMode ? 'Mode Editor CAD: Rancang tembok & tata letak perangkat.' : 'Mode Visualisasi: Klik perangkat untuk mengontrol.'}
             </p>
           </div>
           
-          <div className="flex gap-3">
-            <button onClick={toggleFullscreen} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg bg-slate-800 text-slate-200 hover:bg-slate-700">
-              <Maximize2 size={16} /> Fullscreen
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <button onClick={toggleFullscreen} className="flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg bg-slate-800 text-slate-200 hover:bg-slate-700">
+              <Maximize2 size={15} /> Fullscreen
             </button>
             {editMode ? (
-              <button onClick={saveLayout} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg bg-emerald-500 text-slate-900 hover:bg-emerald-400 shadow-emerald-500/20">
-                <Save size={16} /> Simpan Layout
+              <button onClick={saveLayout} className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg bg-emerald-500 text-slate-900 hover:bg-emerald-400 shadow-emerald-500/20">
+                <Save size={15} /> Simpan Layout
               </button>
             ) : (
-              <button onClick={handleEnterEditMode} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-amber-500/20">
-                <Edit3 size={16} /> 3D Editor Mode
+              <button onClick={handleEnterEditMode} className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg bg-amber-500 text-slate-900 hover:bg-amber-400 shadow-amber-500/20">
+                <Edit3 size={15} /> 3D Editor Mode
               </button>
             )}
           </div>
@@ -2607,9 +2607,9 @@ export default function FloorPlan({
       ) : null}
 
       <div className="flex-1 flex gap-4 h-full min-h-0 relative">
-        <div className={`flex-1 bg-slate-950 ${isWidget && !isFullscreen ? 'border border-slate-800/80 rounded-2xl' : `border ${editMode ? 'border-amber-500/30' : 'border-slate-800 shadow-2xl'} rounded-3xl`} overflow-hidden relative`}>
+        <div className={`flex-1 min-w-0 bg-slate-950 ${isWidget && !isFullscreen ? 'border border-slate-800/80 rounded-2xl' : `border ${editMode ? 'border-amber-500/30' : 'border-slate-800 shadow-2xl'} rounded-2xl sm:rounded-3xl`} overflow-hidden relative`}>
           {!editMode && (!isWidget || isFullscreen) && (
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 px-3 py-2 rounded-lg shadow-lg">
+            <div className="hidden sm:flex absolute top-4 left-4 z-10 items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 px-3 py-2 rounded-lg shadow-lg">
               <Info size={16} className="text-primary-400" />
               <span className="text-[11px] font-bold text-slate-300">Tarik: Putar kamera. Scroll: Zoom.</span>
             </div>
@@ -2617,29 +2617,29 @@ export default function FloorPlan({
 
           {/* Floating Actions (Top Right) untuk Embedded Mode / Fullscreen */}
           {(hideHeader || isFullscreen) && !isSidebarPreview && (
-            <div className={`absolute ${isWidget && !isFullscreen ? 'top-2.5 right-2.5' : 'top-4 right-4'} z-20 flex gap-2`}>
+            <div className={`absolute ${isWidget && !isFullscreen ? 'top-2.5 right-2.5' : 'top-3 right-3 sm:top-4 sm:right-4'} z-20 flex flex-wrap justify-end gap-1.5 sm:gap-2 max-w-[calc(100%-1.5rem)]`}>
               {editMode && (
                 <>
                   <input type="file" accept=".json" id="import-json" className="hidden" onChange={handleImportJSON} />
                   <button 
                     onClick={() => document.getElementById('import-json').click()} 
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold transition-all shadow-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 border border-slate-700/50 backdrop-blur-md"
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 border border-slate-700/50 backdrop-blur-md"
                     title="Import Layout JSON"
                   >
-                    <Upload size={16} /> Import
+                    <Upload size={15} /> <span className="hidden sm:inline">Import</span>
                   </button>
                   <button 
                     onClick={handleExportJSON} 
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold transition-all shadow-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 border border-slate-700/50 backdrop-blur-md"
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 border border-slate-700/50 backdrop-blur-md"
                     title="Export Layout JSON"
                   >
-                    <Download size={16} /> Export
+                    <Download size={15} /> <span className="hidden sm:inline">Export</span>
                   </button>
                 </>
               )}
               <button 
                 onClick={toggleFullscreen} 
-                className={`flex items-center justify-center ${isWidget && !isFullscreen ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-slate-900/85 text-slate-200 hover:bg-slate-800 border border-slate-700/60 shadow-lg backdrop-blur-md transition-all`}
+                className={`flex items-center justify-center ${isWidget && !isFullscreen ? 'w-8 h-8 rounded-lg' : 'w-9 h-9 sm:w-10 sm:h-10 rounded-xl'} bg-slate-900/85 text-slate-200 hover:bg-slate-800 border border-slate-700/60 shadow-lg backdrop-blur-md transition-all`}
                 title={isFullscreen ? 'Exit Fullscreen' : 'Layar Penuh 3D'}
               >
                 {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={isWidget ? 14 : 18} />}
@@ -2649,23 +2649,23 @@ export default function FloorPlan({
                 <>
                   <button 
                     onClick={handleDownloadImage} 
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all duration-300 shadow-lg bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-slate-100 border border-slate-700/50 backdrop-blur-xl group"
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 shadow-lg bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-slate-100 border border-slate-700/50 backdrop-blur-xl group"
                     title="Download Gambar Denah (PNG)"
                   >
-                    <ImageIcon size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" /> Foto Denah
+                    <ImageIcon size={15} className="text-emerald-400 group-hover:scale-110 transition-transform" /> <span className="hidden sm:inline">Foto Denah</span>
                   </button>
                   <button 
                     onClick={() => setIsExploreMode(!isExploreMode)} 
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all duration-300 shadow-lg backdrop-blur-xl border group ${isExploreMode ? 'bg-primary-500/20 text-primary-400 border-primary-500/50' : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-slate-100 border-slate-700/50'}`}
+                    className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 shadow-lg backdrop-blur-xl border group ${isExploreMode ? 'bg-primary-500/20 text-primary-400 border-primary-500/50' : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-slate-100 border-slate-700/50'}`}
                   >
-                    <User size={16} className={`${isExploreMode ? '' : 'text-indigo-400 group-hover:scale-110 transition-transform'}`} /> {isExploreMode ? 'Keluar Jelajah' : 'Jelajah Ruangan'}
+                    <User size={15} className={`${isExploreMode ? '' : 'text-indigo-400 group-hover:scale-110 transition-transform'}`} /> <span className="hidden sm:inline">{isExploreMode ? 'Keluar Jelajah' : 'Jelajah Ruangan'}</span>
                   </button>
                   {!isExploreMode && (
                     <button 
                       onClick={handleEnterEditMode} 
-                      className="flex items-center gap-2 px-5 py-2 rounded-xl font-bold transition-all duration-300 shadow-lg bg-primary-600/90 text-white hover:bg-primary-500 border border-primary-500/50 backdrop-blur-xl group"
+                      className="flex items-center gap-1.5 px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 shadow-lg bg-primary-600/90 text-white hover:bg-primary-500 border border-primary-500/50 backdrop-blur-xl group"
                     >
-                      <Edit3 size={16} className="group-hover:scale-110 transition-transform" /> Desain Layout
+                      <Edit3 size={15} className="group-hover:scale-110 transition-transform" /> <span>Desain</span><span className="hidden sm:inline"> Layout</span>
                     </button>
                   )}
                 </>
@@ -3106,16 +3106,32 @@ export default function FloorPlan({
           {/* Save button removed from floating - now in toolbar */}
         </div>
 
-        {/* SIDEBAR EDITOR */}
+        {/* SIDEBAR EDITOR (Slide-over drawer on mobile/tablet, docked on desktop) */}
         {editMode && (
-          <div className={`relative transition-all duration-300 flex-shrink-0 ${rightPanelOpen ? 'w-80' : 'w-0'}`}>
-            <button 
-              onClick={() => setRightPanelOpen(!rightPanelOpen)}
-              className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-16 bg-slate-800 border-y border-l border-slate-700 rounded-l-md flex items-center justify-center hover:bg-slate-700 text-slate-400 hover:text-slate-100 cursor-pointer shadow-lg transition-all duration-300 ${rightPanelOpen ? '-left-4' : '-left-8'}`}
+          <>
+            {rightPanelOpen && (
+              <div
+                className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-30 lg:hidden"
+                onClick={() => setRightPanelOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+            <div
+              className={`
+                fixed inset-y-0 right-0 z-40 lg:static lg:z-auto
+                transition-all duration-300 flex-shrink-0
+                ${rightPanelOpen ? 'w-[min(320px,88vw)] lg:w-80 translate-x-0' : 'w-0 translate-x-full lg:translate-x-0'}
+              `}
             >
-               {rightPanelOpen ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-            </button>
-            <div className={`w-80 h-full bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl transition-opacity duration-300 ${rightPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <button 
+                type="button"
+                onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                aria-label={rightPanelOpen ? 'Tutup panel properti' : 'Buka panel properti'}
+                className={`absolute top-1/2 -translate-y-1/2 z-20 w-6 lg:w-4 h-16 bg-slate-800 border-y border-l border-slate-700 rounded-l-md flex items-center justify-center hover:bg-slate-700 text-slate-300 hover:text-slate-100 cursor-pointer shadow-lg transition-all duration-300 ${rightPanelOpen ? '-left-6 lg:-left-4' : '-left-6 lg:-left-8'}`}
+              >
+                {rightPanelOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+              </button>
+              <div className={`w-[min(320px,88vw)] lg:w-80 h-full bg-slate-900 border border-slate-800 rounded-l-3xl lg:rounded-3xl p-4 sm:p-5 flex flex-col shadow-xl transition-opacity duration-300 ${rightPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             {/* TABS */}
             <div className="flex gap-2 mb-5 p-1 bg-slate-950 rounded-xl border border-slate-800">
               <button 
@@ -3837,6 +3853,7 @@ export default function FloorPlan({
             })()}
           </div>
         </div>
+          </>
         )}
       </div>
     </div>

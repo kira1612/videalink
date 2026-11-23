@@ -50,8 +50,8 @@ const dict = {
     signIn: 'Masuk',
     buy: 'Daftar',
     heroTitle: 'Videa Link.',
-    heroSub: 'Kendalikan perangkat IoT & ruangan 3D Anda.',
-    heroDesc: 'Hubungkan ESP32, ESP8266, dan sensor IoT via MQTT atau HTTP REST. Kelola Data Bucket otomatis, buat skenario automasi, dan desain denah Ruangan 3D interaktif dalam satu platform.',
+    heroSub: 'Kendali real-time untuk setiap perangkat dan ruang fisik.',
+    heroDesc: 'Platform terpadu untuk memantau telemetri, mengotomasi operasional, dan memvisualisasikan aset IoT Anda secara langsung dalam ruang 3D.',
     getStarted: 'Mulai Gratis',
     learnMore: 'Pelajari fitur',
     univConn: 'Konektivitas IoT & Ruangan 3D',
@@ -79,7 +79,7 @@ const dict = {
     featRoom3D: 'Ruangan 3D & Denah (Floor Plan)',
     featRoom3DDesc: 'Bangun denah ruangan 3D berbasis Three.js lengkap dengan tembok, pintu tunggal/ganda, serta template kamar (10x10, L-Shape, Apartemen 2 Ruang). Pasang & kontrol perangkat IoT langsung di 3D, gunakan Mode Jelajah Avatar (WASD), Export/Import JSON, dan sematkan (Pin) ke Dashboard.',
     featColor: 'Tema Warna & Mode UI',
-    featColorDesc: '5 warna aksen bawaan (Cyan, Emerald, Violet, Rose, Amber) ditambah Custom Hex Color dalam mode Gelap dan Terang. Seluruh grafik, sidebar, dan widget langsung berubah serta tersinkronisasi ke profil akun Anda.',
+    featColorDesc: '6 warna aksen bawaan (Blue, Cyan, Emerald, Violet, Rose, Amber) ditambah Custom Hex Color dalam mode Gelap dan Terang. Seluruh grafik, sidebar, dan widget langsung berubah serta tersinkronisasi ke profil akun Anda.',
     featRealtime: 'Dashboard Drag-and-Drop & Widget',
     featRealtimeDesc: 'Susun ulang layout dashboard secara bebas (drag-and-drop). Tersedia grafik Area, Line, Bar, Gauge, Sparkline, Thermostat Widget, dan Smart Switch ON/OFF dua arah via MQTT.',
     featBuckets: 'Auto-Discovery Data Bucket',
@@ -125,8 +125,8 @@ const dict = {
     signIn: 'Sign In',
     buy: 'Sign Up',
     heroTitle: 'Videa Link.',
-    heroSub: 'Command your IoT devices & 3D rooms.',
-    heroDesc: 'Connect ESP32, ESP8266, and IoT sensors via MQTT or HTTP REST. Manage auto-discovery Data Buckets, build IF-THEN automations, and design interactive 3D Rooms in one unified platform.',
+    heroSub: 'Real-time command for every connected device and space.',
+    heroDesc: 'One unified platform to stream telemetry, automate operations, and monitor your physical IoT infrastructure in live 3D.',
     getStarted: 'Start for Free',
     learnMore: 'Explore features',
     univConn: 'IoT Connectivity & 3D Rooms',
@@ -154,7 +154,7 @@ const dict = {
     featRoom3D: '3D Room & Floor Plan Editor',
     featRoom3DDesc: 'Design 3D rooms powered by Three.js with walls, single/double doors, and ready-made room templates (10x10, L-Shape, 2-Room Apartment). Place & toggle IoT devices right in 3D, walk around in WASD Avatar Mode, Export/Import JSON, and Pin rooms to your Dashboard.',
     featColor: 'Color Themes & UI Modes',
-    featColorDesc: '5 signature accent themes (Cyan, Emerald, Violet, Rose, Amber) plus Custom Hex Color across Dark and Light modes. Charts, sidebars, and widgets adapt immediately and sync to your user profile.',
+    featColorDesc: '6 signature accent themes (Blue, Cyan, Emerald, Violet, Rose, Amber) plus Custom Hex Color across Dark and Light modes. Charts, sidebars, and widgets adapt immediately and sync to your user profile.',
     featRealtime: 'Drag-and-Drop Dashboard & Widgets',
     featRealtimeDesc: 'Freely rearrange your dashboard layout with drag-and-drop. Includes Area, Line, Bar, Gauge, Sparkline charts, Thermostat Widget, and bi-directional MQTT Smart Switch controls.',
     featBuckets: 'Auto-Discovery Data Buckets',
@@ -287,17 +287,7 @@ export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lang, setLang] = useState('id'); // Language State
   const t = dict[lang];
-  const [activeTheme, setActiveTheme] = useState(() => {
-    try {
-      const savedTheme = localStorage.getItem('iot_theme');
-      const savedMode = localStorage.getItem('iot_mode') || 'dark';
-      if (savedTheme) {
-        const found = THEMES.find(t => t.id === `${savedMode}-${savedTheme}`);
-        if (found) return found;
-      }
-    } catch (e) {}
-    return THEMES[0];
-  });
+  const [activeTheme, setActiveTheme] = useState(THEMES[0]);
   const cycleTheme = () => {
     setActiveTheme(prev => {
       const currentMode = prev?.mode || 'dark';
@@ -307,12 +297,12 @@ export default function LandingPage() {
       const nextTheme = availableThemes[nextIndex] || THEMES[0];
 
       try {
-        const colorName = nextTheme?.id ? nextTheme.id.replace('dark-', '').replace('light-', '') : 'cyan';
+        const colorName = nextTheme?.id ? nextTheme.id.replace('dark-', '').replace('light-', '') : 'blue';
         localStorage.setItem('iot_theme', colorName);
-        localStorage.setItem('iot_theme_color', nextTheme.primary || '#06b6d4');
+        localStorage.setItem('iot_theme_color', nextTheme.primary || '#0075ff');
         localStorage.setItem('iot_mode', nextTheme.mode || 'dark');
 
-        if (colorName === 'cyan') {
+        if (colorName === 'blue') {
           document.documentElement.removeAttribute('data-theme');
         } else {
           document.documentElement.setAttribute('data-theme', colorName);
@@ -345,7 +335,7 @@ export default function LandingPage() {
     setLang(lang === 'id' ? 'en' : 'id');
   };
 
-  const primaryColor = activeTheme?.primary || '#06b6d4';
+  const primaryColor = activeTheme?.primary || '#0075ff';
   const silk = getSilkPaletteTokens(primaryColor);
   const darkThemes = THEMES.filter((th) => th.mode === 'dark');
 
@@ -356,7 +346,7 @@ export default function LandingPage() {
       localStorage.setItem('iot_theme', colorName);
       localStorage.setItem('iot_theme_color', th.primary);
       localStorage.setItem('iot_mode', th.mode || 'dark');
-      if (colorName === 'cyan') {
+      if (colorName === 'blue') {
         document.documentElement.removeAttribute('data-theme');
       } else {
         document.documentElement.setAttribute('data-theme', colorName);
@@ -367,7 +357,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-[#04050b] text-white font-sans antialiased selection:bg-white/20 overflow-x-hidden"
+      className="relative min-h-screen bg-[#04050b] text-white font-sans antialiased selection:bg-white/20 [overflow-x:clip]"
       style={{
         // Lock dark surface tokens so global [data-mode="light"] never breaks LandingPage text contrast
         '--surface-50': '255 255 255',
@@ -405,6 +395,7 @@ export default function LandingPage() {
       <header
         className="fixed top-0 inset-x-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-300"
         style={{
+          paddingTop: 'env(safe-area-inset-top)',
           backgroundColor: scrollY > 24 ? silk.deepRgba(0.76) : 'transparent',
           backdropFilter: scrollY > 24 ? 'blur(20px)' : 'none',
           WebkitBackdropFilter: scrollY > 24 ? 'blur(20px)' : 'none',
@@ -444,33 +435,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right: Quiet Theme Swatches, Language Toggle & Stark White Pill CTA */}
+          {/* Right: Language Toggle & Stark White Pill CTA */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="hidden md:flex items-center gap-0.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.09]">
-              {darkThemes.map((th) => {
-                const isSelected = activeTheme?.primary?.toLowerCase() === th.primary.toLowerCase();
-                return (
-                  <button
-                    key={th.id}
-                    type="button"
-                    onClick={() => selectThemeSwatch(th)}
-                    title={th.label[lang] || th.label.id}
-                    aria-label={th.label[lang] || th.label.id}
-                    className="p-1.5 rounded-full cursor-pointer flex items-center justify-center group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full transition-[transform,opacity] duration-200 ${
-                        isSelected
-                          ? 'scale-125 ring-2 ring-white/95'
-                          : 'opacity-50 group-hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: th.primary }}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-
             <button
               onClick={toggleLanguage}
               className="min-h-[36px] min-w-[38px] text-[12px] font-medium text-white/70 hover:text-white transition-[color,background-color,transform] duration-200 active:scale-[0.96] hover:bg-white/[0.06] rounded-full px-3 py-1.5 select-none cursor-pointer"
@@ -499,8 +465,8 @@ export default function LandingPage() {
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
           <div
-            className="lg:hidden px-6 py-4 flex flex-col gap-3 backdrop-blur-2xl border-b border-white/[0.10]"
-            style={{ backgroundColor: silk.deepRgba(0.92) }}
+            className="lg:hidden px-5 py-3 flex flex-col gap-1 backdrop-blur-2xl border-b border-white/[0.10]"
+            style={{ backgroundColor: silk.deepRgba(0.94) }}
           >
             {[
               { href: '#overview', label: t.overview },
@@ -513,7 +479,7 @@ export default function LandingPage() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-normal text-white/80 hover:text-white py-1.5 transition-colors"
+                className="min-h-[44px] flex items-center px-3 rounded-xl text-[15px] font-normal text-white/85 hover:text-white hover:bg-white/[0.06] transition-colors"
               >
                 {item.label}
               </a>
@@ -525,9 +491,19 @@ export default function LandingPage() {
       {/* ── WEIGHTLESS EDITORIAL HERO (ANTIGRAVITY.GOOGLE ARCHITECTURE OVER LIVE WEBGL) ── */}
       <section
         id="overview"
-        className="relative z-10 pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 overflow-hidden"
+        className="relative z-10 pt-28 sm:pt-36 pb-20 sm:pb-28 px-6 overflow-hidden"
         style={{ position: 'relative' }}
       >
+        {/* Seamless radial legibility scrim so bright silk wave crests never wash out hero copy */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 62% 54% at 50% 56%, rgba(3, 6, 16, 0.76) 0%, rgba(3, 6, 16, 0.44) 50%, transparent 82%)',
+          }}
+        />
+
         <div className="w-full max-w-[1160px] mx-auto flex flex-col items-center text-center relative z-10">
           {/* Calm Brand Lockup above Headline */}
           <FadeIn delay={60} className="w-full flex justify-center">
@@ -537,7 +513,7 @@ export default function LandingPage() {
                 alt="Videa Link Icon"
                 className="w-5 h-5 object-contain"
               />
-              <span className="text-[15px] font-medium tracking-[-0.015em] text-white/85">
+              <span className="text-[15px] font-medium tracking-[-0.015em] text-white/90">
                 Videa Link
               </span>
             </div>
@@ -546,31 +522,32 @@ export default function LandingPage() {
           {/* Editorial Regular/Medium Display Headline (Antigravity signature weight & spacing) */}
           <FadeIn delay={120} className="w-full">
             <h1
-              className="text-[2.6rem] sm:text-6xl md:text-[4.5rem] lg:text-[5rem] leading-[1.05] font-normal tracking-[-0.04em] text-white max-w-[920px] mx-auto"
+              className="text-[clamp(2.1rem,7.8vw,5rem)] leading-[1.06] font-normal tracking-[-0.04em] text-white max-w-[920px] mx-auto"
               style={{
                 textWrap: 'balance',
-                textShadow: '0 10px 36px rgba(0, 0, 0, 0.45)',
+                textShadow: '0 8px 32px rgba(2, 5, 14, 0.75), 0 2px 8px rgba(2, 5, 14, 0.65)',
               }}
             >
-              {lang === 'id'
-                ? 'Kendalikan perangkat IoT dan ruangan 3D dalam satu ruang kerja.'
-                : 'Control IoT devices and 3D rooms from one workspace.'}
+              {t.heroSub}
             </h1>
           </FadeIn>
 
           <FadeIn delay={180} className="mt-6 flex flex-col items-center w-full">
             <p
-              className="text-base sm:text-lg text-white/65 max-w-[600px] mx-auto font-normal leading-relaxed"
-              style={{ textWrap: 'pretty' }}
+              className="text-[15px] sm:text-lg text-white/92 max-w-[600px] mx-auto font-normal leading-relaxed"
+              style={{
+                textWrap: 'pretty',
+                textShadow: '0 2px 18px rgba(2, 5, 14, 0.92), 0 1px 4px rgba(2, 5, 14, 0.95)',
+              }}
             >
               {t.heroDesc}
             </p>
 
-            {/* Stark Monochrome Primary Pill + Minimal Frosted Secondary Pill */}
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            {/* Stark Monochrome Primary Pill + Crisp Frosted Secondary Pill */}
+            <div className="mt-8 sm:mt-9 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-xs sm:max-w-none">
               <Link
                 to="/login?mode=register"
-                className="min-h-[48px] inline-flex items-center gap-2 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
+                className="min-h-[48px] inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
               >
                 <span>{t.getStarted}</span>
                 <ArrowRight size={15} />
@@ -578,62 +555,10 @@ export default function LandingPage() {
 
               <a
                 href="#features"
-                className="min-h-[48px] inline-flex items-center gap-1.5 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] text-white/90 hover:text-white backdrop-blur-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.15] transition-[transform,background-color,border-color,color] duration-200 active:scale-[0.96] select-none"
+                className="min-h-[48px] inline-flex items-center justify-center gap-1.5 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] text-white hover:text-white backdrop-blur-xl bg-[#040714]/55 hover:bg-[#040714]/75 border border-white/25 transition-[transform,background-color,border-color,color] duration-200 active:scale-[0.96] select-none"
               >
                 <span>{t.learnMore}</span>
               </a>
-            </div>
-          </FadeIn>
-
-          {/* ── ANTIGRAVITY-STYLE CENTERED PRODUCT VIEWPORT SHOWCASE ── */}
-          <FadeIn delay={260} className="w-full mt-16 sm:mt-24">
-            <div
-              className="relative w-full max-w-[1080px] mx-auto rounded-[28px] p-2 sm:p-2.5 backdrop-blur-2xl border border-white/[0.12] overflow-hidden"
-              style={{
-                background: silk.cardSurface,
-                boxShadow: `inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 40px 100px -24px rgba(0, 0, 0, 0.85)`,
-              }}
-            >
-              {/* Concentric inner cinema window: 28px outer - 10px padding = 18px inner */}
-              <div
-                className="rounded-[18px] overflow-hidden bg-[#05070e]"
-                style={{
-                  outline: '1px solid rgba(255, 255, 255, 0.10)',
-                  outlineOffset: '-1px',
-                }}
-              >
-                {/* Minimal Workspace Title Bar */}
-                <div className="px-4 sm:px-5 py-3 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
-                    <span className="ml-2 font-mono text-[11px] text-white/45 tracking-wide">
-                      videalink.app / 3d-room-editor
-                    </span>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2 font-mono text-[11px] text-white/55">
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{
-                        backgroundColor: silk.mid,
-                        boxShadow: `0 0 8px ${silk.mid}`,
-                      }}
-                    />
-                    <span>MQTT · REST · Heartbeat 60s</span>
-                  </div>
-                </div>
-
-                {/* Product Showcase Media */}
-                <div className="relative aspect-[16/9] w-full overflow-hidden">
-                  <img
-                    src="/assets/room3d.jpg"
-                    alt="Videa Link 3D Room Editor & Live IoT Telemetry"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#04050b]/55 via-transparent to-transparent pointer-events-none" />
-                </div>
-              </div>
             </div>
           </FadeIn>
         </div>
@@ -734,7 +659,7 @@ export default function LandingPage() {
           {/* Right Column: Serene Frosted Cinema Stage framing IoTAnimation */}
           <FadeIn delay={220} direction="left" className="lg:col-span-7 relative w-full flex items-center justify-center">
             <div
-              className="relative w-full aspect-[16/11] rounded-[28px] p-3 sm:p-5 backdrop-blur-2xl border border-white/[0.12] flex items-center justify-center overflow-hidden"
+              className="relative w-full aspect-[4/3] sm:aspect-[16/11] rounded-[24px] sm:rounded-[28px] p-2.5 sm:p-5 backdrop-blur-2xl border border-white/[0.12] flex items-center justify-center overflow-hidden"
               style={{
                 background: silk.cardSurface,
                 boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.8)',
@@ -746,15 +671,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── MACBOOK-STYLE FEATURE SHOWCASE ── */}
-      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
-        <FeatureShowcase
-          t={t}
-          lang={lang}
-          activeTheme={activeTheme}
-          onThemeChange={setActiveTheme}
-        />
-      </FadeIn>
+      {/* ── SCROLL-DRIVEN STICKY FEATURE SHOWCASE ── */}
+      <FeatureShowcase
+        t={t}
+        lang={lang}
+        activeTheme={activeTheme}
+        onThemeChange={setActiveTheme}
+      />
 
       {/* ── INDUSTRY SHOWCASE (SETELAH FITUR) ── */}
       <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>

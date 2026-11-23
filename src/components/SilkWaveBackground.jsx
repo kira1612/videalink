@@ -1,8 +1,28 @@
 import React, { useEffect, useRef } from 'react';
 
-// Single-hue tonal neon palettes matched cleanly to VideaLink's 5 theme accents.
+// Single-hue tonal neon palettes matched cleanly to VideaLink's 6 theme accents.
 // Each theme stays cohesive in one color family (luminous light tint -> vivid primary -> deep tonal shade).
 const PALETTES = {
+  '#0075ff': {
+    left: [0.38, 0.68, 1.0],       // Luminous Sky Cobalt
+    mid: [0.04, 0.46, 1.0],        // Vivid Electric Royal Blue
+    right: [0.05, 0.26, 0.86],     // Deep Sapphire Blue
+    duneLeft: [0.08, 0.30, 0.72],
+    duneMid: [0.05, 0.22, 0.62],
+    duneRight: [0.04, 0.14, 0.48],
+    surfaceRgb: [8, 14, 34],
+    deepRgb: [4, 7, 18],
+  },
+  '#005ed4': {
+    left: [0.38, 0.68, 1.0],
+    mid: [0.04, 0.46, 1.0],
+    right: [0.05, 0.26, 0.86],
+    duneLeft: [0.08, 0.30, 0.72],
+    duneMid: [0.05, 0.22, 0.62],
+    duneRight: [0.04, 0.14, 0.48],
+    surfaceRgb: [8, 14, 34],
+    deepRgb: [4, 7, 18],
+  },
   '#06b6d4': {
     left: [0.42, 0.92, 1.0],       // Luminous Ice Cyan
     mid: [0.04, 0.76, 0.88],       // Vivid VideaLink Cyan
@@ -116,9 +136,9 @@ const DEFAULT_SECTIONS = [
   'footer',
 ];
 
-function resolvePalette(hex = '#06b6d4') {
+function resolvePalette(hex = '#0075ff') {
   const key = String(hex).toLowerCase();
-  return PALETTES[key] || PALETTES['#06b6d4'];
+  return PALETTES[key] || PALETTES['#0075ff'];
 }
 
 function rgbFloatToHex(rgb) {

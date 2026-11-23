@@ -3547,8 +3547,8 @@ export default function BucketDetail() {
 
       {/* ─── Tab Content: Raw Records ─── */}
       {activeTab === 'records' && (
-        <div className="glass-card p-6 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
+        <div className="glass-card p-4 sm:p-6 animate-fade-in">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h4 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
               <Database size={18} className="text-violet-400" /> Raw Records
             </h4>
@@ -3628,8 +3628,8 @@ export default function BucketDetail() {
               </div>
 
               {/* Clickable Segmented Stepper Tabs */}
-              <div className="px-5 sm:px-6 pt-4 pb-2 shrink-0">
-                <div className="grid grid-cols-3 gap-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80">
+              <div className="px-4 sm:px-6 pt-4 pb-2 shrink-0">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-2 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80">
                   {[
                     { step: 1, label: 'Tipe Widget', sub: '25 Visualisasi', icon: LayoutGrid },
                     { step: 2, label: 'Gaya & Grid', sub: 'Warna & Ukuran', icon: Palette },

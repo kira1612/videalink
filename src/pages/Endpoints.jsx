@@ -526,7 +526,7 @@ export default function Endpoints() {
       <QuotaNoticeBanner quota={endpointQuota} />
 
       {/* Quiet Single-Row Metric Strip */}
-      <div className="ops-surface grid grid-cols-3 divide-x" style={{ borderColor: 'rgb(var(--surface-700) / 0.5)' }}>
+      <div className="ops-surface grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: 'rgb(var(--surface-700) / 0.5)' }}>
         <div className="px-4 py-3.5" style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}>
           <p className="text-[11px] font-medium" style={{ color: 'rgb(var(--surface-400))' }}>
             Total Endpoint
@@ -597,7 +597,7 @@ export default function Endpoints() {
           className="px-4 py-3 border-b flex flex-col md:flex-row md:items-center justify-between gap-3"
           style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
         >
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 md:max-w-xs">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -672,7 +672,7 @@ export default function Endpoints() {
               <div key={i} className="px-4 py-4 flex items-center justify-between gap-4 animate-pulse">
                 <div className="space-y-2 flex-1 max-w-md">
                   <div className="h-3.5 w-44 rounded" style={{ backgroundColor: 'rgb(var(--surface-700) / 0.6)' }} />
-                  <div className="h-3 w-72 rounded" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
+                  <div className="h-3 w-full max-w-[18rem] rounded" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
                 </div>
                 <div className="h-8 w-24 rounded-lg" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
               </div>

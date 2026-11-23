@@ -432,7 +432,7 @@ export default function Buckets() {
 
       {/* ── TOOLBAR ── */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
           <input
             type="search" value={search} onChange={e => setSearch(e.target.value)}
@@ -444,7 +444,7 @@ export default function Buckets() {
           {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"><X size={13} /></button>}
         </div>
 
-        <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+        <div className="flex items-center gap-1 flex-shrink-0 self-end sm:self-auto sm:ml-auto">
           {[{ v: 'grid', I: LayoutGrid }, { v: 'list', I: List }].map(({ v, I }) => (
             <button key={v} onClick={() => setView(v)}
               className="w-8 h-8 flex items-center justify-center rounded-lg transition-all"

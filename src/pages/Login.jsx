@@ -140,6 +140,9 @@ export default function Login() {
       } else {
         res = await authApi.register(name, email, password);
       }
+      if (!res?.data || typeof res.data !== 'object' || !res.data.token || !res.data.user) {
+        throw new Error('Respons server tidak valid (bukan JSON). Pastikan backend berjalan normal.');
+      }
       clearPendingPrefsSync();
       clearLegacyGlobalPrefs();
       localStorage.setItem('iot_token', res.data.token);
@@ -174,7 +177,7 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center justify-center bg-[#04050b] text-white relative overflow-hidden font-sans antialiased selection:bg-white/20 py-20 px-4 sm:px-6"
+      className="min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#04050b] text-white relative overflow-x-hidden font-sans antialiased selection:bg-white/20 pt-24 pb-12 sm:py-20 px-4 sm:px-6"
       style={{
         '--surface-50': '255 255 255',
         '--surface-100': '247 250 252',
@@ -219,10 +222,13 @@ export default function Login() {
 
       {/* ── TOP MINIMAL FLOATING BAR (BACK LINK + 5 THEME SWATCHES) ── */}
       {!showGameTransition && (
-        <header className="fixed top-4 md:top-6 inset-x-0 z-40 px-4 md:px-8 flex items-center justify-between pointer-events-none">
+        <header
+          className="fixed inset-x-0 z-40 px-3 sm:px-4 md:px-8 flex items-center justify-between gap-2 pointer-events-none"
+          style={{ top: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <Link
             to="/"
-            className="pointer-events-auto min-h-[40px] inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-[13px] font-medium text-white/80 hover:text-white backdrop-blur-2xl border border-white/[0.14] hover:border-white/[0.26] transition-[transform,color,border-color,background-color] duration-200 active:scale-[0.96] group"
+            className="pointer-events-auto min-h-[40px] inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-[13px] font-medium text-white/80 hover:text-white backdrop-blur-2xl border border-white/[0.14] hover:border-white/[0.26] transition-[transform,color,border-color,background-color] duration-200 active:scale-[0.96] group shrink-0"
             style={{
               background: silk.pillSurface,
               boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.16), 0 10px 28px -8px rgba(0, 0, 0, 0.65)',
@@ -232,7 +238,8 @@ export default function Login() {
               size={15}
               className="group-hover:-translate-x-0.5 transition-transform duration-200"
             />
-            <span>Kembali ke Beranda</span>
+            <span className="hidden sm:inline">Kembali ke Beranda</span>
+            <span className="sm:hidden">Beranda</span>
           </Link>
 
           {/* 5 Single-Hue Theme Swatches */}

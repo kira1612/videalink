@@ -2,40 +2,49 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Bell, Search, RefreshCw, Check, Activity, AlertCircle,
-  CheckCircle2, XCircle, Settings, User, Menu
+  CheckCircle2, XCircle, Settings, User, Menu, X
 } from 'lucide-react';
 
 const mockNotifications = [
-  { id: 1, type: 'warning', title: 'Device offline',     body: 'ESP32-Lab-02 has been offline for 5m', time: '5m ago',  read: false },
-  { id: 2, type: 'success', title: 'Data synced',        body: 'Bucket "sensors-prod" synced 1.2k rows', time: '18m ago', read: false },
-  { id: 3, type: 'info',    title: 'Endpoint triggered', body: 'Webhook /api/alert was triggered',     time: '1h ago',  read: true },
+  { id: 1, type: 'warning', title: 'Device offline', body: 'ESP32-Lab-02 has been offline for 5m', time: '5m ago', read: false },
+  { id: 2, type: 'success', title: 'Data synced', body: 'Bucket "sensors-prod" synced 1.2k rows', time: '18m ago', read: false },
+  { id: 3, type: 'info', title: 'Endpoint triggered', body: 'Webhook /api/alert was triggered', time: '1h ago', read: true },
 ];
 
 const notifType = {
-  warning: { Icon: AlertCircle,  bg: 'bg-amber-500/10',   text: 'text-amber-400',   dot: 'bg-amber-400' },
+  warning: { Icon: AlertCircle, bg: 'bg-amber-500/10', text: 'text-amber-400', dot: 'bg-amber-400' },
   success: { Icon: CheckCircle2, bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-400' },
-  info:    { Icon: Activity,     bg: 'bg-primary-500/10', text: 'text-primary-400', dot: 'bg-primary-400' },
-  error:   { Icon: XCircle,      bg: 'bg-rose-500/10',    text: 'text-rose-400',    dot: 'bg-rose-400'   },
+  info: { Icon: Activity, bg: 'bg-primary-500/10', text: 'text-primary-400', dot: 'bg-primary-400' },
+  error: { Icon: XCircle, bg: 'bg-rose-500/10', text: 'text-rose-400', dot: 'bg-rose-400' },
 };
 
 export default function Navbar({ title, onOpenMobileNav }) {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(() => {
-    const s = localStorage.getItem('iot_user');
-    return s ? JSON.parse(s) : { name: 'Administrator', email: 'admin@platform.io' };
+    try {
+      const s = localStorage.getItem('iot_user');
+      const parsed = s ? JSON.parse(s) : null;
+      return parsed && typeof parsed === 'object' ? parsed : { name: 'Administrator', email: 'admin@platform.io' };
+    } catch {
+      return { name: 'Administrator', email: 'admin@platform.io' };
+    }
   });
-  const [notifOpen, setNotifOpen]     = useState(false);
-  const [notifs, setNotifs]           = useState(mockNotifications);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [notifs, setNotifs] = useState(mockNotifications);
   const [searchQuery, setSearchQuery] = useState('');
-  const [refreshing, setRefreshing]   = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const notifRef = useRef(null);
 
   const unread = notifs.filter(n => !n.read).length;
 
   useEffect(() => {
     const h = () => {
-      const s = localStorage.getItem('iot_user');
-      if (s) setCurrentUser(JSON.parse(s));
+      try {
+        const s = localStorage.getItem('iot_user');
+        const parsed = s ? JSON.parse(s) : null;
+        if (parsed && typeof parsed === 'object') setCurrentUser(parsed);
+      } catch { }
     };
     window.addEventListener('user-updated', h);
     return () => window.removeEventListener('user-updated', h);
@@ -68,37 +77,52 @@ export default function Navbar({ title, onOpenMobileNav }) {
     else if (q.includes('auto')) navigate('/app/automations');
     else if (q.includes('set') || q.includes('prof')) navigate('/app/settings');
     else if (q.includes('doc') || q.includes('guide') || q.includes('panduan')) navigate('/app/guide');
+    setMobileSearchOpen(false);
   };
 
   return (
-    <header className="sticky top-0 z-30 pt-4 pb-3 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 bg-slate-950/80 backdrop-blur-xl transition-colors duration-300">
-      {/* ── Left: Hamburger (mobile/tablet) + Breadcrumbs ── */}
+    <header
+      className="sticky top-0 z-30 pb-2.5 sm:pb-3 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl transition-colors duration-300 border-b border-slate-800/40 sm:border-b-0"
+      style={{ paddingTop: 'max(0.65rem, env(safe-area-inset-top))' }}
+    >
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+      {/* ── Left: Brand Mark (mobile) + Breadcrumbs ── */}
       <div className="flex items-center gap-2.5 min-w-0">
         {onOpenMobileNav && (
           <button
             type="button"
             onClick={onOpenMobileNav}
-            className="lg:hidden p-2 -ml-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+            className="hidden sm:flex lg:hidden w-10 h-10 -ml-1 items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
             title="Buka Menu Navigasi"
             aria-label="Buka Menu Navigasi"
           >
-            <Menu size={18} />
+            <Menu size={19} />
           </button>
         )}
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[11px] sm:text-[12px]">
+          <div className="hidden sm:flex items-center gap-1.5 text-[12px]">
             <span className="text-slate-400 font-normal">Pages</span>
             <span className="text-slate-500">/</span>
             <span className="text-slate-100 font-medium truncate">{title}</span>
           </div>
-          <h1 className="text-[14px] sm:text-[15px] font-extrabold text-slate-100 tracking-tight mt-0.5 truncate">
+          <h1 className="text-[15px] font-extrabold text-slate-100 tracking-tight sm:mt-0.5 truncate">
             {title}
           </h1>
         </div>
       </div>
 
       {/* ── Right: Search Pill + User + Settings + Bell ── */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0">
+        {/* Mobile Search Toggle */}
+        <button
+          type="button"
+          onClick={() => setMobileSearchOpen(v => !v)}
+          className="sm:hidden w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
+          aria-label="Cari halaman"
+        >
+          {mobileSearchOpen ? <X size={16} /> : <Search size={16} />}
+        </button>
+
         {/* Search Input ("Type here...") */}
         <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
           <Search
@@ -110,14 +134,14 @@ export default function Navbar({ title, onOpenMobileNav }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Type here..."
-            className="w-[190px] lg:w-[220px] pl-9 pr-3.5 py-2 rounded-2xl text-[12px] text-slate-100 placeholder-slate-500 bg-slate-800/90 border border-slate-700/70 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all duration-200"
+            className="w-[180px] md:w-[200px] lg:w-[220px] pl-9 pr-3.5 py-2 rounded-2xl text-[12px] text-slate-100 placeholder-slate-500 bg-slate-800/90 border border-slate-700/70 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all duration-200"
           />
         </form>
 
         {/* User / Profile Button */}
         <Link
           to="/app/settings"
-          className="flex items-center gap-1.5 text-[12px] font-bold text-slate-300 hover:text-primary-400 transition-colors px-1.5 py-1"
+          className="hidden sm:flex items-center gap-1.5 text-[12px] font-bold text-slate-300 hover:text-primary-400 transition-colors px-1.5 py-1 min-h-[36px]"
           title="Profile & Account"
         >
           <User size={14} style={{ color: 'rgb(var(--primary-400))' }} />
@@ -126,25 +150,25 @@ export default function Navbar({ title, onOpenMobileNav }) {
           </span>
         </Link>
 
-        {/* Settings Icon */}
+        {/* Settings Icon (hidden on xs since accessible via Bottom Nav Menu) */}
         <Link
           to="/app/settings"
-          className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
+          className="hidden sm:flex w-9 h-9 items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
           title="Settings"
           aria-label="Settings"
         >
-          <Settings size={15} />
+          <Settings size={16} />
         </Link>
 
         {/* Refresh Icon */}
         <button
           id="navbar-refresh"
           onClick={handleRefresh}
-          className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
           title="Refresh"
           aria-label="Refresh data"
         >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
         </button>
 
         {/* Notifications Bell */}
@@ -152,13 +176,13 @@ export default function Navbar({ title, onOpenMobileNav }) {
           <button
             id="navbar-notifications"
             onClick={() => setNotifOpen(v => !v)}
-            className="relative w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
+            className="relative w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-all"
             aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ''}`}
           >
-            <Bell size={15} />
+            <Bell size={16} />
             {unread > 0 && (
               <span
-                className="absolute top-1.5 right-1.5 w-[6px] h-[6px] rounded-full ring-[1.5px] ring-slate-950"
+                className="absolute top-2 right-2 w-[6px] h-[6px] rounded-full ring-[1.5px] ring-slate-950"
                 style={{ background: 'rgb(var(--primary-500))' }}
               />
             )}
@@ -166,7 +190,7 @@ export default function Navbar({ title, onOpenMobileNav }) {
 
           {notifOpen && (
             <div
-              className="absolute right-0 top-11 w-[310px] rounded-2xl overflow-hidden shadow-2xl vision-card"
+              className="absolute right-0 top-12 w-[min(calc(100vw-1.5rem),330px)] rounded-2xl overflow-hidden shadow-2xl vision-card z-50"
               style={{ animation: 'fadeInDown 0.15s ease-out' }}
             >
               {/* Header */}
@@ -232,6 +256,25 @@ export default function Navbar({ title, onOpenMobileNav }) {
           )}
         </div>
       </div>
+      </div>
+
+      {/* Mobile Expandable Quick Search */}
+      {mobileSearchOpen && (
+        <form onSubmit={handleSearchSubmit} className="sm:hidden relative mt-2.5">
+          <Search
+            size={14}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+          <input
+            type="search"
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari halaman (devices, buckets, settings)..."
+            className="w-full min-h-[42px] pl-9 pr-3.5 py-2 rounded-xl text-[13px] text-slate-100 placeholder-slate-500 bg-slate-800/90 border border-slate-700/70 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+          />
+        </form>
+      )}
     </header>
   );
 }

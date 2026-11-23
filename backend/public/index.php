@@ -1,5 +1,9 @@
 <?php
 
+// Prevent PHP 8.5/8.6 deprecation notices from corrupting JSON responses before Laravel boots
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 

@@ -114,11 +114,12 @@ function VisionChartTooltip({ active, payload, label }) {
 function DeviceProgressBar({ online, total }) {
   const onlinePct = total > 0 ? Math.round((online / total) * 100) : 0;
   return (
-    <div className="space-y-1.5 mt-3 pt-3 border-t border-slate-700/40">
-      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-        <span>Ketersediaan Node</span>
-        <span className={onlinePct > 0 ? "text-emerald-400 font-bold" : "text-slate-400"}>
-          {online} / {total} Unit ({onlinePct}%)
+    <div className="space-y-1 sm:space-y-1.5 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-700/40">
+      <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-semibold text-slate-400">
+        <span className="truncate">Node</span>
+        <span className={`shrink-0 tabular-nums ${onlinePct > 0 ? "text-emerald-400 font-bold" : "text-slate-400"}`}>
+          <span className="hidden sm:inline">{online} / {total} Unit ({onlinePct}%)</span>
+          <span className="sm:hidden">{online}/{total} ({onlinePct}%)</span>
         </span>
       </div>
       <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex">
@@ -133,14 +134,14 @@ function DeviceProgressBar({ online, total }) {
 
 function SignalPulseWave({ isOnline, latency = '24ms' }) {
   return (
-    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/40 text-[11px]">
-      <div className="flex items-center gap-1.5 text-slate-400 font-medium">
-        <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-        <span>{isOnline ? 'MQTT Broker Live' : 'Node Standby'}</span>
+    <div className="flex items-center justify-between gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-700/40 text-[10px] sm:text-[11px]">
+      <div className="flex items-center gap-1.5 text-slate-400 font-medium min-w-0">
+        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+        <span className="truncate">{isOnline ? 'MQTT Live' : 'Standby'}</span>
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-mono text-slate-400">{latency}</span>
-        <div className="flex items-end gap-0.5 h-3">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400">{latency}</span>
+        <div className="hidden sm:flex items-end gap-0.5 h-3">
           <span className={`w-1 rounded-sm ${isOnline ? 'bg-emerald-400 h-1.5' : 'bg-slate-600 h-1'}`} />
           <span className={`w-1 rounded-sm ${isOnline ? 'bg-emerald-400 h-2.5' : 'bg-slate-600 h-1'}`} />
           <span className={`w-1 rounded-sm ${isOnline ? 'bg-emerald-400 h-3.5' : 'bg-slate-600 h-1'}`} />
@@ -155,17 +156,18 @@ function MiniSparkline({ label = 'Throughput Telemetri' }) {
     { v: 18 }, { v: 26 }, { v: 22 }, { v: 34 }, { v: 29 }, { v: 42 }, { v: 38 }, { v: 49 },
   ];
   return (
-    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/40">
-      <div className="text-[11px] font-medium text-slate-400">
-        <span>{label}</span>
+    <div className="flex items-center justify-between gap-1.5 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-700/40">
+      <div className="text-[10px] sm:text-[11px] font-medium text-slate-400 truncate">
+        <span className="hidden sm:inline">{label}</span>
+        <span className="sm:hidden">Telemetri</span>
       </div>
-      <div className="w-24 h-6 flex items-center">
+      <div className="w-16 sm:w-24 h-5 sm:h-6 flex items-center shrink-0">
         <BklitAreaSparkline
           data={sparkData}
           dataKey="v"
           color="rgb(var(--primary-400))"
-          width={96}
-          height={22}
+          width={80}
+          height={20}
           showHighlight={true}
           interactive={false}
         />
@@ -176,16 +178,16 @@ function MiniSparkline({ label = 'Throughput Telemetri' }) {
 
 function EndpointPipeline({ active, total }) {
   return (
-    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/40 text-[11px]">
-      <div className="flex items-center gap-1.5 text-slate-400 font-medium truncate">
+    <div className="flex items-center justify-between gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-700/40 text-[10px] sm:text-[11px]">
+      <div className="flex items-center gap-1 text-slate-400 font-medium truncate">
         <span className="text-primary-400 font-bold">MQTT</span>
         <span className="text-slate-600">→</span>
-        <span>Webhook Relay</span>
+        <span className="truncate">Relay</span>
       </div>
-      <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+      <span className={`text-[9.5px] sm:text-[10px] font-extrabold px-1.5 py-0.5 rounded shrink-0 ${
         active > 0 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-slate-700/40 text-slate-400'
       }`}>
-        {total === 0 ? '0 Route' : `${active} / ${total} Aktif`}
+        {total === 0 ? '0 Route' : `${active}/${total}`}
       </span>
     </div>
   );
@@ -211,44 +213,44 @@ function VisionStatCard({
   };
 
   return (
-    <div className={`vision-card p-4 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:border-primary-500/30 hover:shadow-lg hover:shadow-primary-500/5 flex flex-col justify-between w-full min-w-0 max-w-full ${className || 'min-h-[160px]'}`}>
+    <div className={`vision-card p-3 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:border-primary-500/30 hover:shadow-lg hover:shadow-primary-500/5 flex flex-col justify-between w-full min-w-0 max-w-full ${className || 'min-h-[118px] sm:min-h-[160px]'}`}>
       {/* Top Edge Laser Accent */}
       <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-primary-500/40 to-transparent pointer-events-none" />
 
       {/* Ambient Radial Theme Glow in Background */}
-      <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-primary-500/10 blur-2xl group-hover:bg-primary-500/15 transition-all pointer-events-none" />
+      <div className="absolute -right-6 -bottom-6 w-24 sm:w-32 h-24 sm:h-32 rounded-full bg-primary-500/10 blur-2xl group-hover:bg-primary-500/15 transition-all pointer-events-none" />
 
       {/* Background Watermark Icon — Dynamic Theme Color (Stationary, No Movement) */}
       {Icon && (
         <div className="absolute -right-2 top-2 sm:right-1 sm:top-1 pointer-events-none text-primary-500/[0.08] dark:text-primary-400/[0.11] group-hover:text-primary-500/[0.16] dark:group-hover:text-primary-400/[0.18] transition-opacity duration-300 select-none">
-          <Icon size={96} strokeWidth={1.3} />
+          <Icon className="w-14 h-14 sm:w-24 sm:h-24" strokeWidth={1.3} />
         </div>
       )}
 
       {/* Foreground Content */}
       <div className="relative z-10">
         {/* Top Header Row: Category Label (Left) + Status Badge (Right) */}
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 truncate">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+          <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-400 truncate">
             {label}
           </p>
 
           {badgeText && (
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeColors[badgeVariant] || badgeColors.neutral} flex-shrink-0 shadow-sm`}
+              className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[9.5px] sm:text-[11px] font-bold border ${badgeColors[badgeVariant] || badgeColors.neutral} self-start sm:self-auto flex-shrink-0 shadow-sm max-w-full truncate`}
             >
-              {BadgeIcon && <BadgeIcon size={12} className="flex-shrink-0" />}
-              {badgeText}
+              {BadgeIcon && <BadgeIcon size={10} className="flex-shrink-0 hidden sm:inline" />}
+              <span className="truncate">{badgeText}</span>
             </span>
           )}
         </div>
 
         {/* Value Section */}
-        <div className="mt-3">
+        <div className="mt-2 sm:mt-3">
           {loading ? (
-            <div className="h-8 w-28 rounded-lg bg-slate-800 animate-pulse my-0.5" />
+            <div className="h-6 sm:h-8 w-20 sm:w-28 rounded-lg bg-slate-800 animate-pulse my-0.5" />
           ) : (
-            <h3 className="text-[27px] sm:text-[30px] font-black text-slate-100 tracking-tight leading-none drop-shadow-sm">
+            <h3 className="text-[20px] sm:text-[30px] font-black text-slate-100 tracking-tight leading-none drop-shadow-sm tabular-nums truncate">
               {value}
             </h3>
           )}
@@ -257,7 +259,7 @@ function VisionStatCard({
 
       {/* Bottom Micro-Telemetry Widget */}
       {!loading && footerWidget && (
-        <div className="relative z-10 pt-2">
+        <div className="relative z-10 pt-1 sm:pt-2">
           {footerWidget}
         </div>
       )}
@@ -292,21 +294,21 @@ function MetricWidgetsGroup({
   loading = false,
 }) {
   const isHalf = cols <= 6;
-  const gridColsClass = isHalf ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-4';
+  const gridColsClass = isHalf ? 'grid-cols-2' : 'grid-cols-2 xl:grid-cols-4';
 
   const cardMinH =
     height === 'compact'
-      ? 'min-h-[130px]'
+      ? 'min-h-[104px] sm:min-h-[130px]'
       : height === 'tall'
-      ? 'min-h-[195px]'
-      : 'min-h-[160px]';
+      ? 'min-h-[136px] sm:min-h-[195px]'
+      : 'min-h-[118px] sm:min-h-[160px]';
 
   const stripMinH =
     height === 'compact'
-      ? 'min-h-[110px]'
+      ? 'min-h-[96px] sm:min-h-[110px]'
       : height === 'tall'
-      ? 'min-h-[175px]'
-      : 'min-h-[135px]';
+      ? 'min-h-[130px] sm:min-h-[175px]'
+      : 'min-h-[110px] sm:min-h-[135px]';
 
   const metricItems = [
     {
@@ -413,10 +415,10 @@ function MetricWidgetsGroup({
       <div className={`vision-card relative overflow-hidden w-full min-w-0 max-w-full ${stripMinH}`}>
         <div className="absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-primary-500/50 to-transparent pointer-events-none" />
         <div
-          className={`grid grid-cols-1 ${
+          className={`grid grid-cols-2 ${
             isHalf
-              ? 'sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x'
-              : 'sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 xl:divide-x'
+              ? 'divide-y sm:divide-y-0 sm:divide-x'
+              : 'xl:grid-cols-4 divide-y sm:divide-y-0 xl:divide-x'
           } divide-slate-700/40 h-full`}
         >
           {metricItems.map((item) => {
@@ -424,7 +426,7 @@ function MetricWidgetsGroup({
             return (
               <div
                 key={item.key}
-                className="p-4 sm:p-5 flex flex-col justify-between gap-3 hover:bg-primary-500/[0.04] transition-colors min-w-0"
+                className="p-3 sm:p-5 flex flex-col justify-between gap-2 sm:gap-3 hover:bg-primary-500/[0.04] transition-colors min-w-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -465,13 +467,13 @@ function MetricWidgetsGroup({
   // Style 2: Bento Minimalist
   if (metricStyle === 'bento') {
     return (
-      <div className={`grid grid-cols-1 ${gridColsClass} gap-3.5 sm:gap-5 w-full min-w-0 max-w-full`}>
+      <div className={`grid ${gridColsClass} gap-2.5 sm:gap-5 w-full min-w-0 max-w-full`}>
         {metricItems.map((item) => {
           const Icon = item.icon;
           return (
             <div
               key={item.key}
-              className={`vision-card p-4 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-500/35 flex flex-col justify-between w-full min-w-0 max-w-full border-l-2 ${item.leftBorder} ${cardMinH}`}
+              className={`vision-card p-3 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:-translate-y-0.5 hover:border-primary-500/35 flex flex-col justify-between w-full min-w-0 max-w-full border-l-2 ${item.leftBorder} ${cardMinH}`}
             >
               <div className="flex items-start justify-between gap-2.5">
                 <div className="flex items-center gap-3 min-w-0">
@@ -525,7 +527,7 @@ function MetricWidgetsGroup({
     const circumference = 2 * Math.PI * radius;
 
     return (
-      <div className={`grid grid-cols-1 ${gridColsClass} gap-3.5 sm:gap-5 w-full min-w-0 max-w-full`}>
+      <div className={`grid ${gridColsClass} gap-2.5 sm:gap-5 w-full min-w-0 max-w-full`}>
         {metricItems.map((item) => {
           const Icon = item.icon;
           const dashOffset =
@@ -534,7 +536,7 @@ function MetricWidgetsGroup({
           return (
             <div
               key={item.key}
-              className={`vision-card p-4 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:border-primary-500/35 flex items-center justify-between gap-3 w-full min-w-0 max-w-full ${cardMinH}`}
+              className={`vision-card p-3 sm:p-5 relative overflow-hidden group transition-all duration-300 hover:border-primary-500/35 flex items-center justify-between gap-2 sm:gap-3 w-full min-w-0 max-w-full ${cardMinH}`}
             >
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 truncate">
@@ -596,7 +598,7 @@ function MetricWidgetsGroup({
 
   // Style 1 (Default): Classic Vision Stat Cards
   return (
-    <div className={`grid grid-cols-1 ${gridColsClass} gap-3.5 sm:gap-5 w-full min-w-0 max-w-full`}>
+    <div className={`grid ${gridColsClass} gap-2.5 sm:gap-5 w-full min-w-0 max-w-full`}>
       {metricItems.map((item) => (
         <VisionStatCard
           key={item.key}
@@ -2894,34 +2896,34 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-5 pb-8 animate-fade-in max-w-[1600px] mx-auto relative w-full min-w-0">
+    <div className="space-y-3.5 sm:space-y-5 pb-8 animate-fade-in max-w-[1600px] mx-auto relative w-full min-w-0">
       {/* ── Top Dashboard Header / Edit Mode Action Bar ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-500/25">
-              <SlidersHorizontal size={20} />
+        <div className="flex items-center justify-between gap-2.5 px-0.5">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-500/25 shrink-0">
+              <SlidersHorizontal size={16} className="sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-100 tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-[16px] sm:text-2xl font-black text-slate-100 tracking-tight truncate">
                 IoT Platform Overview
               </h1>
-              <p className="text-xs text-slate-400 font-medium">
+              <p className="hidden sm:block text-xs text-slate-400 font-medium">
                 Monitoring telemetri & otomasi cerdas end-to-end
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {editMode ? (
               <>
                 <button
                   type="button"
                   onClick={resetDashboard}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-sm"
                   title="Kembalikan layout & style ke setelan awal"
                 >
                   <RotateCcw size={14} className="text-amber-400" />
-                  <span>Reset Bawaan</span>
+                  <span className="hidden sm:inline">Reset Bawaan</span>
                 </button>
 
                 <button
@@ -2931,23 +2933,24 @@ export default function Dashboard() {
                     setBucketSidebarOpen(false);
                     setUserJsonPref(PREF_KEYS.SIDEBAR_OPEN, false, { syncToServer: false });
                   }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg shadow-primary-500/25 transition-all hover:brightness-110 active:scale-95"
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg shadow-primary-500/25 transition-all hover:brightness-110 active:scale-95"
                   style={{
                     background: 'linear-gradient(135deg, rgb(var(--primary-500)), rgb(var(--primary-600)))',
                   }}
                 >
                   <Check size={15} />
-                  <span>Selesai Edit</span>
+                  <span>Selesai</span>
                 </button>
               </>
             ) : (
               <button
                 type="button"
                 onClick={() => setEditMode(true)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/70 transition-all shadow-sm group"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white border border-slate-700/70 transition-all shadow-sm group"
               >
                 <Pencil size={13} className="text-primary-400 group-hover:scale-110 transition-transform" />
-                <span>Kustomisasi Dashboard</span>
+                <span className="hidden sm:inline">Kustomisasi Dashboard</span>
+                <span className="sm:hidden">Atur</span>
               </button>
             )}
           </div>

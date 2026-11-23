@@ -25,8 +25,16 @@ import Guide from './pages/Guide';
 import Billing from './pages/Billing';
 
 const ProtectedRoute = ({ children }) => {
-  const token = localStorage.getItem('iot_token');
+  const rawToken = localStorage.getItem('iot_token');
+  const token = rawToken && rawToken !== 'undefined' && rawToken !== 'null' ? rawToken : null;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token && rawToken) {
+      localStorage.removeItem('iot_token');
+      localStorage.removeItem('iot_user');
+    }
+  }, [token, rawToken]);
 
   useEffect(() => {
     if (!token) return;
@@ -63,7 +71,7 @@ const ProtectedRoute = ({ children }) => {
       } else {
         clearLegacyGlobalPrefs();
       }
-    } catch {}
+    } catch { }
 
     // Sync user profile from API (so timezone, theme, & dashboard_preferences are always fresh)
     const syncUserProfile = () => {
@@ -76,7 +84,7 @@ const ProtectedRoute = ({ children }) => {
             hydratePrefsFromUser(res.data);
             window.dispatchEvent(new Event('user-updated'));
           }
-        }).catch(() => {});
+        }).catch(() => { });
       });
     };
 
@@ -147,7 +155,7 @@ export default function App() {
               user.dashboard_preferences?.custom_primary ||
               null;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (savedTheme && savedTheme !== 'blue') {
@@ -157,7 +165,7 @@ export default function App() {
       }
 
       applyCustomPrimaryHex(customHex);
-      
+
       if (savedMode && savedMode === 'light') {
         document.documentElement.setAttribute('data-mode', 'light');
       } else {

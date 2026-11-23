@@ -202,29 +202,31 @@ export default function DeviceDetail() {
       </div>
 
       {/* Last Connection Banner */}
-      <div className="vision-card p-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="vision-inner-box w-11 h-11 rounded-xl flex items-center justify-center text-primary-400">
+      <div className="vision-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="vision-inner-box w-11 h-11 rounded-xl flex items-center justify-center text-primary-400 shrink-0">
             <Clock size={18} />
           </div>
-          <div>
-            <p className="text-[15px] font-bold text-slate-100">{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : 'Never'}</p>
+          <div className="min-w-0">
+            <p className="text-[14px] sm:text-[15px] font-bold text-slate-100 truncate">{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : 'Never'}</p>
             <p className="text-[11px] font-medium text-slate-400">Last telemetry heartbeat received</p>
           </div>
         </div>
-        <StatusBadge status={device.status} />
+        <div className="self-start sm:self-auto shrink-0">
+          <StatusBadge status={device.status} />
+        </div>
       </div>
 
       {/* Live Transmission Chart */}
-      <div className="vision-card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="vision-card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
           <div>
-            <h3 className="text-[17px] font-bold text-slate-100 flex items-center gap-2">
+            <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-100 flex items-center gap-2">
               <Activity size={18} className="text-primary-400" /> Live Transmission
             </h3>
             <p className="text-[12px] text-slate-400 mt-0.5">Real-time packet stream (TX / RX)</p>
           </div>
-          <div className="vision-inner-box px-3 py-1.5 rounded-xl flex items-center gap-2">
+          <div className="vision-inner-box px-3 py-1.5 rounded-xl flex items-center gap-2 self-start sm:self-auto">
             <div className={`w-2 h-2 rounded-full ${device.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
             <span className="text-xs font-bold text-slate-300">{device.status === 'online' ? 'Live Stream' : 'Idle (Offline)'}</span>
           </div>
@@ -242,12 +244,12 @@ export default function DeviceDetail() {
 
       {/* Device Location Map */}
       <div className="vision-card p-0 overflow-hidden relative group">
-        <div className="p-4 bg-slate-900/80 backdrop-blur-md absolute top-0 w-full z-10 flex items-center justify-between border-b border-slate-800/70">
+        <div className="p-3 sm:p-4 bg-slate-900/80 backdrop-blur-md absolute top-0 w-full z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 border-b border-slate-800/70">
           <div className="flex items-center gap-2">
-            <MapPin size={16} className="text-primary-400" />
+            <MapPin size={16} className="text-primary-400 shrink-0" />
             <h3 className="text-sm font-bold text-slate-100">Device Location & Placement</h3>
           </div>
-          <span className="text-xs text-slate-300 font-mono px-3 py-1 rounded-xl vision-inner-box">
+          <span className="text-[11px] sm:text-xs text-slate-300 font-mono px-2.5 sm:px-3 py-1 rounded-xl vision-inner-box self-start sm:self-auto truncate max-w-full">
             {device.location ? device.location : 'Not Set (Set in Edit)'}
           </span>
         </div>
@@ -543,12 +545,12 @@ export default function DeviceDetail() {
                         <input name="broker_host" type="text" defaultValue={device.broker_config?.host || 'test.mosquitto.org'} className="input-field w-full font-mono text-[12px]" required />
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-1 space-y-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-1 space-y-1">
                           <label className="text-[11px] font-bold text-slate-400">Port</label>
                           <input name="broker_port" type="number" defaultValue={device.broker_config?.port || 1883} className="input-field w-full font-mono text-[12px]" required />
                         </div>
-                        <div className="col-span-2 space-y-1">
+                        <div className="sm:col-span-2 space-y-1">
                           <label className="text-[11px] font-bold text-slate-400">MQTT Topic (Optional)</label>
                           <input name="broker_topic" type="text" defaultValue={device.broker_config?.topic || ''} placeholder="e.g. videalink/devices/node-01" className="input-field w-full font-mono text-[12px]" />
                         </div>

@@ -713,7 +713,7 @@ export default function Automations() {
           className="px-4 py-3 border-b flex flex-col md:flex-row md:items-center justify-between gap-3"
           style={{ borderColor: 'rgb(var(--surface-700) / 0.45)' }}
         >
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 md:max-w-xs">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -748,7 +748,7 @@ export default function Automations() {
           <div
             role="tablist"
             aria-label="Filter Aturan"
-            className="inline-flex p-0.5 rounded-lg border self-start md:self-auto"
+            className="inline-flex p-0.5 rounded-lg border self-start md:self-auto overflow-x-auto no-scrollbar max-w-full"
             style={{
               backgroundColor: 'rgb(var(--surface-800) / 0.45)',
               borderColor: 'rgb(var(--surface-700) / 0.55)',
@@ -788,7 +788,7 @@ export default function Automations() {
               <div key={i} className="px-4 py-4 flex items-center justify-between gap-4 animate-pulse">
                 <div className="space-y-2 flex-1 max-w-md">
                   <div className="h-3.5 w-48 rounded" style={{ backgroundColor: 'rgb(var(--surface-700) / 0.6)' }} />
-                  <div className="h-3 w-80 rounded" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
+                  <div className="h-3 w-full max-w-[20rem] rounded" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
                 </div>
                 <div className="h-8 w-24 rounded-lg" style={{ backgroundColor: 'rgb(var(--surface-800) / 0.8)' }} />
               </div>
@@ -1209,7 +1209,7 @@ export default function Automations() {
                           </div>
                         )}
 
-                        <div className="grid grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                           <div>
                             <label className="block text-[11px] font-medium mb-1" style={{ color: 'rgb(var(--surface-300))' }}>
                               Operator
