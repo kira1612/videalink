@@ -69,13 +69,18 @@ export const mqttApi = {
   publish: (topic, message) => api.post('/mqtt/publish', { topic, message: typeof message === 'string' ? message : JSON.stringify(message) }),
 };
 
-// Endpoints
+// Endpoints & Alert Utilities (Telegram + Email)
 export const endpointsApi = {
   list: () => api.get('/endpoints'),
   create: (data) => api.post('/endpoints', data),
+  update: (id, data) => api.put(`/endpoints/${id}`, data),
   delete: (id) => api.delete(`/endpoints/${id}`),
   toggle: (id) => api.patch(`/endpoints/${id}/toggle`),
   trigger: (id) => api.post(`/endpoints/${id}/trigger`),
+  telegramStatus: () => api.get('/telegram/status'),
+  testTelegram: (data) => api.post('/telegram/test', data),
+  emailStatus: () => api.get('/email/status'),
+  testEmail: (data) => api.post('/email/test', data),
 };
 
 // User Profile & Management
@@ -104,6 +109,7 @@ export const automationsApi = {
   create: (data) => api.post('/automations', data),
   update: (id, data) => api.put(`/automations/${id}`, data),
   delete: (id) => api.delete(`/automations/${id}`),
+  test: (id) => api.post(`/automations/${id}/test`),
 };
 
 // Subscription & Billing
@@ -115,6 +121,7 @@ export const billingApi = {
   resume: () => api.post('/billing/resume'),
   invoices: () => api.get('/billing/invoices'),
   invoiceDetail: (id) => api.get(`/billing/invoices/${id}`),
+  sendInvoiceEmail: (id, email) => api.post(`/billing/invoices/${id}/email`, email ? { email } : {}),
 };
 
 export default api;

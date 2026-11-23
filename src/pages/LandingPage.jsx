@@ -1,8 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Cpu, Zap, Database, Globe, ChevronRight, ChevronDown, Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Settings2, Menu, X } from 'lucide-react';
+import {
+  Cpu,
+  Zap,
+  Database,
+  Globe,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Minus,
+  Wifi,
+  Activity,
+  Shield,
+  Layers,
+  Bell,
+  Settings2,
+  Menu,
+  X,
+  Box,
+  Radio,
+  Thermometer,
+  ToggleRight,
+  Compass,
+  Webhook,
+  ArrowRight,
+} from 'lucide-react';
 import IoTAnimation from '../components/IoTAnimation';
-import ParticleTunnel from '../components/ParticleTunnel';
+import SilkWaveBackground, { getSilkPaletteTokens } from '../components/SilkWaveBackground';
+import FloatingIconWave from '../components/FloatingIconWave';
 import FeatureShowcase, { THEMES } from '../components/FeatureShowcase';
 import IndustryShowcase from '../components/IndustryShowcase';
 import PricingSection from '../components/PricingSection';
@@ -23,67 +48,69 @@ const dict = {
     pricing: 'Harga',
     faq: 'FAQ',
     signIn: 'Masuk',
-    buy: 'Beli',
+    buy: 'Daftar',
     heroTitle: 'Videa Link.',
-    heroSub: 'Kendalikan masa depan, sekarang.',
-    heroDesc: 'Bangun ekosistem IoT masif Anda dalam hitungan detik. Pantau jutaan perangkat secara real-time tanpa jeda, tanpa batas, tanpa kompromi.',
+    heroSub: 'Kendalikan perangkat IoT & ruangan 3D Anda.',
+    heroDesc: 'Hubungkan ESP32, ESP8266, dan sensor IoT via MQTT atau HTTP REST. Kelola Data Bucket otomatis, buat skenario automasi, dan desain denah Ruangan 3D interaktif dalam satu platform.',
     getStarted: 'Mulai Gratis',
-    learnMore: 'Pelajari lebih lanjut',
-    univConn: 'Konektivitas Universal',
-    oneGate: 'Satu gerbang.',
-    thousands: 'Ribuan perangkat.',
-    gateDesc: 'Videa Link OS mendengarkan dan menghubungkan seluruh ekosistem Anda. Mulai dari Lampu Pintar, Kamera CCTV, Sensor Suhu, hingga Speaker Pintar—semua terpusat dalam satu gateway dengan latensi nyaris nol.',
-    rtGate: 'Gateway Waktu Nyata',
-    rtGateDesc: 'Komunikasi dua arah instan tanpa jeda.',
-    uniProto: 'Protokol Universal',
-    uniProtoDesc: 'Mendukung MQTT, WebSocket, dan REST API.',
+    learnMore: 'Pelajari fitur',
+    univConn: 'Konektivitas IoT & Ruangan 3D',
+    oneGate: 'Satu platform.',
+    thousands: 'Kendali penuh real-time.',
+    gateDesc: 'Videa Link menyatukan telemetri sensor, kontrol sakelar dua arah (Smart Switch & Thermostat), Data Bucket Auto-Discovery, serta Editor Denah Ruangan 3D dalam satu ekosistem terpadu.',
+    rtGate: 'Kontrol Dua Arah & Ruangan 3D',
+    rtGateDesc: 'Nyalakan perangkat langsung dari widget dashboard atau klik objek di dalam denah 3D interaktif.',
+    uniProto: 'MQTT Broker & HTTP REST API',
+    uniProtoDesc: 'Mendukung ESP32, ESP8266, Arduino, dan Raspberry Pi dengan Bearer Token & auto-discovery JSON.',
     scaryFast: 'Sangat cepat.',
     scaryCap: 'Sangat mumpuni.',
     globalLat: 'Latensi Global',
-    globalLatDesc: 'Pemrosesan data yang sangat cepat, terasa seperti terjadi sebelum Anda mengklik.',
-    uptimeGuar: 'Jaminan Uptime',
-    uptimeGuarDesc: 'Dirancang untuk keandalan ekstrem. Sistem Anda tidak pernah tidur, begitu juga kami.',
+    globalLatDesc: 'Pemrosesan telemetri dan perintah perangkat yang cepat serta responsif.',
+    uptimeGuar: 'Deteksi Heartbeat 60s',
+    uptimeGuarDesc: 'Status perangkat ONLINE/OFFLINE terpantau otomatis setiap 60 detik.',
     connEverything: 'Hubungkan segalanya.',
     compNothing: 'Tanpa kompromi.',
-    connDesc: 'Integrasi asli untuk perangkat keras dan protokol paling mumpuni di dunia.',
-    protoHwLabel: 'PROTOKOL & PERANGKAT KERAS YANG DIDUKUNG',
-    featMagic: 'Fitur yang terasa seperti sihir.',
-    featDesc: 'Semua yang Anda butuhkan untuk mengatur ekosistem IoT masif, dibangun dalam satu pengalaman yang mulus.',
+    connDesc: 'Integrasi langsung untuk mikrokontroler, protokol, dan kanal notifikasi favorit Anda.',
+    protoHwLabel: 'FITUR, PROTOKOL & PERANGKAT KERAS YANG DIDUKUNG',
+    featMagic: 'Fitur lengkap siap produksi.',
+    featDesc: 'Semua yang Anda butuhkan untuk mengelola perangkat IoT, Data Bucket, Automasi, hingga Ruangan 3D dalam satu antarmuka modern.',
     // MacBook feature section
     chooseTheme: 'Tema',
-    featColor: 'Warna',
-    featColorDesc: 'Enam pilihan tema warna elegan — dari Tengah Malam yang dalam hingga Aurora yang hidup. Setiap tema menyesuaikan seluruh UI secara instan, termasuk chart, badge, dan sidebar. Jadikan platform ini benar-benar milik Anda.',
-    featRealtime: 'Telemetri Waktu Nyata',
-    featRealtimeDesc: 'Data sensor mengalir langsung ke dashboard dalam hitungan milidetik via WebSocket. Tidak ada polling, tidak ada refresh — hanya aliran data yang selalu hidup dan responsif.',
-    featDevices: 'Manajemen Perangkat',
-    featDevicesDesc: 'Pantau ribuan perangkat sekaligus. Lacak status online/offline, atur endpoint API, dan autentikasi ESP32, Arduino, atau Raspberry Pi Anda dari satu panel terpusat.',
-    featSecurity: 'Keamanan Berlapis',
-    featSecurityDesc: 'Setiap koneksi perangkat dilindungi token unik. Payload divalidasi sebelum disimpan. Rate limiting otomatis mencegah flooding data dari perangkat nakal.',
-    featBuckets: 'Wadah Data Terorganisir',
-    featBucketsDesc: 'Kelompokkan data sensor ke dalam bucket deret waktu yang terstruktur. Buat widget visualisasi dari bucket mana pun — line chart, gauge, atau tabel histori — secara drag-and-drop.',
-    featAlerts: 'Notifikasi & Alarm',
-    featAlertsDesc: 'Atur threshold untuk setiap metrik sensor. Ketika nilai melampaui batas, sistem langsung mengirim notifikasi real-time — tidak ada data kritis yang terlewat.',
+    featRoom3D: 'Ruangan 3D & Denah (Floor Plan)',
+    featRoom3DDesc: 'Bangun denah ruangan 3D berbasis Three.js lengkap dengan tembok, pintu tunggal/ganda, serta template kamar (10x10, L-Shape, Apartemen 2 Ruang). Pasang & kontrol perangkat IoT langsung di 3D, gunakan Mode Jelajah Avatar (WASD), Export/Import JSON, dan sematkan (Pin) ke Dashboard.',
+    featColor: 'Tema Warna & Mode UI',
+    featColorDesc: '5 warna aksen bawaan (Cyan, Emerald, Violet, Rose, Amber) ditambah Custom Hex Color dalam mode Gelap dan Terang. Seluruh grafik, sidebar, dan widget langsung berubah serta tersinkronisasi ke profil akun Anda.',
+    featRealtime: 'Dashboard Drag-and-Drop & Widget',
+    featRealtimeDesc: 'Susun ulang layout dashboard secara bebas (drag-and-drop). Tersedia grafik Area, Line, Bar, Gauge, Sparkline, Thermostat Widget, dan Smart Switch ON/OFF dua arah via MQTT.',
+    featBuckets: 'Auto-Discovery Data Bucket',
+    featBucketsDesc: 'Kirim data sensor JSON mentah tanpa membuat skema database manual — backend Videa Link otomatis mendeteksi setiap field metrik (suhu, kelembapan, rssi, dll.) dengan retensi hingga 365 hari.',
+    featDevices: 'Manajemen Perangkat & Heartbeat 60s',
+    featDevicesDesc: 'Daftarkan perangkat ESP32, ESP8266, Arduino, atau Raspberry Pi dengan auto-provisioning bucket untuk MQTT, sinkronisasi ruangan otomatis, dan deteksi status ONLINE/OFFLINE setiap 60 detik.',
+    featAlerts: 'Automations & Endpoints Webhook',
+    featAlertsDesc: 'Buat aturan IF-THEN otomatis berdasarkan Jadwal Waktu atau ambang batas sensor (>, <, ==) untuk mengendalikan perangkat, serta hubungkan Endpoint ke HTTP Webhook, Telegram, Email, Slack, dan MQTT.',
+    featSecurity: 'Keamanan Token, Rate Limit & Kuota',
+    featSecurityDesc: 'Dilengkapi Bearer Token unik per perangkat, autentikasi Laravel Sanctum, rate limiting 60 req/menit, manajemen peran Admin/User (RBAC), serta notifikasi batas kuota paket secara proaktif.',
     dataBuckets: 'Wadah Data & Telemetri.',
-    dataBucketsDesc: 'Simpan data sensor IoT Anda dalam wadah deret waktu yang terorganisir. Visualisasikan tren secara instan dengan widget waktu nyata interaktif kami dan jangan pernah melewatkan satu titik data pun.',
+    dataBucketsDesc: 'Simpan data sensor IoT Anda dalam Data Bucket time-series yang terorganisir dengan Auto-Discovery field otomatis.',
     devMan: 'Manajemen Perangkat.',
-    devManDesc: 'Visibilitas penuh atas jaringan edge Anda. Lacak status online, kelola titik akhir API, dan autentikasi perangkat Arduino, ESP32, dan Raspberry Pi Anda secara aman dari mana saja.',
+    devManDesc: 'Visibilitas penuh atas perangkat ESP32, ESP8266, Arduino, dan Raspberry Pi Anda dengan pemantauan heartbeat otomatis.',
     intCust: 'Kustomisasi Antarmuka.',
-    intCustDesc: 'Jadikan milik Anda. Personalisasi ruang kerja dengan avatar kustom, beralih antara mode Terang dan Gelap, dan terapkan tema warna dinamis yang indah dan tersinkronisasi seketika melalui backend kami.',
-    whichPlat: 'Platform mana yang tepat untuk Anda?',
-    dev: 'Pengembang',
-    devDesc: 'Esensi bagi penghobi dan penerapan skala kecil.',
+    intCustDesc: 'Personalisasi ruang kerja dengan mode Gelap/Terang, 5 tema warna + Custom Hex, dan tata letak widget yang tersimpan per akun.',
+    whichPlat: 'Paket mana yang tepat untuk Anda?',
+    dev: 'Starter',
+    devDesc: 'Esensi untuk uji coba awal dan satu perangkat smart home.',
     free: 'Gratis',
-    upTo5: 'Hingga 5 Perangkat',
-    msg10k: '10.000 Pesan / bln',
-    ret24h: 'Retensi Data 24-jam',
-    ent: 'Perusahaan',
-    entDesc: 'Performa tanpa kompromi untuk skala produksi masif.',
+    upTo5: '1 Perangkat IoT',
+    msg10k: '1 Data Bucket & 1 Endpoint',
+    ret24h: 'Retensi Data 7 Hari',
+    ent: 'Enterprise',
+    entDesc: 'Performa penuh untuk skala gedung dan armada besar.',
     mo: '/bln',
-    unlimitedDev: 'Perangkat Tak Terbatas',
-    msg1m: '1Jt+ Pesan / bln',
-    ret1y: 'Retensi Data 1 Tahun',
-    custAnalyt: 'Mesin Analitik Kustom',
-    copy: 'Hak Cipta © {year} Videa Link Inc. Seluruh hak cipta dilindungi.',
+    unlimitedDev: 'Perangkat & Ruangan 3D Tanpa Batas',
+    msg1m: 'Bucket & Endpoint Tanpa Batas',
+    ret1y: 'Retensi Data 365 Hari',
+    custAnalyt: 'Dukungan Prioritas & RBAC',
+    copy: 'Hak Cipta © {year} Videa Link. Seluruh hak cipta dilindungi.',
     privPolicy: 'Kebijakan Privasi',
     termsUse: 'Syarat Penggunaan',
   },
@@ -96,67 +123,69 @@ const dict = {
     pricing: 'Pricing',
     faq: 'FAQ',
     signIn: 'Sign In',
-    buy: 'Buy',
+    buy: 'Sign Up',
     heroTitle: 'Videa Link.',
-    heroSub: 'Command the future, today.',
-    heroDesc: 'Build your massive IoT ecosystem in seconds. Monitor millions of devices in real-time with zero latency, zero limits, and zero compromise.',
+    heroSub: 'Command your IoT devices & 3D rooms.',
+    heroDesc: 'Connect ESP32, ESP8266, and IoT sensors via MQTT or HTTP REST. Manage auto-discovery Data Buckets, build IF-THEN automations, and design interactive 3D Rooms in one unified platform.',
     getStarted: 'Start for Free',
-    learnMore: 'Learn more',
-    univConn: 'Universal Connectivity',
-    oneGate: 'One gateway.',
-    thousands: 'Thousands of devices.',
-    gateDesc: 'Videa Link OS listens and connects your entire ecosystem. From Smart Lamps, CCTV Cameras, Temperature Sensors, to Smart Speakers—all centralized in one gateway with near-zero latency.',
-    rtGate: 'Real-time Gateway',
-    rtGateDesc: 'Instant bi-directional communication with zero delay.',
-    uniProto: 'Universal Protocol',
-    uniProtoDesc: 'Supports MQTT, WebSocket, and REST API.',
+    learnMore: 'Explore features',
+    univConn: 'IoT Connectivity & 3D Rooms',
+    oneGate: 'One platform.',
+    thousands: 'Complete real-time control.',
+    gateDesc: 'Videa Link unifies sensor telemetry, bi-directional device control (Smart Switch & Thermostat), Auto-Discovery Data Buckets, and an interactive 3D Room Floor Plan Editor.',
+    rtGate: 'Bi-Directional Control & 3D Rooms',
+    rtGateDesc: 'Toggle devices directly from dashboard widgets or click objects inside your interactive 3D room.',
+    uniProto: 'MQTT Broker & HTTP REST API',
+    uniProtoDesc: 'Supports ESP32, ESP8266, Arduino, and Raspberry Pi with Bearer Token auth & JSON auto-discovery.',
     scaryFast: 'Scary fast.',
     scaryCap: 'Scary capable.',
-    globalLat: 'Global Latency',
-    globalLatDesc: 'Data processing so fast, it feels like it happened before you clicked.',
-    uptimeGuar: 'Uptime Guarantee',
-    uptimeGuarDesc: 'Engineered for extreme reliability. Your systems never sleep, neither do we.',
+    globalLat: 'Fast Ingestion',
+    globalLatDesc: 'Responsive telemetry ingestion and bi-directional device commands.',
+    uptimeGuar: '60s Heartbeat Detection',
+    uptimeGuarDesc: 'Automatic ONLINE/OFFLINE status tracking every 60 seconds.',
     connEverything: 'Connect everything.',
     compNothing: 'Compromise nothing.',
-    connDesc: 'Native integrations for the world\'s most capable hardware and protocols.',
-    protoHwLabel: 'SUPPORTED PROTOCOLS & HARDWARE',
-    featMagic: 'Features that feel like magic.',
-    featDesc: 'Everything you need to orchestrate a massive IoT ecosystem, built into one seamless experience.',
+    connDesc: 'Native integrations for microcontrollers, protocols, and notification channels.',
+    protoHwLabel: 'SUPPORTED FEATURES, PROTOCOLS & HARDWARE',
+    featMagic: 'Production-ready features.',
+    featDesc: 'Everything you need to manage IoT devices, Data Buckets, Automations, and 3D Rooms in one seamless workspace.',
     // MacBook feature section
     chooseTheme: 'Theme',
-    featColor: 'Color',
-    featColorDesc: 'Six elegant color themes — from deep Midnight to vibrant Aurora. Every theme instantly adapts the entire UI including charts, badges, and sidebar. Make this platform truly yours.',
-    featRealtime: 'Real-time Telemetry',
-    featRealtimeDesc: 'Sensor data flows directly to the dashboard in milliseconds via WebSocket. No polling, no refresh — just a live, always-responsive data stream.',
-    featDevices: 'Device Management',
-    featDevicesDesc: 'Monitor thousands of devices at once. Track online/offline status, manage API endpoints, and authenticate your ESP32, Arduino, or Raspberry Pi from one central panel.',
-    featSecurity: 'Layered Security',
-    featSecurityDesc: 'Every device connection is protected by a unique token. Payloads are validated before storage. Automatic rate limiting prevents data flooding from rogue devices.',
-    featBuckets: 'Organized Data Buckets',
-    featBucketsDesc: 'Group sensor data into structured time-series buckets. Build visualization widgets from any bucket — line charts, gauges, or history tables — via drag-and-drop.',
-    featAlerts: 'Notifications & Alerts',
-    featAlertsDesc: 'Set thresholds for any sensor metric. When a value exceeds the limit, the system instantly sends a real-time notification — no critical data goes unnoticed.',
+    featRoom3D: '3D Room & Floor Plan Editor',
+    featRoom3DDesc: 'Design 3D rooms powered by Three.js with walls, single/double doors, and ready-made room templates (10x10, L-Shape, 2-Room Apartment). Place & toggle IoT devices right in 3D, walk around in WASD Avatar Mode, Export/Import JSON, and Pin rooms to your Dashboard.',
+    featColor: 'Color Themes & UI Modes',
+    featColorDesc: '5 signature accent themes (Cyan, Emerald, Violet, Rose, Amber) plus Custom Hex Color across Dark and Light modes. Charts, sidebars, and widgets adapt immediately and sync to your user profile.',
+    featRealtime: 'Drag-and-Drop Dashboard & Widgets',
+    featRealtimeDesc: 'Freely rearrange your dashboard layout with drag-and-drop. Includes Area, Line, Bar, Gauge, Sparkline charts, Thermostat Widget, and bi-directional MQTT Smart Switch controls.',
+    featBuckets: 'Auto-Discovery Data Buckets',
+    featBucketsDesc: 'Send raw JSON sensor payloads without manual schema setup — Videa Link automatically discovers metric fields (temperature, humidity, rssi, etc.) with up to 365 days retention.',
+    featDevices: 'Device Management & 60s Heartbeat',
+    featDevicesDesc: 'Register ESP32, ESP8266, Arduino, or Raspberry Pi devices with automatic MQTT bucket provisioning, room sync, and automatic ONLINE/OFFLINE heartbeat detection (60s timeout).',
+    featAlerts: 'Automations & Webhook Endpoints',
+    featAlertsDesc: 'Create IF-THEN rules triggered by Time Schedule or Sensor Thresholds (>, <, ==) to control devices, and connect Endpoints to HTTP Webhooks, Telegram, Email, Slack, and MQTT.',
+    featSecurity: 'Token Security, Rate Limit & Quotas',
+    featSecurityDesc: 'Protected by unique per-device Bearer Tokens, Laravel Sanctum auth, 60 req/min rate limiting, Admin/User RBAC roles, and proactive plan quota enforcement.',
     dataBuckets: 'Data Buckets & Telemetry.',
-    dataBucketsDesc: 'Store your IoT sensor data in organized time-series buckets. Visualize trends instantly with our interactive real-time widgets and never miss a single data point.',
+    dataBucketsDesc: 'Store IoT sensor data in structured time-series buckets with automatic JSON field discovery.',
     devMan: 'Device Management.',
-    devManDesc: 'Full visibility over your edge network. Track online status, manage API endpoints, and securely authenticate your Arduino, ESP32, and Raspberry Pi devices from anywhere.',
+    devManDesc: 'Full visibility over your ESP32, ESP8266, Arduino, and Raspberry Pi fleet with automatic heartbeat tracking.',
     intCust: 'Interface Customization.',
-    intCustDesc: 'Make it yours. Personalize your workspace with custom avatars, toggle between Light and Dark modes, and apply beautiful dynamic color themes that sync instantly via our backend.',
-    whichPlat: 'Which platform is right for you?',
-    dev: 'Developer',
-    devDesc: 'The essentials for hobbyists and small-scale deployments.',
+    intCustDesc: 'Personalize your workspace with Light/Dark modes, 5 accent themes + Custom Hex, and per-user saved widget layouts.',
+    whichPlat: 'Which plan is right for you?',
+    dev: 'Starter',
+    devDesc: 'The essentials for initial testing and a single smart home device.',
     free: 'Free',
-    upTo5: 'Up to 5 Devices',
-    msg10k: '10,000 Messages / mo',
-    ret24h: '24-hour Data Retention',
+    upTo5: '1 IoT Device',
+    msg10k: '1 Data Bucket & 1 Endpoint',
+    ret24h: '7-Day Data Retention',
     ent: 'Enterprise',
-    entDesc: 'Uncompromised performance for massive production scale.',
+    entDesc: 'Full scale performance for multi-building and large fleets.',
     mo: '/mo',
-    unlimitedDev: 'Unlimited Devices',
-    msg1m: '1M+ Messages / mo',
-    ret1y: '1 Year Data Retention',
-    custAnalyt: 'Custom Analytics Engine',
-    copy: 'Copyright © {year} Videa Link Inc. All rights reserved.',
+    unlimitedDev: 'Unlimited Devices & 3D Rooms',
+    msg1m: 'Unlimited Buckets & Endpoints',
+    ret1y: '365-Day Data Retention',
+    custAnalyt: 'Priority Support & RBAC',
+    copy: 'Copyright © {year} Videa Link. All rights reserved.',
     privPolicy: 'Privacy Policy',
     termsUse: 'Terms of Use',
   }
@@ -227,7 +256,7 @@ const FadeIn = ({ children, delay = 0, direction = 'up', className = '', thresho
   return (
     <div
       ref={domRef}
-      className={`relative ${className}`}
+      className={`relative z-10 ${className}`}
       style={{
         perspective: '1400px',
         transformStyle: 'preserve-3d',
@@ -316,536 +345,402 @@ export default function LandingPage() {
     setLang(lang === 'id' ? 'en' : 'id');
   };
 
+  const primaryColor = activeTheme?.primary || '#06b6d4';
+  const silk = getSilkPaletteTokens(primaryColor);
+  const darkThemes = THEMES.filter((th) => th.mode === 'dark');
+
+  const selectThemeSwatch = (th) => {
+    setActiveTheme(th);
+    try {
+      const colorName = th.id.replace('dark-', '').replace('light-', '');
+      localStorage.setItem('iot_theme', colorName);
+      localStorage.setItem('iot_theme_color', th.primary);
+      localStorage.setItem('iot_mode', th.mode || 'dark');
+      if (colorName === 'cyan') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', colorName);
+      }
+      window.dispatchEvent(new CustomEvent('theme-updated'));
+    } catch (e) {}
+  };
+
   return (
-    <div className="min-h-screen bg-black text-[#f5f5f7] font-sans selection:bg-emerald-500/30 overflow-x-hidden">
-      
-      {/* ── CAPSULE FLOATING NAVBAR (WITH DYNAMIC THEME ACCENTS) ── */}
-      <header className="fixed top-4 md:top-6 left-0 right-0 z-50 px-3 md:px-8 flex justify-center pointer-events-none transition-all duration-300">
-        <nav
-          className="w-full max-w-[1240px] pointer-events-auto rounded-full transition-all duration-500 backdrop-blur-xl"
-          style={{
-            backgroundColor: scrollY > 20 ? 'rgba(3, 19, 30, 0.92)' : 'rgba(3, 19, 30, 0.78)',
-            borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(6, 182, 212, 0.3)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            boxShadow: activeTheme
-              ? `0 10px 35px rgba(0,0,0,0.7), 0 0 25px ${activeTheme.glow || `${activeTheme.primary}33`}`
-              : '0 10px 35px rgba(0,0,0,0.7), 0 0 25px rgba(6, 182, 212, 0.18)',
-          }}
-        >
-          <div className="px-5 sm:px-7 md:px-8 py-2 md:py-2.5 flex items-center justify-between">
-            {/* Left: Previous Brand Logo */}
-            <a href="#overview" className="flex items-center gap-2 group select-none">
+    <div
+      className="relative min-h-screen bg-[#04050b] text-white font-sans antialiased selection:bg-white/20 overflow-x-hidden"
+      style={{
+        // Lock dark surface tokens so global [data-mode="light"] never breaks LandingPage text contrast
+        '--surface-50': '255 255 255',
+        '--surface-100': '247 250 252',
+        '--surface-200': '226 232 240',
+        '--surface-300': '203 213 225',
+        '--surface-400': '160 174 192',
+        '--surface-500': '113 128 150',
+        '--surface-600': '45 55 88',
+        '--surface-700': '26 31 55',
+        '--surface-800': '15 21 53',
+        '--surface-900': '6 11 40',
+        '--surface-950': '3 8 27',
+        '--silk-left': silk.left,
+        '--silk-mid': silk.mid,
+        '--silk-right': silk.right,
+      }}
+    >
+      {/* ── FULL-PAGE ZIG-ZAG SCROLL-CHOREOGRAPHED LIQUID-SILK BACKGROUND ── */}
+      <div
+        className="pointer-events-none"
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 0,
+        }}
+      >
+        <SilkWaveBackground color={primaryColor} fullPage />
+      </div>
+
+      {/* ── ANTIGRAVITY-STYLE WEIGHTLESS FULL-WIDTH TOP NAVBAR ── */}
+      <header
+        className="fixed top-0 inset-x-0 z-50 transition-[background-color,border-color,backdrop-filter] duration-300"
+        style={{
+          backgroundColor: scrollY > 24 ? silk.deepRgba(0.76) : 'transparent',
+          backdropFilter: scrollY > 24 ? 'blur(20px)' : 'none',
+          WebkitBackdropFilter: scrollY > 24 ? 'blur(20px)' : 'none',
+          borderBottom: scrollY > 24 ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
+        }}
+      >
+        <nav className="w-full max-w-[1320px] mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+          {/* Left: Brand Lockup + Quiet Navigation Links */}
+          <div className="flex items-center gap-8">
+            <a href="#overview" className="flex items-center gap-2.5 group select-none">
               <img
-                src="/new_videa_link_logo.png"
-                alt="Videa Link Logo"
-                className="h-7 sm:h-8 md:h-9 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform"
+                src="/new_videa_link_icon.png"
+                alt="Videa Link"
+                className="w-6 h-6 object-contain group-hover:scale-105 transition-transform duration-200"
               />
+              <span className="text-[15px] font-medium tracking-[-0.02em] text-white">
+                Videa Link
+              </span>
             </a>
 
-            {/* Center: Navigation Links (Matching Actual Page Content) */}
-            <div className="hidden lg:flex items-center gap-7 xl:gap-9">
-              <a
-                href="#overview"
-                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
-                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
-              >
-                {t.overview}
-              </a>
-              <a
-                href="#features"
-                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
-                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
-              >
-                {t.features}
-              </a>
-              <a
-                href="#industri"
-                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
-                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
-              >
-                {t.industry}
-              </a>
-              <a
-                href="#pricing"
-                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
-                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
-              >
-                {t.pricing}
-              </a>
-              <a
-                href="#faq"
-                className="text-[13.5px] font-medium text-slate-300 hover:text-white transition-all"
-                onMouseEnter={(e) => { if (activeTheme?.primary) e.currentTarget.style.color = activeTheme.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = ''; }}
-              >
-                {t.faq}
-              </a>
-            </div>
-
-            {/* Right: Language Switcher & Dynamic Themed Login Button */}
-            <div className="flex items-center gap-2 sm:gap-3.5">
-              <button
-                onClick={toggleLanguage}
-                className="text-[11px] font-bold text-slate-400 hover:text-white transition-colors border border-white/10 hover:border-white/25 rounded-full px-2.5 py-1 select-none"
-                title="Ganti Bahasa / Change Language"
-              >
-                {lang === 'id' ? 'ID' : 'EN'}
-              </button>
-
-              <Link
-                to="/login"
-                className="px-6 sm:px-7 py-2 md:py-2.5 rounded-full font-bold text-xs sm:text-[13px] tracking-tight transition-all duration-300 hover:scale-[1.04] active:scale-[0.98] whitespace-nowrap"
-                style={{
-                  backgroundColor: activeTheme?.primary || '#06b6d4',
-                  color: activeTheme?.mode === 'light' ? '#ffffff' : '#000000',
-                  boxShadow: activeTheme
-                    ? `0 0 20px ${activeTheme.glow || `${activeTheme.primary}80`}`
-                    : '0 0 20px rgba(6, 182, 212, 0.5)',
-                }}
-              >
-                Login
-              </Link>
-
-              {/* Mobile menu button */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 text-slate-300 hover:text-white rounded-full bg-white/5 border border-white/10"
-                aria-label="Toggle navigation menu"
-              >
-                {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Dropdown Menu */}
-          {mobileMenuOpen && (
-            <div
-              className="lg:hidden px-6 py-4 flex flex-col gap-3 rounded-b-[28px] backdrop-blur-2xl bg-[#03131e]/95"
-              style={{
-                borderTopWidth: '1px',
-                borderTopStyle: 'solid',
-                borderTopColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(6, 182, 212, 0.2)',
-              }}
-            >
-              <a
-                href="#overview"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
-              >
-                {t.overview}
-              </a>
-              <a
-                href="#features"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
-              >
-                {t.features}
-              </a>
-              <a
-                href="#industri"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
-              >
-                {t.industry}
-              </a>
-              <a
-                href="#pricing"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
-              >
-                {t.pricing}
-              </a>
-              <a
-                href="#faq"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-sm font-medium text-slate-300 hover:text-white py-1 transition-colors"
-              >
-                {t.faq}
-              </a>
-            </div>
-          )}
-        </nav>
-      </header>
-
-      {/* ── HERO SECTION ── */}
-      <section id="overview" className="relative pt-32 pb-20 px-6 min-h-screen flex flex-col justify-center overflow-hidden">
-        
-        {/* Background Animation (Sticky to viewport while inside overview) */}
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <div className="sticky top-0 w-full h-screen">
-            <ParticleTunnel
-              color={activeTheme?.primary}
-              onCycleTheme={cycleTheme}
-            />
-          </div>
-        </div>
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black pointer-events-none z-0" />
-        
-        {/* Content container perfectly centered in available space */}
-        <div className="w-full flex flex-col items-center justify-center text-center relative z-10">
-          <FadeIn delay={100} className="w-full drop-shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-            <h1 className="text-[14vw] md:text-[9rem] leading-[1.05] font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-[#ffffff] to-[#a1a1a6] pb-2">
-              {t.heroTitle}
-            </h1>
-          </FadeIn>
-          
-          <FadeIn delay={200} className="mt-4 md:mt-6 drop-shadow-[0_4px_30px_rgba(0,0,0,1)] flex flex-col items-center">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
-              {t.heroSub}
-            </h2>
-            <p className="mt-4 sm:mt-5 text-sm sm:text-base md:text-lg text-slate-300/85 max-w-xl mx-auto font-normal leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,1)]">
-              {t.heroDesc}
-            </p>
-            <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-5">
-              {/* Primary CTA Button (Dynamic Theme Cyber Pill with Glow) */}
-              <Link
-                to="/login"
-                className="px-7 sm:px-8 py-3 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-tight transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg select-none"
-                style={{
-                  backgroundColor: activeTheme?.primary || '#06b6d4',
-                  color: activeTheme?.mode === 'light' ? '#ffffff' : '#04121a',
-                  boxShadow: activeTheme
-                    ? `0 0 25px ${activeTheme.glow || `${activeTheme.primary}80`}, 0 4px 15px rgba(0,0,0,0.5)`
-                    : '0 0 25px rgba(6, 182, 212, 0.5), 0 4px 15px rgba(0,0,0,0.5)',
-                }}
-              >
-                {t.getStarted}
-              </Link>
-
-              {/* Secondary Ghost Button (Translucent Capsule with Theme Border & Hover) */}
-              <a
-                href="#features"
-                className="px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-medium text-xs sm:text-sm tracking-tight transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2 select-none group"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.15)',
-                  color: activeTheme?.primary || '#38bdf8',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-                }}
-                onMouseEnter={(e) => {
-                  if (activeTheme?.primary) {
-                    e.currentTarget.style.borderColor = activeTheme.primary;
-                    e.currentTarget.style.backgroundColor = `${activeTheme.primary}1A`;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.15)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                }}
-              >
-                <span>{t.learnMore}</span>
-                <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
-              </a>
-            </div>
-
-            {/* ── 4 STAT CARDS (SESUAI GAMBAR 2) ── */}
-            <div className="mt-14 sm:mt-16 w-full max-w-4xl px-2 sm:px-4">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                {/* Card 1: <12ms */}
-                <div
-                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
-                  style={{
-                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
-                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
-                  }}
-                >
-                  <div
-                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
-                    style={{ color: activeTheme?.primary || '#22d3ee' }}
-                  >
-                    &lt;12ms
-                  </div>
-                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
-                    {lang === 'id' ? 'LATENSI RATA-RATA' : 'AVG LATENCY'}
-                  </div>
-                </div>
-
-                {/* Card 2: 99.99% */}
-                <div
-                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
-                  style={{
-                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
-                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
-                  }}
-                >
-                  <div
-                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
-                    style={{ color: activeTheme?.primary || '#22d3ee' }}
-                  >
-                    99.99%
-                  </div>
-                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
-                    {lang === 'id' ? 'UPTIME SLA' : 'UPTIME SLA'}
-                  </div>
-                </div>
-
-                {/* Card 3: 50K+ */}
-                <div
-                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
-                  style={{
-                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
-                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
-                  }}
-                >
-                  <div
-                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
-                    style={{ color: activeTheme?.primary || '#22d3ee' }}
-                  >
-                    50K+
-                  </div>
-                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
-                    {lang === 'id' ? 'NODE AKTIF' : 'ACTIVE NODES'}
-                  </div>
-                </div>
-
-                {/* Card 4: 180+ */}
-                <div
-                  className="rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center backdrop-blur-xl border transition-all duration-300 hover:-translate-y-1 group"
-                  style={{
-                    backgroundColor: 'rgba(8, 15, 28, 0.65)',
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary || '#06b6d4';
-                    e.currentTarget.style.boxShadow = `0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px ${activeTheme?.glow || 'rgba(6, 182, 212, 0.3)'}`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = activeTheme?.primary ? `${activeTheme.primary}33` : 'rgba(56, 189, 248, 0.2)';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.5)';
-                  }}
-                >
-                  <div
-                    className="text-2xl sm:text-3xl font-extrabold tracking-tight transition-colors duration-300"
-                    style={{ color: activeTheme?.primary || '#22d3ee' }}
-                  >
-                    180+
-                  </div>
-                  <div className="font-mono text-[9px] sm:text-[10px] tracking-[0.2em] uppercase text-slate-400 mt-2">
-                    {lang === 'id' ? 'PROTOKOL DIDUKUNG' : 'PROTOCOLS SUPPORTED'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Animated Cyber Scroll Indicator */}
-              <div className="mt-10 sm:mt-12 flex justify-center">
-                <a
-                  href="#connectivity"
-                  className="flex flex-col items-center gap-2 group cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95"
-                  aria-label="Scroll to next section"
-                >
-                  <span
-                    className="font-mono text-[9px] sm:text-[10px] tracking-[0.32em] uppercase text-slate-400 group-hover:text-white transition-colors"
-                  >
-                    SCROLL
-                  </span>
-
-                  {/* Cyber Mouse Capsule with dynamic glowing wheel */}
-                  <div
-                    className="w-[20px] h-[34px] rounded-full border-[1.5px] flex items-start justify-center p-1 transition-all duration-300"
-                    style={{
-                      borderColor: activeTheme?.primary ? `${activeTheme.primary}80` : 'rgba(56, 189, 248, 0.5)',
-                      boxShadow: `0 0 16px ${activeTheme?.glow ? activeTheme.glow.replace('0.45', '0.25') : 'rgba(6, 182, 212, 0.25)'}`,
-                      backgroundColor: 'rgba(3, 10, 20, 0.6)',
-                    }}
-                  >
-                    <div
-                      className="w-1.5 h-2 rounded-full animate-scroll-wheel"
-                      style={{
-                        backgroundColor: activeTheme?.primary || '#06b6d4',
-                        boxShadow: `0 0 8px ${activeTheme?.primary || '#06b6d4'}`,
-                      }}
-                    />
-                  </div>
-
-                  {/* Pulsing subtle chevron */}
-                  <div className="animate-scroll-bounce -mt-0.5">
-                    <ChevronDown size={14} style={{ color: activeTheme?.primary || '#38bdf8' }} />
-                  </div>
-                </a>
-              </div>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* ── PROTOCOL & HARDWARE TICKER (LANGSUNG DI BAWAH HERO OVERVIEW) ── */}
-      <section id="connectivity" className="relative py-20 bg-black border-y border-white/5 overflow-hidden z-20">
-        {/* Subtle radial glow from active theme */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
-            background: `radial-gradient(ellipse 70% 50% at 50% 50%, ${activeTheme?.primary || '#06b6d4'}26, transparent 75%)`,
-          }}
-        />
-
-        <div className="w-full relative z-10 flex flex-col items-center">
-          {/* Cyber Pill Tag Header */}
-          <div className="text-center mb-8 px-4">
-            <div
-              className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest border"
-              style={{
-                backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
-                borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
-                color: activeTheme?.primary || '#38bdf8',
-              }}
-            >
-              {t.protoHwLabel}
-            </div>
-          </div>
-
-          {/* Infinite Seamless Marquee Ticker */}
-          <div className="w-full overflow-hidden select-none py-2 relative">
-            {/* Edge fade gradients for seamless look */}
-            <div className="absolute top-0 bottom-0 left-0 w-24 sm:w-36 bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
-            <div className="absolute top-0 bottom-0 right-0 w-24 sm:w-36 bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
-
-            <div className="animate-marquee items-center gap-10 sm:gap-14">
+            <div className="hidden lg:flex items-center gap-1">
               {[
-                'HTTP/2',
-                'LoRaWAN',
-                'Zigbee',
-                'REST API',
-                'MQTT v5.0',
-                'WebSocket',
-                'Arduino',
-                'ESP32',
-                'Raspberry Pi',
-                'Modbus TCP',
-                'OPC-UA',
-                'RTSP / ONVIF',
-                'WebRTC',
-                'CoAP',
-                // Repeated sequence for 100% infinite continuous loop
-                'HTTP/2',
-                'LoRaWAN',
-                'Zigbee',
-                'REST API',
-                'MQTT v5.0',
-                'WebSocket',
-                'Arduino',
-                'ESP32',
-                'Raspberry Pi',
-                'Modbus TCP',
-                'OPC-UA',
-                'RTSP / ONVIF',
-                'WebRTC',
-                'CoAP',
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-10 sm:gap-14 flex-shrink-0">
-                  <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#8e9bb0]/70 hover:text-white transition-colors duration-300">
-                    {item}
-                  </span>
-                  <span
-                    className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.8)]"
-                    style={{
-                      backgroundColor: activeTheme?.primary || '#06b6d4',
-                      boxShadow: `0 0 12px ${activeTheme?.primary || '#06b6d4'}`,
-                    }}
-                  />
-                </div>
+                { href: '#overview', label: t.overview },
+                { href: '#features', label: t.features },
+                { href: '#industri', label: t.industry },
+                { href: '#pricing', label: t.pricing },
+                { href: '#faq', label: t.faq },
+              ].map((navItem) => (
+                <a
+                  key={navItem.href}
+                  href={navItem.href}
+                  className="px-3.5 py-2 rounded-full text-[13.5px] font-normal text-white/65 hover:text-white hover:bg-white/[0.06] transition-[color,background-color] duration-200"
+                >
+                  {navItem.label}
+                </a>
               ))}
             </div>
           </div>
+
+          {/* Right: Quiet Theme Swatches, Language Toggle & Stark White Pill CTA */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="hidden md:flex items-center gap-0.5 px-2 py-1 rounded-full bg-white/[0.04] border border-white/[0.09]">
+              {darkThemes.map((th) => {
+                const isSelected = activeTheme?.primary?.toLowerCase() === th.primary.toLowerCase();
+                return (
+                  <button
+                    key={th.id}
+                    type="button"
+                    onClick={() => selectThemeSwatch(th)}
+                    title={th.label[lang] || th.label.id}
+                    aria-label={th.label[lang] || th.label.id}
+                    className="p-1.5 rounded-full cursor-pointer flex items-center justify-center group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full transition-[transform,opacity] duration-200 ${
+                        isSelected
+                          ? 'scale-125 ring-2 ring-white/95'
+                          : 'opacity-50 group-hover:opacity-100'
+                      }`}
+                      style={{ backgroundColor: th.primary }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={toggleLanguage}
+              className="min-h-[36px] min-w-[38px] text-[12px] font-medium text-white/70 hover:text-white transition-[color,background-color,transform] duration-200 active:scale-[0.96] hover:bg-white/[0.06] rounded-full px-3 py-1.5 select-none cursor-pointer"
+              title="Ganti Bahasa / Change Language"
+            >
+              {lang === 'id' ? 'ID' : 'EN'}
+            </button>
+
+            <Link
+              to="/login"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-medium text-[13px] tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 transition-[transform,background-color] duration-200 active:scale-[0.96] whitespace-nowrap"
+            >
+              <span>{t.signIn}</span>
+            </Link>
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden min-w-[40px] min-h-[40px] flex items-center justify-center text-white/80 hover:text-white rounded-full bg-white/[0.06] border border-white/[0.12] transition-[color,background-color,transform] duration-200 active:scale-[0.96]"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div
+            className="lg:hidden px-6 py-4 flex flex-col gap-3 backdrop-blur-2xl border-b border-white/[0.10]"
+            style={{ backgroundColor: silk.deepRgba(0.92) }}
+          >
+            {[
+              { href: '#overview', label: t.overview },
+              { href: '#features', label: t.features },
+              { href: '#industri', label: t.industry },
+              { href: '#pricing', label: t.pricing },
+              { href: '#faq', label: t.faq },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-normal text-white/80 hover:text-white py-1.5 transition-colors"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {/* ── WEIGHTLESS EDITORIAL HERO (ANTIGRAVITY.GOOGLE ARCHITECTURE OVER LIVE WEBGL) ── */}
+      <section
+        id="overview"
+        className="relative z-10 pt-32 sm:pt-40 pb-20 sm:pb-28 px-6 overflow-hidden"
+        style={{ position: 'relative' }}
+      >
+        <div className="w-full max-w-[1160px] mx-auto flex flex-col items-center text-center relative z-10">
+          {/* Calm Brand Lockup above Headline */}
+          <FadeIn delay={60} className="w-full flex justify-center">
+            <div className="inline-flex items-center gap-2.5 mb-6 select-none">
+              <img
+                src="/new_videa_link_icon.png"
+                alt="Videa Link Icon"
+                className="w-5 h-5 object-contain"
+              />
+              <span className="text-[15px] font-medium tracking-[-0.015em] text-white/85">
+                Videa Link
+              </span>
+            </div>
+          </FadeIn>
+
+          {/* Editorial Regular/Medium Display Headline (Antigravity signature weight & spacing) */}
+          <FadeIn delay={120} className="w-full">
+            <h1
+              className="text-[2.6rem] sm:text-6xl md:text-[4.5rem] lg:text-[5rem] leading-[1.05] font-normal tracking-[-0.04em] text-white max-w-[920px] mx-auto"
+              style={{
+                textWrap: 'balance',
+                textShadow: '0 10px 36px rgba(0, 0, 0, 0.45)',
+              }}
+            >
+              {lang === 'id'
+                ? 'Kendalikan perangkat IoT dan ruangan 3D dalam satu ruang kerja.'
+                : 'Control IoT devices and 3D rooms from one workspace.'}
+            </h1>
+          </FadeIn>
+
+          <FadeIn delay={180} className="mt-6 flex flex-col items-center w-full">
+            <p
+              className="text-base sm:text-lg text-white/65 max-w-[600px] mx-auto font-normal leading-relaxed"
+              style={{ textWrap: 'pretty' }}
+            >
+              {t.heroDesc}
+            </p>
+
+            {/* Stark Monochrome Primary Pill + Minimal Frosted Secondary Pill */}
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                to="/login?mode=register"
+                className="min-h-[48px] inline-flex items-center gap-2 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
+              >
+                <span>{t.getStarted}</span>
+                <ArrowRight size={15} />
+              </Link>
+
+              <a
+                href="#features"
+                className="min-h-[48px] inline-flex items-center gap-1.5 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] text-white/90 hover:text-white backdrop-blur-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.15] transition-[transform,background-color,border-color,color] duration-200 active:scale-[0.96] select-none"
+              >
+                <span>{t.learnMore}</span>
+              </a>
+            </div>
+          </FadeIn>
+
+          {/* ── ANTIGRAVITY-STYLE CENTERED PRODUCT VIEWPORT SHOWCASE ── */}
+          <FadeIn delay={260} className="w-full mt-16 sm:mt-24">
+            <div
+              className="relative w-full max-w-[1080px] mx-auto rounded-[28px] p-2 sm:p-2.5 backdrop-blur-2xl border border-white/[0.12] overflow-hidden"
+              style={{
+                background: silk.cardSurface,
+                boxShadow: `inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 40px 100px -24px rgba(0, 0, 0, 0.85)`,
+              }}
+            >
+              {/* Concentric inner cinema window: 28px outer - 10px padding = 18px inner */}
+              <div
+                className="rounded-[18px] overflow-hidden bg-[#05070e]"
+                style={{
+                  outline: '1px solid rgba(255, 255, 255, 0.10)',
+                  outlineOffset: '-1px',
+                }}
+              >
+                {/* Minimal Workspace Title Bar */}
+                <div className="px-4 sm:px-5 py-3 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-white/15" />
+                    <span className="ml-2 font-mono text-[11px] text-white/45 tracking-wide">
+                      videalink.app / 3d-room-editor
+                    </span>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 font-mono text-[11px] text-white/55">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{
+                        backgroundColor: silk.mid,
+                        boxShadow: `0 0 8px ${silk.mid}`,
+                      }}
+                    />
+                    <span>MQTT · REST · Heartbeat 60s</span>
+                  </div>
+                </div>
+
+                {/* Product Showcase Media */}
+                <div className="relative aspect-[16/9] w-full overflow-hidden">
+                  <img
+                    src="/assets/room3d.jpg"
+                    alt="Videa Link 3D Room Editor & Live IoT Telemetry"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#04050b]/55 via-transparent to-transparent pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
-      {/* ── UNIVERSAL CONNECTIVITY (Gateway) ── */}
-      <section id="gateway" className="relative py-32 px-6 bg-black z-10 scroll-mt-24">
-        {/* Soft blur/gradient transition that overlays and fades out the hero section above */}
-        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-transparent to-black -translate-y-full pointer-events-none" />
+      {/* ── ANTIGRAVITY SIGNATURE SINUSOIDAL FLOATING ICON WAVE + EDITORIAL MANIFESTO ── */}
+      <section
+        id="connectivity"
+        className="relative py-20 sm:py-28 bg-transparent border-t border-white/[0.08] overflow-hidden z-20"
+      >
+        <div className="w-full relative z-10">
+          {/* Sinusoidal Floating Circular Icon Wave */}
+          <FloatingIconWave primaryColor={primaryColor} />
 
-        <div className="w-full max-w-[1300px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center text-left">
-          {/* Left Column: Animation with Dynamic Theme and New Logo */}
-          <FadeIn delay={400} direction="right" className="relative w-full aspect-[16/11] flex items-center justify-center">
-            <IoTAnimation lang={lang} activeTheme={activeTheme} />
-          </FadeIn>
-
-          {/* Right Column: Explanatory Text */}
-          <FadeIn delay={600} direction="left" className="text-left flex flex-col justify-center">
-            <div
-              className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6 w-fit border"
-              style={{
-                backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
-                borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
-                color: activeTheme?.primary || '#38bdf8',
-              }}
-            >
-              {t.univConn}
+          {/* Left-Aligned Antigravity Editorial Manifesto Statement */}
+          <div className="max-w-[1200px] mx-auto mt-16 sm:mt-24 px-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
+            <div className="lg:col-span-3">
+              <span className="font-mono text-xs tracking-[0.06em] text-white/45">
+                01 / {lang === 'id' ? 'Ekosistem' : 'Ecosystem'}
+              </span>
             </div>
-            <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-[#f5f5f7] mb-6">
-              {t.oneGate}<br/>
-              {t.thousands}
+            <div className="lg:col-span-9">
+              <p
+                className="text-2xl sm:text-3xl md:text-[2.35rem] font-normal leading-[1.24] tracking-[-0.03em] text-white"
+                style={{ textWrap: 'pretty' }}
+              >
+                {lang === 'id' ? (
+                  <>
+                    Videa Link menyatukan telemetri sensor, Data Bucket Auto-Discovery, dan Editor Ruangan 3D.{' '}
+                    <span className="text-white/50">
+                      Dirancang agar perangkat ESP32, ESP8266, Arduino, hingga Raspberry Pi terhubung dan dapat dikendalikan dalam hitungan detik.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Videa Link unifies sensor telemetry, Auto-Discovery Data Buckets, and a 3D Room Editor.{' '}
+                    <span className="text-white/50">
+                      Built so ESP32, ESP8266, Arduino, and Raspberry Pi hardware connect and respond in seconds.
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── EDITORIAL ARCHITECTURE BEAT (GATEWAY) ── */}
+      <section
+        id="gateway"
+        className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10 scroll-mt-20"
+      >
+        <div className="w-full max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center text-left">
+          {/* Left Column: Calm Editorial Copy + Hairline Spec Rows */}
+          <FadeIn delay={140} direction="right" className="lg:col-span-5 text-left flex flex-col justify-center">
+            <span className="font-mono text-xs tracking-[0.06em] text-white/45 mb-5">
+              02 / {t.univConn}
+            </span>
+
+            <h3
+              className="text-3xl sm:text-4xl md:text-[2.85rem] font-normal tracking-[-0.035em] leading-[1.1] text-white mb-6"
+              style={{ textWrap: 'balance' }}
+            >
+              {t.oneGate} {t.thousands}
             </h3>
-            <p className="text-lg md:text-xl text-[#86868b] leading-relaxed mb-10 max-w-lg">
+
+            <p
+              className="text-base text-white/65 leading-relaxed mb-10"
+              style={{ textWrap: 'pretty' }}
+            >
               {t.gateDesc}
             </p>
 
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center gap-5">
-                <div
-                  className="w-14 h-14 rounded-2xl bg-[#111111] border flex items-center justify-center shadow-lg transition-colors"
-                  style={{
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : '#333336',
-                  }}
-                >
-                  <Zap size={24} style={{ color: activeTheme?.primary || '#0071e3' }} />
-                </div>
+            {/* Clean Architectural Hairline Spec Rows (No stacked heavy card clutter) */}
+            <div className="border-t border-white/[0.10] divide-y divide-white/[0.10]">
+              <div className="py-5 flex items-start gap-4">
+                <Zap size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
                 <div>
-                  <h4 className="text-[#f5f5f7] font-semibold text-lg">{t.rtGate}</h4>
-                  <p className="text-[#86868b] text-sm mt-1">{t.rtGateDesc}</p>
+                  <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">{t.rtGate}</h4>
+                  <p className="text-white/60 text-sm mt-1 leading-relaxed" style={{ textWrap: 'pretty' }}>
+                    {t.rtGateDesc}
+                  </p>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-5">
-                <div
-                  className="w-14 h-14 rounded-2xl bg-[#111111] border flex items-center justify-center shadow-lg transition-colors"
-                  style={{
-                    borderColor: activeTheme?.primary ? `${activeTheme.primary}33` : '#333336',
-                  }}
-                >
-                  <Database size={24} style={{ color: activeTheme?.primary || '#0071e3' }} />
-                </div>
+
+              <div className="py-5 flex items-start gap-4">
+                <Database size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
                 <div>
-                  <h4 className="text-[#f5f5f7] font-semibold text-lg">{t.uniProto}</h4>
-                  <p className="text-[#86868b] text-sm mt-1">{t.uniProtoDesc}</p>
+                  <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">{t.uniProto}</h4>
+                  <p className="text-white/60 text-sm mt-1 leading-relaxed" style={{ textWrap: 'pretty' }}>
+                    {t.uniProtoDesc}
+                  </p>
                 </div>
               </div>
+            </div>
+          </FadeIn>
+
+          {/* Right Column: Serene Frosted Cinema Stage framing IoTAnimation */}
+          <FadeIn delay={220} direction="left" className="lg:col-span-7 relative w-full flex items-center justify-center">
+            <div
+              className="relative w-full aspect-[16/11] rounded-[28px] p-3 sm:p-5 backdrop-blur-2xl border border-white/[0.12] flex items-center justify-center overflow-hidden"
+              style={{
+                background: silk.cardSurface,
+                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.8)',
+              }}
+            >
+              <IoTAnimation lang={lang} activeTheme={activeTheme} />
             </div>
           </FadeIn>
         </div>

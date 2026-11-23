@@ -191,7 +191,18 @@ class BucketController extends Controller
             'recorded_at'    => $recordedAt,
         ]);
 
-        return response()->json($record, 201);
+        $alertsTriggered = [];
+        if ($bucket->device) {
+            $alertsTriggered = app(\App\Services\AlertEvaluatorService::class)->evaluate(
+                $bucket->device,
+                $validated['payload'],
+                $recordedAt
+            );
+        }
+
+        return response()->json(array_merge($record->toArray(), [
+            'alerts_triggered' => count($alertsTriggered),
+        ]), 201);
     }
 
     public function destroy(Request $request, DataBucket $bucket)
@@ -318,18 +329,26 @@ class BucketController extends Controller
             'recorded_at'    => $recordedAt,
         ]);
 
-        // Update associated device status if available
+        // Update associated device status if available & evaluate alert rules
+        $alertsTriggered = [];
         if ($bucket->device) {
             $bucket->device->update([
                 'last_seen_at' => now(),
                 'status'       => 'online',
             ]);
+
+            $alertsTriggered = app(\App\Services\AlertEvaluatorService::class)->evaluate(
+                $bucket->device,
+                $payload,
+                $recordedAt
+            );
         }
 
         return response()->json([
-            'message'     => 'MQTT telemetry recorded successfully',
-            'record_id'   => $record->id,
-            'recorded_at' => $record->recorded_at,
+            'message'          => 'MQTT telemetry recorded successfully',
+            'record_id'        => $record->id,
+            'recorded_at'      => $record->recorded_at,
+            'alerts_triggered' => count($alertsTriggered),
         ], 201);
     }
 }

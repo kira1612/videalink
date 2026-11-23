@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, FastForward } from 'lucide-react';
+import { Volume2, VolumeX, FastForward, Box } from 'lucide-react';
+import { getSilkPaletteTokens } from './SilkWaveBackground';
 
-export default function GameLoginTransition({ user = {}, onComplete, color = '#0071e3' }) {
-  const [progress, setProgress] = useState(0);
+export default function GameLoginTransition({ user = {}, onComplete, color = '#06b6d4' }) {
+  const [phase, setPhase] = useState('diving'); // 'diving' | 'cubes' | 'greeting'
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isWarpExplosion, setIsWarpExplosion] = useState(false);
-  const [showGreeting, setShowGreeting] = useState(false);
   const [hasStartedAudio, setHasStartedAudio] = useState(false);
   const audioCtxRef = useRef(null);
   const audioInitializedRef = useRef(false);
+  const soundEnabledRef = useRef(true);
+  const completedRef = useRef(false);
 
-  // Audio setup
+  const silk = getSilkPaletteTokens(color);
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
   const initAudio = () => {
     if (audioInitializedRef.current) return;
     try {
@@ -28,142 +34,150 @@ export default function GameLoginTransition({ user = {}, onComplete, color = '#0
     }
   };
 
-  const playWarpDrone = () => {
-    if (!soundEnabled || !audioCtxRef.current) return;
+  // Smooth aquatic/energy-stream plunge sound (low-pass filter sweep)
+  const playDiveSubmerge = () => {
+    if (!soundEnabledRef.current || !audioCtxRef.current) return;
     try {
       const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+
       const osc = ctx.createOscillator();
+      const subOsc = ctx.createOscillator();
       const filter = ctx.createBiquadFilter();
       const gain = ctx.createGain();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(65, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 2.0);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(210, now);
+      osc.frequency.exponentialRampToValueAtTime(72, now + 1.1);
+
+      subOsc.type = 'triangle';
+      subOsc.frequency.setValueAtTime(105, now);
+      subOsc.frequency.exponentialRampToValueAtTime(48, now + 1.15);
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(200, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 2.0);
+      filter.Q.setValueAtTime(3.2, now);
+      filter.frequency.setValueAtTime(1400, now);
+      filter.frequency.exponentialRampToValueAtTime(220, now + 1.05);
 
-      gain.gain.setValueAtTime(0.01, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.09, ctx.currentTime + 1.5);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.2);
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.11, now + 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
 
       osc.connect(filter);
+      subOsc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
 
-      osc.start();
-      osc.stop(ctx.currentTime + 2.2);
+      osc.start(now);
+      subOsc.start(now);
+      osc.stop(now + 1.25);
+      subOsc.stop(now + 1.25);
     } catch (e) {}
   };
 
-  const playHyperspaceBoom = () => {
-    if (!soundEnabled || !audioCtxRef.current) return;
+  // Crystalline harmonic shimmer as the 3D data cubes surround the viewer
+  const playDataCubesShimmer = () => {
+    if (!soundEnabledRef.current || !audioCtxRef.current) return;
     try {
       const ctx = audioCtxRef.current;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(120, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.6);
-
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.6);
-    } catch (e) {}
-  };
-
-  const playWelcomeChime = () => {
-    if (!soundEnabled || !audioCtxRef.current) return;
-    try {
-      const ctx = audioCtxRef.current;
-      // High-tech chord chime (F# - A# - C# - D#)
-      const notes = [370, 466, 554, 740];
+      const now = ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
+        const t = now + i * 0.065;
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+        osc.frequency.setValueAtTime(freq, t);
 
-        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.08);
-        gain.gain.linearRampToValueAtTime(0.09, ctx.currentTime + i * 0.08 + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.6);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(0.045, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        osc.start(ctx.currentTime + i * 0.08);
-        osc.stop(ctx.currentTime + i * 0.08 + 0.65);
+        osc.start(t);
+        osc.stop(t + 0.7);
       });
     } catch (e) {}
   };
 
-  // Start sound & sequence on mount
+  // Warm major-9th welcome chord
+  const playWelcomeChime = () => {
+    if (!soundEnabledRef.current || !audioCtxRef.current) return;
+    try {
+      const ctx = audioCtxRef.current;
+      const now = ctx.currentTime;
+      const notes = [329.63, 415.3, 493.88, 622.25, 739.99];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + i * 0.055;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.linearRampToValueAtTime(0.055, t + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(t);
+        osc.stop(t + 1.0);
+      });
+    } catch (e) {}
+  };
+
+  const finishTransition = () => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    onComplete && onComplete();
+  };
+
   useEffect(() => {
-    // Check WCAG prefers-reduced-motion for photosensitive users
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
-      // Langsung lewati efek warp dan tampilkan sambutan statis lembut
-      setShowGreeting(true);
-      const timer = setTimeout(() => {
-        onComplete && onComplete();
-      }, 1400);
+      setPhase('greeting');
+      const timer = setTimeout(finishTransition, 1500);
       return () => clearTimeout(timer);
     }
 
     initAudio();
-    playWarpDrone();
+    playDiveSubmerge();
 
-    const startTime = performance.now();
-    const warpDuration = 1800; // 1.8 detik animasi warp tunnel halus
+    const timers = [];
 
-    let animationFrameId;
+    // Act 2: Emerge underneath the glowing silk waves into the 3D data cube stream
+    timers.push(
+      setTimeout(() => {
+        setPhase('cubes');
+        playDataCubesShimmer();
+      }, 1480)
+    );
 
-    const tick = (now) => {
-      const elapsed = now - startTime;
-      const rawProgress = Math.min(100, Math.round((elapsed / warpDuration) * 100));
-      setProgress(rawProgress);
+    // Act 3: Decelerate into calm hover & reveal welcome greeting
+    timers.push(
+      setTimeout(() => {
+        setPhase('greeting');
+        playWelcomeChime();
+      }, 3150)
+    );
 
-      if (rawProgress >= 100) {
-        // Warp Selesai -> Smooth Soft Glow Transition (AMAN: tanpa white flash)
-        setIsWarpExplosion(true);
-        playHyperspaceBoom();
+    // Complete transition into dashboard
+    timers.push(setTimeout(finishTransition, 5900));
 
-        // Tampilkan teks sambutan hangat secara lembut
-        setTimeout(() => {
-          setShowGreeting(true);
-          playWelcomeChime();
-        }, 200);
-
-        // Berikan waktu membaca sambutan sebelum masuk dashboard (diperpanjang jadi ~3.2 detik)
-        setTimeout(() => {
-          onComplete && onComplete();
-        }, 3200);
-      } else {
-        animationFrameId = requestAnimationFrame(tick);
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(tick);
-
-    // Keyboard shortcut: Space / Escape to skip
     const handleKeyDown = (e) => {
       if (e.code === 'Space' || e.code === 'Escape') {
         e.preventDefault();
-        skipTransition();
+        finishTransition();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      timers.forEach((t) => clearTimeout(t));
       window.removeEventListener('keydown', handleKeyDown);
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
         try {
@@ -173,116 +187,108 @@ export default function GameLoginTransition({ user = {}, onComplete, color = '#0
     };
   }, []);
 
-  const skipTransition = () => {
-    setIsWarpExplosion(true);
-    setTimeout(() => {
-      onComplete && onComplete();
-    }, 100);
-  };
-
   const displayName = user?.name || user?.email?.split('@')[0] || 'Operator';
+  const showGreeting = phase === 'greeting';
 
   return (
-    <div 
-      className={`fixed inset-0 z-50 flex flex-col justify-between p-6 md:p-10 select-none overflow-hidden transition-all duration-700 ${
-        showGreeting ? 'bg-black/80 backdrop-blur-[4px]' : 'bg-transparent'
-      }`}
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-between p-6 md:p-10 select-none overflow-hidden"
       onClick={() => {
         if (!hasStartedAudio) initAudio();
       }}
     >
-      {/* ── PHOTOSENSITIVE-SAFE SMOOTH AMBIENT GLOW (Bukan White Flash, adaptif ke warna landing) ── */}
-      <div 
-        className={`absolute inset-0 z-40 pointer-events-none transition-opacity duration-700 ${
-          isWarpExplosion && !showGreeting ? 'opacity-80' : 'opacity-0'
+      {/* Gentle atmospheric readability vignette (keeps 3D data cubes crisp & visible behind text) */}
+      <div
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
+          showGreeting ? 'opacity-100' : 'opacity-45'
         }`}
         style={{
-          background: `radial-gradient(circle at center, ${color}66 0%, ${color}26 40%, rgba(0,0,0,0.85) 100%)`,
-        }}
-      />
-
-      {/* Cybernetic Scanlines & Vignette */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_30%,_#000000_90%)] opacity-85 z-0" />
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.03] z-0"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px)',
-          backgroundSize: '100% 4px',
+          background:
+            'radial-gradient(ellipse 62% 58% at 50% 50%, rgba(2, 4, 12, 0.56) 0%, rgba(2, 4, 12, 0.18) 58%, rgba(2, 3, 8, 0.72) 100%)',
         }}
       />
 
       {/* ── TOP CONTROLS (Audio & Skip) ── */}
-      <div className="relative z-50 flex items-center justify-end text-xs font-mono uppercase tracking-widest text-[#86868b]">
+      <div className="relative z-50 flex items-center justify-end">
         <div className="flex items-center gap-2">
-          {/* Audio toggle button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               initAudio();
-              setSoundEnabled(!soundEnabled);
+              setSoundEnabled((prev) => !prev);
             }}
-            className="p-2.5 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-[#86868b] hover:text-[#f5f5f7] transition-all backdrop-blur-md"
-            title={soundEnabled ? 'Mute Audio' : 'Unmute Audio'}
+            className="min-w-[42px] min-h-[42px] flex items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 text-white/70 hover:text-white transition-all backdrop-blur-xl cursor-pointer active:scale-95"
+            title={soundEnabled ? 'Bisukan Audio' : 'Aktifkan Audio'}
+            aria-label={soundEnabled ? 'Bisukan Audio' : 'Aktifkan Audio'}
           >
-            {soundEnabled ? (
-              <Volume2 size={16} style={{ color }} />
-            ) : (
-              <VolumeX size={16} />
-            )}
+            {soundEnabled ? <Volume2 size={16} style={{ color: silk.left }} /> : <VolumeX size={16} />}
           </button>
 
-          {/* Quick Skip Button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              skipTransition();
+              finishTransition();
             }}
-            className="p-2.5 rounded-full hover:brightness-125 border text-[#f5f5f7] transition-all backdrop-blur-md group"
+            className="min-h-[42px] inline-flex items-center gap-1.5 px-3.5 rounded-full hover:brightness-125 border text-white/90 text-xs font-medium transition-all backdrop-blur-xl group cursor-pointer active:scale-95"
             style={{
-              backgroundColor: `${color}26`,
-              borderColor: `${color}66`,
+              backgroundColor: silk.surfaceRgba(0.65),
+              borderColor: silk.midRgba(0.55),
             }}
-            title="Lewati"
+            title="Lewati animasi (Spasi / Esc)"
           >
-            <FastForward size={16} className="group-hover:translate-x-0.5 transition-transform" />
+            <span>Lewati</span>
+            <FastForward size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
       </div>
 
-      {/* ── CENTER AREA: ELEGANT WELCOME REVEAL (MUNCUL SETELAH ANIMASI WARP) ── */}
+      {/* ── CENTER AREA: SERENE WELCOME REVEAL SURROUNDED BY 3D DATA CUBES ── */}
       <div className="relative z-50 flex-1 flex flex-col items-center justify-center pointer-events-none">
         {showGreeting && (
-          <div className="flex flex-col items-center text-center px-4 animate-fade-in transition-all duration-700">
-            {/* Subtle glow orb behind text with active landing color */}
-            <div 
-              className="absolute w-72 h-72 rounded-full blur-[90px] pointer-events-none -z-10"
+          <div className="relative flex flex-col items-center text-center px-4 animate-fade-in transition-all duration-700">
+            {/* Soft tonal glow behind typography */}
+            <div
+              className="absolute w-80 h-80 rounded-full blur-[100px] pointer-events-none -z-10"
               style={{
-                background: `radial-gradient(circle, ${color}66 0%, ${color}26 60%, transparent 100%)`,
+                background: `radial-gradient(circle, ${silk.midRgba(0.45)} 0%, ${silk.rightRgba(0.18)} 55%, transparent 100%)`,
               }}
             />
 
             {/* Status Pill */}
-            <div 
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.06] border border-white/15 backdrop-blur-md mb-4"
+            <div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 backdrop-blur-2xl mb-5"
               style={{
-                boxShadow: `0 0 20px ${color}40`,
+                background: silk.pillSurface,
+                boxShadow: `0 0 24px ${silk.midRgba(0.35)}, inset 0 1px 0 rgba(255,255,255,0.18)`,
               }}
             >
-              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: color }} />
-              <span className="text-[11px] font-mono tracking-widest uppercase font-semibold" style={{ color }}>
-                Sistem Terhubung
+              <span className="relative flex h-2 w-2">
+                <span
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                  style={{ backgroundColor: silk.left }}
+                />
+                <span
+                  className="relative inline-flex rounded-full h-2 w-2"
+                  style={{ backgroundColor: silk.left }}
+                />
+              </span>
+              <span
+                className="text-[11px] font-mono tracking-[0.16em] uppercase font-semibold"
+                style={{ color: silk.left }}
+              >
+                Aliran Data Tersinkronisasi
               </span>
             </div>
 
-            {/* Main Greeting Headline with landing color gradient */}
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.35)] leading-tight">
+            {/* Main Greeting Headline */}
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white drop-shadow-[0_6px_32px_rgba(0,0,0,0.65)] leading-tight">
               Selamat Datang,{' '}
-              <span 
+              <span
                 className="text-transparent bg-clip-text"
                 style={{
-                  backgroundImage: `linear-gradient(to right, ${color}, #ffffff)`,
+                  backgroundImage: `linear-gradient(120deg, ${silk.left} 0%, #ffffff 55%, ${silk.mid} 100%)`,
                 }}
               >
                 {displayName}
@@ -290,15 +296,27 @@ export default function GameLoginTransition({ user = {}, onComplete, color = '#0
             </h1>
 
             {/* Subtitle */}
-            <p className="mt-3 text-sm sm:text-base text-[#86868b] font-medium tracking-wide max-w-md">
-              Menyiapkan ruang kerja komando IoT Anda...
+            <p className="mt-3.5 text-sm sm:text-base text-white/75 font-medium tracking-wide max-w-md drop-shadow-[0_2px_12px_rgba(0,0,0,0.75)]">
+              Memasuki ruang kerja komando IoT Anda...
             </p>
           </div>
         )}
       </div>
 
-      {/* Bottom spacer */}
-      <div className="relative z-10 h-4 pointer-events-none" />
+      {/* ── BOTTOM SUBTLE STREAM TELEMETRY STATUS (DURING DIVE & CUBE SURGE) ── */}
+      <div className="relative z-50 h-8 flex items-center justify-center pointer-events-none">
+        {!showGreeting && (
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 backdrop-blur-xl text-[11px] font-mono uppercase tracking-[0.16em] text-white/75 animate-fade-in"
+            style={{ background: silk.surfaceRgba(0.45) }}
+          >
+            <Box size={13} style={{ color: silk.left }} className="animate-spin" />
+            <span>
+              {phase === 'diving' ? 'Menyelam ke Aliran Data...' : 'Memuat Kubus Telemetri 3D...'}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

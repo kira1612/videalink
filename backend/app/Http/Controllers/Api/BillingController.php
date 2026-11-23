@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SubscribeRequest;
+use App\Models\ActivityLog;
 use App\Models\Invoice;
 use App\Services\BillingService;
+use App\Services\EmailNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -93,6 +95,36 @@ class BillingController extends Controller
         return response()->json([
             'invoice' => $this->billingService->formatInvoice($invoice),
         ]);
+    }
+
+    public function sendInvoiceEmail(
+        Request $request,
+        Invoice $invoice,
+        EmailNotificationService $emailService
+    ): JsonResponse {
+        if ((int) $invoice->user_id !== (int) $request->user()->id) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'email' => 'nullable|string|max:255',
+        ]);
+
+        $result = $emailService->sendInvoice($invoice, $request->user(), $validated['email'] ?? null);
+
+        if (!$result['ok']) {
+            return response()->json(['message' => $result['message']], 422);
+        }
+
+        ActivityLog::create([
+            'user_id'     => $request->user()->id,
+            'device_id'   => null,
+            'device_name' => $invoice->invoice_number,
+            'event'       => "Mengirim invoice {$invoice->invoice_number} ke email " . implode(', ', $result['recipients'] ?? []),
+            'type'        => 'info',
+        ]);
+
+        return response()->json($result);
     }
 }
 

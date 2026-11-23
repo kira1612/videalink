@@ -566,10 +566,17 @@
 .animate-marquee {
   display: flex;
   width: max-content;
-  animation: marqueeScroll 38s linear infinite;
+  animation: marqueeScroll 42s linear infinite;
 }
 
-.animate-marquee:hover {
+.animate-marquee-reverse {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll 46s linear infinite reverse;
+}
+
+.animate-marquee:hover,
+.animate-marquee-reverse:hover {
   animation-play-state: paused;
 }
 
@@ -629,6 +636,7 @@
   .animate-bounce,
   .animate-float,
   .animate-marquee,
+  .animate-marquee-reverse,
   .animate-pulse-slow {
     animation: none !important;
   }

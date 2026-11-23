@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Minus, Wifi, Activity, Shield, Layers, Bell } from 'lucide-react';
+import { Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Box, Moon, Sun } from 'lucide-react';
+import { getSilkPaletteTokens } from './SilkWaveBackground';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THEMES — persis sesuai sistem: 5 warna aksen × 2 mode (dark / light)
@@ -205,45 +206,61 @@ function CrossfadeImage({ src, alt, glow, primary }) {
     </div>
   );
 
+  const silk = getSilkPaletteTokens(primary);
+
   return (
     <div style={{
-      position:     'relative',
-      width:        '100%',
-      borderRadius: 20,
-      overflow:     'hidden',
-      aspectRatio:  '16 / 10',
-      background:   '#0d1117',
-      boxShadow:    `
-        0 0 0 1px rgba(255,255,255,0.07),
-        0 40px 100px -20px ${glow},
-        0 20px 60px -10px rgba(0,0,0,0.8)
+      position:       'relative',
+      width:          '100%',
+      padding:        8,
+      borderRadius:   26,
+      background:     silk.cardSurface,
+      backdropFilter: 'blur(24px)',
+      WebkitBackdropFilter: 'blur(24px)',
+      border:         '1px solid rgba(255, 255, 255, 0.14)',
+      boxShadow:      `
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+        0 32px 90px -22px ${glow},
+        0 24px 60px -14px rgba(2, 4, 10, 0.85)
       `,
-      transition:   'box-shadow 0.6s ease',
+      transition:     'box-shadow 0.6s ease',
     }}>
-      {/* ── Layer CURRENT (selalu terlihat kecuali saat fading keluar) ── */}
-      {errorCurr
-        ? <Placeholder opacity={1} zIndex={1} color={primary} />
-        : <img
-            key={`curr-${current}`}
-            src={current}
-            alt={alt}
-            onError={() => setErrorCurr(true)}
-            style={{ ...baseImg, opacity: fading ? 0 : 1, zIndex: 1 }}
-          />
-      }
-
-      {/* ── Layer NEXT (fade-in di atas current) ── */}
-      {next && (
-        errorNext
-          ? <Placeholder opacity={fading ? 1 : 0} zIndex={2} color={primary} />
+      {/* Concentric inner radius: 26px outer - 8px padding = 18px inner */}
+      <div style={{
+        position:      'relative',
+        width:         '100%',
+        borderRadius:  18,
+        overflow:      'hidden',
+        aspectRatio:   '16 / 10',
+        background:    '#050811',
+        outline:       '1px solid rgba(255, 255, 255, 0.10)',
+        outlineOffset: '-1px',
+      }}>
+        {/* ── Layer CURRENT (selalu terlihat kecuali saat fading keluar) ── */}
+        {errorCurr
+          ? <Placeholder opacity={1} zIndex={1} color={primary} />
           : <img
-              key={`next-${next}`}
-              src={next}
+              key={`curr-${current}`}
+              src={current}
               alt={alt}
-              onError={() => setErrorNext(true)}
-              style={{ ...baseImg, opacity: fading ? 1 : 0, zIndex: 2 }}
+              onError={() => setErrorCurr(true)}
+              style={{ ...baseImg, opacity: fading ? 0 : 1, zIndex: 1 }}
             />
-      )}
+        }
+
+        {/* ── Layer NEXT (fade-in di atas current) ── */}
+        {next && (
+          errorNext
+            ? <Placeholder opacity={fading ? 1 : 0} zIndex={2} color={primary} />
+            : <img
+                key={`next-${next}`}
+                src={next}
+                alt={alt}
+                onError={() => setErrorNext(true)}
+                style={{ ...baseImg, opacity: fading ? 1 : 0, zIndex: 2 }}
+              />
+        )}
+      </div>
     </div>
   );
 }
@@ -268,6 +285,10 @@ function getFeatures(t) {
   // image: gambar yang ditampilkan di panel kanan saat item ini aktif
   // isColor: true = special color-picker item, gambarnya berdasarkan tema aktif
   return [
+    { id: 'room3d',   icon: Box,      labelKey: 'featRoom3D',   descKey: 'featRoom3DDesc',
+      image: '/assets/room3d.jpg',
+      glow: 'rgba(6,182,212,0.4)',
+    },
     { id: 'color',    icon: null,     labelKey: 'featColor',    descKey: 'featColorDesc',    isColor: true,
       image: null, /* gambar ditentukan oleh activeTheme.image */
       glow: null,
@@ -276,21 +297,21 @@ function getFeatures(t) {
       image: '/assets/telemetry.png',
       glow: 'rgba(6,182,212,0.35)',
     },
-    { id: 'devices',  icon: Wifi,     labelKey: 'featDevices',  descKey: 'featDevicesDesc',
-      image: '/assets/map.png',
-      glow: 'rgba(139,92,246,0.35)',
-    },
-    { id: 'security', icon: Shield,   labelKey: 'featSecurity', descKey: 'featSecurityDesc',
-      image: '/assets/security.png',
-      glow: 'rgba(244,63,94,0.35)',
-    },
     { id: 'buckets',  icon: Layers,   labelKey: 'featBuckets',  descKey: 'featBucketsDesc',
       image: '/assets/workflow.png',
       glow: 'rgba(16,185,129,0.35)',
     },
+    { id: 'devices',  icon: Wifi,     labelKey: 'featDevices',  descKey: 'featDevicesDesc',
+      image: '/assets/map.png',
+      glow: 'rgba(139,92,246,0.35)',
+    },
     { id: 'alerts',   icon: Bell,     labelKey: 'featAlerts',   descKey: 'featAlertsDesc',
       image: '/assets/alerts.png',
       glow: 'rgba(245,158,11,0.35)',
+    },
+    { id: 'security', icon: Shield,   labelKey: 'featSecurity', descKey: 'featSecurityDesc',
+      image: '/assets/security.png',
+      glow: 'rgba(244,63,94,0.35)',
     },
   ];
 }
@@ -299,7 +320,7 @@ function getFeatures(t) {
 export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThemeChange }) {
   const [internalTheme, setInternalTheme] = useState(THEMES[0]);
   const activeTheme = propTheme || internalTheme;
-  const [openItem,    setOpenItem]    = useState('color');
+  const [openItem,    setOpenItem]    = useState('room3d');
   const [sectionRef, sectionVisible] = useFadeIn(0.08);
 
   const features = getFeatures(t);
@@ -337,54 +358,70 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
   const previewSrc  = isColorItem ? activeTheme.image  : activeFeat.image;
   const previewGlow = isColorItem ? activeTheme.glow   : activeFeat.glow;
   const previewPrimary = isColorItem ? activeTheme.primary : activeFeat.glow?.replace('rgba(', '#').split(',')[0] ?? activeTheme.primary;
+  const silk = getSilkPaletteTokens(activeTheme?.primary || '#06b6d4');
 
   return (
     <section
       id="features"
       style={{
-        scrollMarginTop: '100px',
-        padding:    'clamp(64px, 10vw, 120px) clamp(16px, 4vw, 48px)',
-        background: '#000',
+        position:        'relative',
+        zIndex:          10,
+        scrollMarginTop: '88px',
+        padding:         'clamp(80px, 9vw, 128px) clamp(24px, 4vw, 48px)',
+        background:      'transparent',
+        borderTop:       '1px solid rgba(255, 255, 255, 0.08)',
       }}
     >
-      {/* ── Heading ── */}
-      <div style={{ maxWidth: 1200, margin: '0 auto 64px', textAlign: 'center' }}>
-        <div
+      {/* ── Editorial Split Heading (Antigravity index + regular display type) ── */}
+      <div
+        style={{
+          maxWidth:      1200,
+          margin:        '0 auto 56px',
+          display:       'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap:           '24px',
+          alignItems:    'end',
+        }}
+      >
+        <div>
+          <span
+            style={{
+              display:       'block',
+              fontFamily:    'ui-monospace, SFMono-Regular, Menlo, monospace',
+              fontSize:      '12px',
+              letterSpacing: '0.06em',
+              color:         'rgba(255, 255, 255, 0.45)',
+              marginBottom:  '18px',
+            }}
+          >
+            03 / {lang === 'id' ? 'Fitur Inti' : 'Core Features'}
+          </span>
+          <h2
+            style={{
+              fontSize:      'clamp(2rem, 4.2vw, 3.15rem)',
+              fontWeight:    400,
+              letterSpacing: '-0.035em',
+              color:         '#ffffff',
+              lineHeight:    1.08,
+              textWrap:      'balance',
+              fontFamily:    'Inter, system-ui, sans-serif',
+            }}
+          >
+            {t.featMagic}
+          </h2>
+        </div>
+
+        <p
           style={{
-            display: 'inline-block',
-            padding: '6px 16px',
-            borderRadius: '9999px',
-            fontSize: '12px',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            marginBottom: '16px',
-            border: `1px solid ${activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)'}`,
-            backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
-            color: activeTheme?.primary || '#38bdf8',
+            fontSize:   '16px',
+            color:      'rgba(255, 255, 255, 0.62)',
+            maxWidth:   460,
+            marginLeft: 'auto',
+            lineHeight: 1.65,
+            textWrap:   'pretty',
+            fontFamily: 'Inter, system-ui, sans-serif',
           }}
         >
-          {lang === 'id' ? 'FITUR UTAMA' : 'KEY FEATURES'}
-        </div>
-        <h2 style={{
-          fontSize:      'clamp(1.8rem, 5vw, 4rem)',
-          fontWeight:    800,
-          letterSpacing: '-0.04em',
-          color:         '#f5f5f7',
-          lineHeight:    1.1,
-          marginBottom:  16,
-          fontFamily:    'Inter, system-ui, sans-serif',
-        }}>
-          {t.featMagic}
-        </h2>
-        <p style={{
-          fontSize:   'clamp(0.95rem, 1.8vw, 1.2rem)',
-          color:      '#86868b',
-          maxWidth:   540,
-          margin:     '0 auto',
-          lineHeight: 1.65,
-          fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
           {t.featDesc}
         </p>
       </div>
@@ -396,13 +433,23 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           maxWidth:            1200,
           margin:              '0 auto',
           display:             'grid',
-          gridTemplateColumns: 'minmax(240px, 420px) 1fr',
-          gap:                 'clamp(32px, 5vw, 72px)',
+          gridTemplateColumns: 'minmax(260px, 430px) 1fr',
+          gap:                 'clamp(28px, 4.5vw, 56px)',
           alignItems:          'start',
         }}
       >
-        {/* ── LEFT: Accordion ── */}
-        <div>
+        {/* ── LEFT: Serene Architectural Accordion ── */}
+        <div
+          style={{
+            background: silk.cardSurface,
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderRadius: 24,
+            border: '1px solid rgba(255, 255, 255, 0.11)',
+            padding: '8px 24px',
+            boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 24px 60px -20px rgba(0, 0, 0, 0.78)',
+          }}
+        >
           {features.map((feat, idx) => {
             const isOpen = openItem === feat.id;
             const Icon   = feat.icon;
@@ -411,8 +458,7 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
               <div
                 key={feat.id}
                 style={{
-                  borderTop:    '1px solid #222',
-                  borderBottom: idx === features.length - 1 ? '1px solid #222' : 'none',
+                  borderTop:    idx === 0 ? 'none' : '1px solid rgba(255,255,255,0.09)',
                 }}
               >
                 {/* Header button */}
@@ -441,25 +487,25 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                         height:     20,
                         borderRadius: '50%',
                         background: activeTheme.swatch,
-                        border:     '2px solid rgba(255,255,255,0.1)',
+                        border:     '2px solid rgba(255,255,255,0.2)',
                         flexShrink: 0,
                         boxShadow:  `0 0 12px ${activeTheme.glow}`,
                         transition: 'background 0.5s ease, box-shadow 0.5s ease',
                       }} />
                     ) : Icon ? (
                       <Icon
-                        size={16}
+                        size={17}
                         strokeWidth={2}
-                        color={isOpen ? activeTheme.primary : '#555'}
+                        color={isOpen ? activeTheme.primary : 'rgba(255,255,255,0.52)'}
                         style={{ flexShrink: 0, transition: 'color 0.3s' }}
                       />
                     ) : null}
 
                     <span style={{
-                      fontSize:      16,
-                      fontWeight:    isOpen ? 600 : 400,
-                      color:         isOpen ? '#f5f5f7' : '#999',
-                      letterSpacing: '-0.01em',
+                      fontSize:      15.5,
+                      fontWeight:    isOpen ? 600 : 500,
+                      color:         isOpen ? '#ffffff' : 'rgba(255,255,255,0.72)',
+                      letterSpacing: '-0.012em',
                       fontFamily:    'Inter, system-ui, sans-serif',
                       transition:    'color 0.25s, font-weight 0.25s',
                       whiteSpace:    'nowrap',
@@ -472,20 +518,20 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
 
                   {/* Plus/minus toggle */}
                   <div style={{
-                    width:        22,
-                    height:       22,
+                    width:        24,
+                    height:       24,
                     borderRadius: '50%',
-                    border:       `1.5px solid ${isOpen ? activeTheme.primary : '#333'}`,
+                    border:       `1px solid ${isOpen ? `${activeTheme.primary}99` : 'rgba(255,255,255,0.16)'}`,
                     display:      'flex',
                     alignItems:   'center',
                     justifyContent: 'center',
                     flexShrink:   0,
-                    background:   isOpen ? `${activeTheme.primary}1a` : 'transparent',
+                    background:   isOpen ? `${activeTheme.primary}22` : 'rgba(255,255,255,0.04)',
                     transition:   'border-color 0.3s, background 0.3s',
                   }}>
                     {isOpen
                       ? <Minus size={11} color={activeTheme.primary} />
-                      : <Plus  size={11} color="#555" />}
+                      : <Plus  size={11} color="rgba(255,255,255,0.65)" />}
                   </div>
                 </button>
 
@@ -613,19 +659,30 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                           <span style={{
                             fontSize:     10,
                             fontWeight:   600,
-                            padding:      '2px 8px',
-                            borderRadius: 20,
-                            background:   activeTheme.mode === 'dark' ? '#1e293b' : '#f1f5f9',
-                            color:        activeTheme.mode === 'dark' ? '#94a3b8' : '#64748b',
-                            border:       `1px solid ${activeTheme.mode === 'dark' ? '#334155' : '#cbd5e1'}`,
+                            padding:      '3px 10px',
+                            borderRadius: 999,
+                            display:      'inline-flex',
+                            alignItems:   'center',
+                            gap:          5,
+                            background:   'rgba(255, 255, 255, 0.06)',
+                            color:        'rgba(255, 255, 255, 0.82)',
+                            border:       '1px solid rgba(255, 255, 255, 0.14)',
                             fontFamily:   'Inter, system-ui, sans-serif',
                             transition:   'all 0.3s ease',
-                            letterSpacing: '0.04em',
+                            letterSpacing: '0.06em',
                             textTransform: 'uppercase',
                           }}>
-                            {activeTheme.mode === 'dark'
-                              ? (lang === 'id' ? '🌙 Gelap' : '🌙 Dark')
-                              : (lang === 'id' ? '☀️ Terang' : '☀️ Light')}
+                            {activeTheme.mode === 'dark' ? (
+                              <>
+                                <Moon size={11} color={activeTheme.primary} />
+                                <span>{lang === 'id' ? 'Gelap' : 'Dark'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sun size={11} color={activeTheme.primary} />
+                                <span>{lang === 'id' ? 'Terang' : 'Light'}</span>
+                              </>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -634,7 +691,7 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                     {/* Feature description */}
                     <p style={{
                       fontSize:   14,
-                      color:      '#86868b',
+                      color:      'rgba(255, 255, 255, 0.72)',
                       lineHeight: 1.7,
                       fontFamily: 'Inter, system-ui, sans-serif',
                     }}>
@@ -658,7 +715,8 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
             inset:      '-24px',
             borderRadius: 40,
             background: `radial-gradient(ellipse at 50% 50%, ${previewGlow} 0%, transparent 70%)`,
-            filter:     'blur(30px)',
+            filter:     'blur(34px)',
+            opacity:    0.75,
             pointerEvents: 'none',
             transition: 'background 0.6s ease',
             zIndex:     0,
@@ -673,29 +731,37 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
               primary={activeTheme.primary}
             />
 
-
-
-            {/* Label fitur — tampil saat item non-Warna aktif */}
+            {/* Frosted pill caption — tampil saat item non-Warna aktif */}
             {!isColorItem && (
               <div style={{
-                marginTop:  16,
-                textAlign:  'center',
-                display:    'flex',
+                marginTop:      18,
+                display:        'flex',
                 justifyContent: 'center',
-                alignItems: 'center',
-                gap:        8,
               }}>
-                {activeFeat.icon && (
-                  <activeFeat.icon size={14} color={activeTheme.primary} style={{ flexShrink: 0 }} />
-                )}
-                <span style={{
-                  fontSize:   13,
-                  fontWeight: 600,
-                  color:      '#86868b',
-                  fontFamily: 'Inter, system-ui, sans-serif',
+                <div style={{
+                  display:        'inline-flex',
+                  alignItems:     'center',
+                  gap:            8,
+                  padding:        '6px 14px',
+                  borderRadius:   999,
+                  background:     'rgba(8, 10, 20, 0.56)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border:         '1px solid rgba(255, 255, 255, 0.12)',
+                  boxShadow:      'inset 0 1px 0 0 rgba(255, 255, 255, 0.14)',
                 }}>
-                  {t[activeFeat?.labelKey]}
-                </span>
+                  {activeFeat.icon && (
+                    <activeFeat.icon size={13} color={activeTheme.primary} style={{ flexShrink: 0 }} />
+                  )}
+                  <span style={{
+                    fontSize:   12,
+                    fontWeight: 600,
+                    color:      'rgba(255, 255, 255, 0.8)',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                  }}>
+                    {t[activeFeat?.labelKey]}
+                  </span>
+                </div>
               </div>
             )}
           </div>

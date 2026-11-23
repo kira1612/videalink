@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Radio, Database, Box, Share2, Calendar, ArrowRight } from 'lucide-react';
+import { getSilkPaletteTokens } from './SilkWaveBackground';
+
+const formatRupiah = (amount) => {
+  if (!amount || amount <= 0) return 'Gratis';
+  return `Rp ${Number(amount).toLocaleString('id-ID')}`;
+};
 
 export default function PricingSection({ lang = 'id', activeTheme }) {
   const [isYearly, setIsYearly] = useState(false);
@@ -14,79 +20,111 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
       ([entry]) => {
         setInView(entry.isIntersecting);
       },
-      { threshold: 0.12 }
+      { threshold: 0.1 }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
   const primaryColor = activeTheme?.primary || '#06b6d4';
-  const glowColor = activeTheme?.glow || 'rgba(6, 182, 212, 0.4)';
+  const silk = getSilkPaletteTokens(primaryColor);
+  const isId = lang !== 'en';
 
   const plans = [
     {
       id: 'starter',
       name: 'Starter',
-      tier: 'Smart Home',
-      price: isYearly ? 'Rp 239K' : 'Rp 299K',
-      period: lang === 'id' ? 'per bulan' : 'per month',
+      tier: isId ? 'Gratis' : 'Free',
+      description: isId
+        ? 'Untuk uji coba awal dan satu perangkat smart home.'
+        : 'For initial testing and a single smart home device.',
+      monthly: 0,
+      yearly: 0,
       popular: false,
-      cta: lang === 'id' ? 'Pilih Starter' : 'Choose Starter',
-      features: lang === 'id' ? [
-        'Hingga 25 perangkat IoT',
-        '4 feed kamera CCTV (720p)',
-        'Retensi data telemetri 7 hari',
-        'Notifikasi Telegram & mobile app',
-      ] : [
-        'Up to 25 IoT devices',
-        '4 CCTV camera feeds (720p)',
-        '7-day telemetry data retention',
-        'Telegram & mobile app alerts',
+      cta: isId ? 'Mulai Gratis' : 'Start Free',
+      specs: [
+        { icon: Radio, label: isId ? 'Perangkat IoT' : 'IoT Devices', value: '1' },
+        { icon: Database, label: isId ? 'Data Bucket' : 'Data Buckets', value: '1' },
+        { icon: Box, label: isId ? 'Ruangan 3D' : '3D Rooms', value: isId ? 'Tidak Ada' : 'None', muted: true },
+        { icon: Share2, label: 'Endpoint', value: '1' },
+        { icon: Calendar, label: isId ? 'Retensi Data' : 'Retention', value: isId ? '7 Hari' : '7 Days' },
+      ],
+    },
+    {
+      id: 'basic',
+      name: 'Basic',
+      tier: isId ? 'Pemula' : 'Maker',
+      description: isId
+        ? 'Untuk proyek maker, prototipe aktif, dan 1 ruangan 3D interaktif.'
+        : 'For maker projects, active prototypes, and 1 interactive 3D room.',
+      monthly: 30000,
+      yearly: 288000,
+      popular: false,
+      cta: isId ? 'Pilih Basic' : 'Choose Basic',
+      specs: [
+        { icon: Radio, label: isId ? 'Perangkat IoT' : 'IoT Devices', value: '3' },
+        { icon: Database, label: isId ? 'Data Bucket' : 'Data Buckets', value: '4' },
+        { icon: Box, label: isId ? 'Ruangan 3D' : '3D Rooms', value: '1' },
+        { icon: Share2, label: 'Endpoint', value: '2' },
+        { icon: Calendar, label: isId ? 'Retensi Data' : 'Retention', value: isId ? '14 Hari' : '14 Days' },
+      ],
+    },
+    {
+      id: 'plus',
+      name: 'Plus',
+      tier: isId ? 'Hemat' : 'Best Value',
+      description: isId
+        ? 'Untuk smart home multi-ruangan dan proyek otomasi menengah.'
+        : 'For multi-room smart homes and medium automation setups.',
+      monthly: 70000,
+      yearly: 672000,
+      popular: false,
+      cta: isId ? 'Pilih Plus' : 'Choose Plus',
+      specs: [
+        { icon: Radio, label: isId ? 'Perangkat IoT' : 'IoT Devices', value: '5' },
+        { icon: Database, label: isId ? 'Data Bucket' : 'Data Buckets', value: '8' },
+        { icon: Box, label: isId ? 'Ruangan 3D' : '3D Rooms', value: '3' },
+        { icon: Share2, label: 'Endpoint', value: '5' },
+        { icon: Calendar, label: isId ? 'Retensi Data' : 'Retention', value: isId ? '30 Hari' : '30 Days' },
       ],
     },
     {
       id: 'pro',
-      name: 'Pro',
-      tier: 'Business Building',
-      price: isYearly ? 'Rp 959K' : 'Rp 1.199K',
-      period: lang === 'id' ? 'per bulan' : 'per month',
+      name: 'Pro IoT',
+      tier: isId ? 'Tim & Kantor' : 'Teams & Office',
+      description: isId
+        ? 'Untuk tim engineer, smart office, dan proyek produksi aktif.'
+        : 'For engineering teams, smart offices, and active production fleets.',
+      monthly: 149000,
+      yearly: 1430000,
       popular: true,
-      popLabel: lang === 'id' ? 'Paling Populer' : 'Most Popular',
-      cta: lang === 'id' ? 'Pilih Pro' : 'Choose Pro',
-      features: lang === 'id' ? [
-        'Hingga 200 perangkat IoT',
-        '16 feed kamera CCTV (1080p AI)',
-        'Retensi data 30 hari',
-        'Analisis Vision AI advanced',
-        'Dukungan API & webhook',
-      ] : [
-        'Up to 200 IoT devices',
-        '16 CCTV feeds (1080p AI)',
-        '30-day telemetry retention',
-        'Advanced Vision AI analytics',
-        'API & webhook access',
+      popLabel: isId ? 'Paling Populer' : 'Most Popular',
+      cta: isId ? 'Pilih Pro IoT' : 'Choose Pro IoT',
+      specs: [
+        { icon: Radio, label: isId ? 'Perangkat IoT' : 'IoT Devices', value: '25' },
+        { icon: Database, label: isId ? 'Data Bucket' : 'Data Buckets', value: '50' },
+        { icon: Box, label: isId ? 'Ruangan 3D' : '3D Rooms', value: '15' },
+        { icon: Share2, label: 'Endpoint', value: '25' },
+        { icon: Calendar, label: isId ? 'Retensi Data' : 'Retention', value: isId ? '90 Hari' : '90 Days' },
       ],
     },
     {
       id: 'enterprise',
       name: 'Enterprise',
-      tier: 'Smart City',
-      price: 'Custom',
-      period: lang === 'id' ? 'hubungi tim sales' : 'contact sales team',
+      tier: isId ? 'Skala Penuh' : 'Full Scale',
+      description: isId
+        ? 'Untuk deployment industrial, multi-gedung, dan armada besar.'
+        : 'For industrial deployments, multi-building setups, and large fleets.',
+      monthly: 499000,
+      yearly: 4790000,
       popular: false,
-      cta: lang === 'id' ? 'Hubungi Sales' : 'Contact Sales',
-      features: lang === 'id' ? [
-        'Perangkat & node tanpa batas',
-        'Kamera CCTV unlimited (4K AI)',
-        'On-premise / private cloud deploy',
-        'Dedicated SLA 99.99%',
-        'Custom AI model training',
-      ] : [
-        'Unlimited devices & nodes',
-        'Unlimited CCTV feeds (4K AI)',
-        'On-premise / private cloud deploy',
-        'Dedicated 99.99% SLA',
-        'Custom AI model training',
+      cta: isId ? 'Pilih Enterprise' : 'Choose Enterprise',
+      specs: [
+        { icon: Radio, label: isId ? 'Perangkat IoT' : 'IoT Devices', value: isId ? 'Tanpa Batas' : 'Unlimited' },
+        { icon: Database, label: isId ? 'Data Bucket' : 'Data Buckets', value: isId ? 'Tanpa Batas' : 'Unlimited' },
+        { icon: Box, label: isId ? 'Ruangan 3D' : '3D Rooms', value: isId ? 'Tanpa Batas' : 'Unlimited' },
+        { icon: Share2, label: 'Endpoint', value: isId ? 'Tanpa Batas' : 'Unlimited' },
+        { icon: Calendar, label: isId ? 'Retensi Data' : 'Retention', value: isId ? '365 Hari' : '365 Days' },
       ],
     },
   ];
@@ -95,152 +133,175 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
     <section
       ref={sectionRef}
       id="pricing"
-      className="relative py-28 md:py-36 px-6 bg-black z-10"
-      style={{ scrollMarginTop: '100px' }}
+      className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10"
+      style={{ scrollMarginTop: '88px' }}
     >
-      <div className="max-w-[1240px] mx-auto relative z-20">
-        {/* Section Header */}
+      <div className="max-w-[1320px] mx-auto relative z-20">
+        {/* Editorial Left-Right Header Row + Minimal Monochrome Billing Switch */}
         <div
-          className="text-center mb-12 md:mb-16 transition-all duration-700 ease-out"
+          className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12 md:mb-14 transition-[opacity,transform] duration-700 ease-out"
           style={{
             opacity: inView ? 1 : 0,
-            transform: inView ? 'translateY(0)' : 'translateY(30px)',
+            transform: inView ? 'translateY(0)' : 'translateY(25px)',
           }}
         >
-          <div
-            className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-4 border"
-            style={{
-              backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
-              borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
-              color: activeTheme?.primary || '#38bdf8',
-            }}
-          >
-            {lang === 'id' ? 'PAKET HARGA' : 'PRICING PLANS'}
+          <div>
+            <span className="block font-mono text-xs tracking-[0.06em] text-white/45 mb-4">
+              05 / {isId ? 'Paket & Kuota' : 'Pricing & Quotas'}
+            </span>
+            <h2
+              className="text-3xl sm:text-4xl md:text-[3rem] font-normal tracking-[-0.035em] text-white leading-[1.08]"
+              style={{ textWrap: 'balance' }}
+            >
+              {isId ? 'Pilih paket sesuai skala Anda.' : 'Transparent plans, built to scale.'}
+            </h2>
+            <p
+              className="text-white/62 text-sm sm:text-base mt-3 max-w-xl leading-relaxed"
+              style={{ textWrap: 'pretty' }}
+            >
+              {isId
+                ? 'Mulai gratis dengan paket Starter, atau buka Editor Ruangan 3D mulai dari paket Basic Rp 30.000/bulan.'
+                : 'Start free with Starter, or unlock the 3D Room Editor starting from Basic at Rp 30,000/month.'}
+            </p>
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            {lang === 'id' ? 'Harga Transparan, Skala Sesuai Kebutuhan' : 'Transparent Pricing, Scale As Needed'}
-          </h2>
 
-          {/* Billing Switch Toggle */}
-          <div className="inline-flex items-center gap-3.5 mt-8 px-5 py-2.5 rounded-full bg-[#0B1120]/80 border border-white/10 backdrop-blur-md select-none">
-            <span
-              className={`text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer ${
-                !isYearly ? 'text-white font-bold' : 'text-slate-400'
-              }`}
-              onClick={() => setIsYearly(false)}
-            >
-              {lang === 'id' ? 'Bulanan' : 'Monthly'}
-            </span>
-
+          {/* Minimal Monochrome Segmented Billing Switch */}
+          <div
+            className="inline-flex items-center p-1 rounded-full border border-white/[0.12] backdrop-blur-2xl select-none self-start lg:self-auto"
+            style={{ background: silk.cardSurface }}
+          >
             <button
-              onClick={() => setIsYearly(!isYearly)}
-              className="relative w-12 h-6 rounded-full transition-colors duration-300 p-0.5"
-              style={{
-                backgroundColor: isYearly ? primaryColor : '#1e293b',
-              }}
-              aria-label="Toggle annual billing"
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
-                  isYearly ? 'translate-x-6' : 'translate-x-0'
-                }`}
-              />
-            </button>
-
-            <span
-              className={`text-xs font-mono tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-2 ${
-                isYearly ? 'text-white font-bold' : 'text-slate-400'
+              type="button"
+              onClick={() => setIsYearly(false)}
+              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer ${
+                !isYearly ? 'bg-white text-[#07090f]' : 'text-white/65 hover:text-white'
               }`}
-              onClick={() => setIsYearly(true)}
             >
-              <span>{lang === 'id' ? 'Tahunan' : 'Yearly'}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold tracking-widest">
-                {lang === 'id' ? 'HEMAT 20%' : 'SAVE 20%'}
+              {isId ? 'Bulanan' : 'Monthly'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsYearly(true)}
+              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer inline-flex items-center gap-2 ${
+                isYearly ? 'bg-white text-[#07090f]' : 'text-white/65 hover:text-white'
+              }`}
+            >
+              <span>{isId ? 'Tahunan' : 'Yearly'}</span>
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                  isYearly ? 'bg-black/10 text-[#07090f]' : 'bg-white/10 text-white/85'
+                }`}
+              >
+                -20%
               </span>
-            </span>
+            </button>
           </div>
         </div>
 
-        {/* 3 Pricing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        {/* 5 Real VideaLink Architectural Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-stretch">
           {plans.map((plan, idx) => {
+            const isFree = plan.monthly === 0;
+            const amount = isYearly ? plan.yearly : plan.monthly;
+            const priceLabel = isFree ? (isId ? 'Gratis' : 'Free') : formatRupiah(amount);
+            const periodLabel = isFree
+              ? isId ? 'selamanya · tanpa kartu kredit' : 'forever · no credit card'
+              : isYearly
+                ? isId ? 'per tahun · hemat 20%' : 'per year · save 20%'
+                : isId ? 'per bulan' : 'per month';
+
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-[24px] p-8 sm:p-10 flex flex-col justify-between backdrop-blur-xl ${
+                className={`relative rounded-[24px] p-6 flex flex-col justify-between backdrop-blur-2xl border transition-[border-color,transform] duration-300 ${
                   plan.popular
-                    ? 'border-2 scale-[1.02] lg:-translate-y-2'
-                    : 'border hover:-translate-y-1'
+                    ? 'border-white/[0.28]'
+                    : 'border-white/[0.11] hover:border-white/[0.22]'
                 }`}
                 style={{
-                  backgroundColor: plan.popular
-                    ? 'rgba(15, 23, 42, 0.85)'
-                    : 'rgba(15, 23, 42, 0.55)',
-                  borderColor: plan.popular
-                    ? primaryColor
-                    : 'rgba(56, 189, 248, 0.15)',
+                  background: plan.popular
+                    ? `linear-gradient(165deg, ${silk.midRgba(0.16)} 0%, ${silk.surfaceRgba(0.76)} 46%, ${silk.deepRgba(0.88)} 100%)`
+                    : silk.cardSurface,
                   boxShadow: plan.popular
-                    ? `0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px ${glowColor}`
-                    : '0 15px 40px rgba(0, 0, 0, 0.5)',
+                    ? `inset 0 1px 0 0 rgba(255, 255, 255, 0.24), 0 28px 70px -20px rgba(0, 0, 0, 0.85)`
+                    : 'inset 0 1px 0 0 rgba(255, 255, 255, 0.11), 0 18px 46px -18px rgba(0, 0, 0, 0.72)',
                   opacity: inView ? 1 : 0,
-                  transform: inView
-                    ? (plan.popular ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)')
-                    : 'translateY(50px) scale(0.92)',
-                  transition: `opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 140}ms, transform 0.9s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 140}ms, box-shadow 0.4s ease, border-color 0.4s ease`,
+                  transform: inView ? 'translateY(0)' : 'translateY(28px)',
+                  transition: `opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 70}ms, transform 0.75s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 70}ms, border-color 0.25s ease`,
                 }}
               >
-                {/* Popular Pill Badge */}
-                {plan.popular && (
-                  <div
-                    className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase text-black shadow-lg"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    {plan.popLabel}
-                  </div>
-                )}
-
                 <div>
-                  <div className="flex justify-between items-baseline mb-2">
-                    <h3 className="text-2xl font-extrabold text-white">{plan.name}</h3>
-                    <span className="font-mono text-xs uppercase tracking-wider text-slate-400">
-                      {plan.tier}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="text-lg font-medium text-white tracking-[-0.02em]">{plan.name}</h3>
+                    <span
+                      className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        plan.popular
+                          ? 'bg-white text-[#07090f] font-semibold'
+                          : 'text-white/45'
+                      }`}
+                    >
+                      {plan.popular ? (isId ? 'Populer' : 'Popular') : plan.tier}
                     </span>
                   </div>
 
+                  <p
+                    className="text-xs text-white/60 leading-relaxed min-h-[36px]"
+                    style={{ textWrap: 'pretty' }}
+                  >
+                    {plan.description}
+                  </p>
+
                   <div className="my-6">
-                    <div className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-                      {plan.price}
+                    <div className="text-2xl sm:text-[26px] font-medium text-white tracking-[-0.03em] tabular-nums">
+                      {priceLabel}
                     </div>
-                    <div className="text-xs font-mono text-slate-400 uppercase tracking-widest mt-1">
-                      {plan.period}
+                    <div className="font-mono text-[10px] text-white/50 mt-1">
+                      {periodLabel}
                     </div>
                   </div>
 
-                  {/* Feature List */}
-                  <ul className="space-y-3.5 pt-6 pb-8 border-t border-white/10">
-                    {plan.features.map((feat, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-sm text-slate-300">
-                        <Check size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-                        <span>{feat}</span>
-                      </li>
-                    ))}
+                  {/* Clean Hairline Specs */}
+                  <ul className="space-y-2.5 pt-5 pb-6 border-t border-white/[0.09]">
+                    {plan.specs.map((spec) => {
+                      const SpecIcon = spec.icon;
+                      return (
+                        <li
+                          key={spec.label}
+                          className="flex items-center justify-between text-xs py-0.5"
+                        >
+                          <span className="flex items-center gap-2 text-white/60">
+                            <SpecIcon
+                              size={13}
+                              strokeWidth={1.6}
+                              className="flex-shrink-0"
+                              style={{ color: spec.muted ? 'rgba(255,255,255,0.28)' : silk.left }}
+                            />
+                            <span>{spec.label}</span>
+                          </span>
+                          <span
+                            className={`font-medium tabular-nums ${
+                              spec.muted ? 'text-white/35 font-normal' : 'text-white/95'
+                            }`}
+                          >
+                            {spec.value}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 
-                {/* Action CTA */}
+                {/* Action CTA (Stark White on Popular, Minimal Hairline on Others) */}
                 <Link
-                  to="/login"
-                  className={`w-full py-3.5 rounded-full text-center text-sm font-bold tracking-tight transition-all duration-300 ${
+                  to="/login?mode=register"
+                  className={`min-h-[42px] w-full py-2.5 rounded-full text-center text-xs font-medium tracking-[-0.01em] transition-[transform,background-color,border-color,color] duration-200 flex items-center justify-center gap-1.5 active:scale-[0.96] ${
                     plan.popular
-                      ? 'text-black shadow-lg hover:brightness-110 active:scale-[0.98]'
-                      : 'text-white border border-white/20 hover:border-white/50 hover:bg-white/5'
+                      ? 'bg-white text-[#07090f] hover:bg-white/90'
+                      : 'text-white/90 hover:text-white bg-white/[0.05] hover:bg-white/[0.11] border border-white/[0.14] hover:border-white/[0.26]'
                   }`}
-                  style={plan.popular ? {
-                    backgroundColor: primaryColor,
-                    boxShadow: `0 0 20px ${glowColor}`,
-                  } : {}}
                 >
-                  {plan.cta}
+                  <span>{plan.cta}</span>
+                  <ArrowRight size={13} />
                 </Link>
               </div>
             );

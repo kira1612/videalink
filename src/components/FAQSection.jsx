@@ -1,55 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { getSilkPaletteTokens } from './SilkWaveBackground';
 
 const FAQS = [
   {
     q: {
-      id: 'Apakah Videalink kompatibel dengan perangkat IoT saya yang sudah ada?',
-      en: 'Is Videalink compatible with my existing IoT devices?',
+      id: 'Perangkat keras & protokol apa saja yang didukung Videa Link?',
+      en: 'Which hardware boards & protocols does Videa Link support?',
     },
     a: {
-      id: 'Ya. Videalink mendukung 180+ protokol hardware secara native — termasuk MQTT, Zigbee 3.0, LoRaWAN, Modbus TCP, dan OPC-UA. Mayoritas sensor dan controller yang sudah terpasang dapat terhubung tanpa penggantian perangkat.',
-      en: 'Yes. Videalink natively supports 180+ hardware protocols — including MQTT, Zigbee 3.0, LoRaWAN, Modbus TCP, and OPC-UA. Most installed sensors and controllers connect seamlessly without hardware replacement.',
+      id: 'Videa Link mendukung mikrokontroler populer seperti ESP32, ESP8266, Arduino (dengan modul WiFi/Ethernet), dan Raspberry Pi melalui protokol MQTT Broker bawaan maupun HTTP REST API berautentikasi Bearer Token.',
+      en: 'Videa Link supports popular microcontrollers including ESP32, ESP8266, Arduino (with WiFi/Ethernet), and Raspberry Pi via our built-in MQTT Broker as well as Bearer-Token authenticated HTTP REST API.',
     },
   },
   {
     q: {
-      id: 'Bagaimana cara kamera CCTV lama saya terhubung ke Vision AI?',
-      en: 'How do my existing CCTV cameras connect to Vision AI?',
+      id: 'Bagaimana cara kerja Editor Ruangan 3D & Mode Jelajah WASD?',
+      en: 'How do the 3D Room Editor & WASD Walkthrough Mode work?',
     },
     a: {
-      id: 'Selama kamera Anda mendukung stream RTSP atau standar ONVIF, Videalink dapat menarik feed-nya langsung dan menjalankan analisis Vision AI di edge gateway kami — tanpa perlu mengganti kamera lama Anda.',
-      en: 'As long as your cameras support RTSP stream or the ONVIF standard, Videalink ingests the live feed directly and runs Vision AI analytics on our edge gateway — no camera replacement needed.',
+      id: 'Anda dapat membangun denah ruangan 3D langsung di browser (mulai dari template kamar 10×10, L-Shape, atau Apartemen 2 Ruang), memasang tembok serta pintu tunggal/ganda, meletakkan perangkat IoT ke dalam ruangan 3D, mengontrol sakelar secara real-time, hingga berjalan menjelajahi ruangan dengan kontrol keyboard WASD.',
+      en: 'You can design 3D room floor plans directly in your browser (using 10×10, L-Shape, or 2-Room Apartment templates), place walls and single/double doors, bind live IoT devices into 3D space, toggle switches in real time, and walk through your rooms using WASD keyboard controls.',
     },
   },
   {
     q: {
-      id: 'Apakah data video dan telemetri saya aman?',
-      en: 'Is my video and telemetry data secure?',
+      id: 'Apa itu fitur Auto-Discovery pada Data Bucket?',
+      en: 'What is Auto-Discovery in Data Buckets?',
     },
     a: {
-      id: 'Seluruh komunikasi dienkripsi end-to-end dengan TLS 1.3 dan penyimpanan AES-256. Untuk paket Enterprise, tersedia opsi deployment on-premise sehingga data tidak pernah meninggalkan infrastruktur Anda.',
-      en: 'All communication is end-to-end encrypted with TLS 1.3 and stored with AES-256. For Enterprise plans, on-premise deployment is available so data never leaves your private infrastructure.',
+      id: 'Saat perangkat ESP32/ESP8266 mengirim payload JSON telemetri (misalnya suhu, kelembapan, daya, rssi), backend Videa Link otomatis mengenali dan membuat kolom metrik tanpa perlu mendefinisikan skema database secara manual.',
+      en: 'Whenever your ESP32/ESP8266 sends a telemetry JSON payload (e.g., temperature, humidity, power, rssi), Videa Link automatically discovers and indexes every metric field without manual database schema setup.',
     },
   },
   {
     q: {
-      id: 'Berapa lama masa uji coba gratis dan apa saja yang didapat?',
-      en: 'How long is the free trial and what is included?',
+      id: 'Bagaimana cara membuat otomasi dan notifikasi peringatan?',
+      en: 'How do I create automations and alert notifications?',
     },
     a: {
-      id: 'Trial gratis berlaku 14 hari dengan akses penuh fitur paket Pro: 200 perangkat, 16 feed CCTV AI, dan analitik lengkap. Tidak memerlukan kartu kredit untuk memulai.',
-      en: 'The free trial lasts 14 days with full access to Pro features: 200 devices, 16 AI CCTV feeds, and complete analytics. No credit card required to start.',
+      id: 'Melalui menu Automations & Endpoints, Anda dapat membuat aturan IF-THEN berdasarkan jadwal waktu atau ambang batas sensor (>, <, ==) untuk menyalakan perangkat otomatis, sekaligus meneruskan peringatan ke HTTP Webhook, Telegram, Email, Slack, atau topik MQTT.',
+      en: 'Through Automations & Endpoints, you can configure IF-THEN rules triggered by schedules or sensor thresholds (>, <, ==) to control devices automatically and dispatch alerts to HTTP Webhooks, Telegram, Email, Slack, or MQTT topics.',
     },
   },
   {
     q: {
-      id: 'Apakah Videalink bisa berjalan saat internet terputus?',
-      en: 'Can Videalink operate when internet connection is lost?',
+      id: 'Apakah tersedia paket gratis tanpa kartu kredit?',
+      en: 'Is there a free plan available without a credit card?',
     },
     a: {
-      id: 'Ya. Arsitektur edge computing kami memastikan otomasi lokal, perekaman CCTV, dan logika alarm tetap berjalan penuh saat koneksi cloud terputus, lalu tersinkron otomatis saat kembali online.',
-      en: 'Yes. Our edge computing architecture ensures local automation, CCTV recording, and alarm logic stay fully operational during outages, synchronizing automatically once reconnected.',
+      id: 'Ya! Paket Starter gratis selamanya (1 Perangkat IoT, 1 Data Bucket, 1 Endpoint, retensi 7 hari) tanpa kartu kredit. Untuk membuka fitur Editor Ruangan 3D dan kuota lebih besar, Anda dapat beralih ke paket Basic (Rp 30.000/bln), Plus, Pro IoT, atau Enterprise kapan saja.',
+      en: 'Yes! The Starter plan is free forever (1 IoT Device, 1 Data Bucket, 1 Endpoint, 7-day retention) with no credit card required. To unlock the 3D Room Editor and higher quotas, upgrade anytime to Basic (Rp 30,000/mo), Plus, Pro IoT, or Enterprise.',
     },
   },
 ];
@@ -73,7 +74,7 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
   }, []);
 
   const primaryColor = activeTheme?.primary || '#06b6d4';
-  const glowColor = activeTheme?.glow || 'rgba(6, 182, 212, 0.4)';
+  const silk = getSilkPaletteTokens(primaryColor);
 
   const toggle = (idx) => {
     setOpenIndex(openIndex === idx ? null : idx);
@@ -83,72 +84,79 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
     <section
       ref={sectionRef}
       id="faq"
-      className="relative py-24 md:py-32 px-6 bg-black z-10"
-      style={{ scrollMarginTop: '100px' }}
+      className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10"
+      style={{ scrollMarginTop: '88px' }}
     >
-      <div className="max-w-[860px] mx-auto relative z-20">
-        {/* Section Header */}
+      <div className="max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+        {/* Left Sticky Editorial Heading */}
         <div
-          className="text-center mb-12 md:mb-16 transition-all duration-700 ease-out"
+          className="lg:col-span-4 lg:sticky lg:top-28 transition-[opacity,transform] duration-700 ease-out"
           style={{
             opacity: inView ? 1 : 0,
-            transform: inView ? 'translateY(0)' : 'translateY(25px)',
+            transform: inView ? 'translateY(0)' : 'translateY(24px)',
           }}
         >
-          <div
-            className="inline-block px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-4 border"
-            style={{
-              backgroundColor: activeTheme?.primary ? `${activeTheme.primary}1A` : 'rgba(255, 255, 255, 0.05)',
-              borderColor: activeTheme?.primary ? `${activeTheme.primary}4D` : 'rgba(255, 255, 255, 0.1)',
-              color: activeTheme?.primary || '#38bdf8',
-            }}
+          <span className="block font-mono text-xs tracking-[0.06em] text-white/45 mb-4">
+            06 / FAQ
+          </span>
+          <h2
+            className="text-3xl sm:text-4xl font-normal tracking-[-0.035em] text-white leading-[1.12]"
+            style={{ textWrap: 'balance' }}
           >
-            FAQ
-          </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            {lang === 'id' ? 'Pertanyaan Yang Sering Diajukan' : 'Frequently Asked Questions'}
+            {lang === 'id' ? 'Pertanyaan yang sering diajukan.' : 'Frequently asked questions.'}
           </h2>
+          <p
+            className="mt-4 text-sm text-white/60 leading-relaxed"
+            style={{ textWrap: 'pretty' }}
+          >
+            {lang === 'id'
+              ? 'Detail teknis singkat tentang perangkat keras, Editor Ruangan 3D, Data Bucket, dan paket kuota.'
+              : 'Quick technical details covering hardware support, 3D Room Editor, Data Buckets, and plans.'}
+          </p>
         </div>
 
-        {/* FAQ Accordion List */}
-        <div className="space-y-4">
+        {/* Right Architectural Hairline Accordion Panel */}
+        <div
+          className="lg:col-span-8 rounded-[24px] border border-white/[0.11] backdrop-blur-2xl px-6 sm:px-8 divide-y divide-white/[0.09]"
+          style={{
+            background: silk.cardSurface,
+            boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 24px 60px -20px rgba(0, 0, 0, 0.78)',
+          }}
+        >
           {FAQS.map((faq, idx) => {
             const isOpen = openIndex === idx;
             return (
-              <div
-                key={idx}
-                className="rounded-2xl border overflow-hidden backdrop-blur-xl"
-                style={{
-                  backgroundColor: isOpen ? 'rgba(15, 23, 42, 0.75)' : 'rgba(11, 17, 32, 0.5)',
-                  borderColor: isOpen ? `${primaryColor}66` : 'rgba(56, 189, 248, 0.12)',
-                  boxShadow: isOpen ? `0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px ${glowColor.replace('0.45', '0.1')}` : 'none',
-                  opacity: inView ? 1 : 0,
-                  transform: inView ? 'translateY(0) scale(1)' : 'translateY(35px) scale(0.97)',
-                  transition: `opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 70}ms, transform 0.85s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 70}ms, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease`,
-                }}
-              >
+              <div key={idx}>
                 <button
                   onClick={() => toggle(idx)}
-                  className="w-full text-left p-6 sm:p-7 flex items-center justify-between gap-4 cursor-pointer select-none transition-colors"
+                  aria-expanded={isOpen}
+                  className="w-full text-left py-6 flex items-center justify-between gap-4 cursor-pointer select-none group"
                 >
-                  <span className="text-base sm:text-lg font-bold text-white leading-snug">
+                  <span
+                    className={`text-base sm:text-[17px] font-medium tracking-[-0.015em] leading-snug transition-colors duration-200 ${
+                      isOpen ? 'text-white' : 'text-white/80 group-hover:text-white'
+                    }`}
+                    style={{ textWrap: 'balance' }}
+                  >
                     {faq.q[lang] || faq.q.id}
                   </span>
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-300"
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border border-white/[0.12] text-white/70 group-hover:text-white transition-[transform,color,border-color] duration-200"
                     style={{
-                      backgroundColor: isOpen ? `${primaryColor}22` : 'rgba(255, 255, 255, 0.05)',
-                      color: isOpen ? primaryColor : '#94a3b8',
                       transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+                      borderColor: isOpen ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.12)',
                     }}
                   >
-                    <Plus size={18} />
-                  </div>
+                    <Plus size={15} />
+                  </span>
                 </button>
 
                 {isOpen && (
-                  <div className="px-6 sm:px-7 pb-6 sm:pb-7 pt-1 border-t border-white/5 animate-fade-in">
-                    <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal">
+                  <div className="pb-6 pr-8 animate-fade-in">
+                    <p
+                      className="text-sm sm:text-[15px] text-white/65 leading-relaxed font-normal"
+                      style={{ textWrap: 'pretty' }}
+                    >
                       {faq.a[lang] || faq.a.id}
                     </p>
                   </div>

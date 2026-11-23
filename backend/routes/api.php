@@ -48,6 +48,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('devices', DeviceController::class);
     Route::apiResource('rooms', RoomController::class);
     Route::apiResource('automations', AutomationController::class);
+    Route::post('/automations/{automation}/test', [AutomationController::class, 'test'])->middleware('throttle:15,1');
 
     // Data Buckets
     Route::get('/buckets', [BucketController::class, 'index']);
@@ -62,12 +63,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // MQTT
     Route::post('/mqtt/publish', [App\Http\Controllers\Api\MqttController::class, 'publish']);
 
-    // Endpoints
+    // Endpoints & Alert Utilities (Telegram + Email)
     Route::get('/endpoints', [EndpointController::class, 'index']);
     Route::post('/endpoints', [EndpointController::class, 'store']);
+    Route::put('/endpoints/{endpoint}', [EndpointController::class, 'update']);
     Route::delete('/endpoints/{endpoint}', [EndpointController::class, 'destroy']);
     Route::patch('/endpoints/{endpoint}/toggle', [EndpointController::class, 'toggle']);
-    Route::post('/endpoints/{endpoint}/trigger', [EndpointController::class, 'trigger']);
+    Route::post('/endpoints/{endpoint}/trigger', [EndpointController::class, 'trigger'])->middleware('throttle:15,1');
+    Route::get('/telegram/status', [EndpointController::class, 'telegramStatus']);
+    Route::post('/telegram/test', [EndpointController::class, 'testTelegram'])->middleware('throttle:15,1');
+    Route::get('/email/status', [EndpointController::class, 'emailStatus']);
+    Route::post('/email/test', [EndpointController::class, 'testEmail'])->middleware('throttle:15,1');
 
     // Subscription & Billing
     Route::prefix('billing')->group(function () {
@@ -77,5 +83,6 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('/resume', [BillingController::class, 'resume']);
         Route::get('/invoices', [BillingController::class, 'invoices']);
         Route::get('/invoices/{invoice}', [BillingController::class, 'showInvoice']);
+        Route::post('/invoices/{invoice}/email', [BillingController::class, 'sendInvoiceEmail'])->middleware('throttle:10,1');
     });
 });

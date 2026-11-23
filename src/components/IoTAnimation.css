@@ -37,17 +37,17 @@
 }
 
 .device-box {
-  fill: #0f2233;
-  stroke: #1e3a4f;
-  stroke-width: 1.4;
+  fill: rgba(10, 13, 24, 0.78);
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1.25;
 }
 
 .device-box.connected {
-  stroke: var(--cyan-dim);
+  stroke: rgba(255, 255, 255, 0.22);
 }
 
 .device-icon {
-  stroke: var(--text);
+  stroke: rgba(255, 255, 255, 0.88);
   stroke-width: 1.6;
   fill: none;
   stroke-linecap: round;
@@ -55,8 +55,9 @@
 }
 
 .device-label {
-  fill: var(--text);
+  fill: rgba(255, 255, 255, 0.82);
   font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.2px;
 }
 
@@ -69,8 +70,8 @@
 }
 
 .hub-core {
-  fill: #0f2233;
-  stroke: var(--cyan-dim);
+  fill: rgba(10, 12, 24, 0.92);
+  stroke: rgba(255, 255, 255, 0.28);
   stroke-width: 1.6;
 }
 
@@ -91,7 +92,7 @@
 }
 
 .caption {
-  fill: var(--text-dim);
+  fill: rgba(255, 255, 255, 0.65);
   font-size: 12px;
 }
 
@@ -113,8 +114,8 @@
 }
 
 @keyframes hub-breathe {
-  0%, 100% { filter: drop-shadow(0 0 6px rgba(41,151,255,0.35)); }
-  50%      { filter: drop-shadow(0 0 16px rgba(41,151,255,0.7)); }
+  0%, 100% { opacity: 0.92; }
+  50%      { opacity: 1; }
 }
 
 @keyframes label-fade {

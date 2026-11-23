@@ -326,10 +326,14 @@ class DeviceController extends Controller
             'recorded_at'    => $recordedAt,
         ]);
 
+        // Evaluasi aturan alert (Automation & Telegram Endpoint) secara aman tanpa mengganggu ingestion
+        $alertsTriggered = app(\App\Services\AlertEvaluatorService::class)->evaluate($device, $payload, $recordedAt);
+
         return response()->json([
-            'message'     => $bucket ? 'Telemetry accepted' : 'Device heartbeat accepted (no active bucket assigned)',
-            'recorded_at' => $record ? $record->recorded_at : now(),
-            'status'      => 'online',
+            'message'          => $bucket ? 'Telemetry accepted' : 'Device heartbeat accepted (no active bucket assigned)',
+            'recorded_at'      => $record ? $record->recorded_at : now(),
+            'status'           => 'online',
+            'alerts_triggered' => count($alertsTriggered),
         ], 201);
     }
 }

@@ -220,7 +220,7 @@ class BillingService
     {
         $this->ensurePlansSeeded();
 
-        return DB::transaction(function () use ($user, $payload) {
+        $result = DB::transaction(function () use ($user, $payload) {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
 
             $idempotencyKey = $payload['idempotency_key'] ?? null;
@@ -352,9 +352,22 @@ class BillingService
             return [
                 'idempotent_replay' => false,
                 'invoice' => $this->formatInvoice($invoice),
+                'invoice_model' => $invoice,
                 'summary' => $this->getCurrentBillingSummary($user),
             ];
         });
+
+        // Send corporate invoice email safely outside DB transaction so checkout never fails if mail fails
+        if (empty($result['idempotent_replay']) && !empty($result['invoice_model']) && !empty($user->email)) {
+            try {
+                app(EmailNotificationService::class)->sendInvoice($result['invoice_model'], $user);
+            } catch (\Throwable) {
+                // Already logged inside EmailNotificationService
+            }
+        }
+        unset($result['invoice_model']);
+
+        return $result;
     }
 
     public function cancel(User $user, ?string $reason = null): array
