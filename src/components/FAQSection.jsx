@@ -84,29 +84,29 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
     <section
       ref={sectionRef}
       id="faq"
-      className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10"
-      style={{ scrollMarginTop: '88px' }}
+      className="relative min-h-[100dvh] flex flex-col justify-center py-[clamp(64px,8vh,108px)] px-6 bg-transparent border-t border-white/[0.08] z-10"
+      style={{ scrollMarginTop: '72px' }}
     >
-      <div className="max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+      <div className="w-full max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
         {/* Left Sticky Editorial Heading */}
         <div
-          className="lg:col-span-4 lg:sticky lg:top-28 transition-[opacity,transform] duration-700 ease-out"
+          className="relative lg:col-span-4 lg:sticky lg:top-24 transition-[opacity,transform] duration-700 ease-out"
           style={{
             opacity: inView ? 1 : 0,
             transform: inView ? 'translateY(0)' : 'translateY(24px)',
           }}
         >
-          <span className="block font-mono text-xs tracking-[0.06em] text-white/45 mb-4">
+          <span className="block font-mono text-xs tracking-[0.06em] text-white/60 mb-3">
             06 / FAQ
           </span>
           <h2
-            className="text-3xl sm:text-4xl font-normal tracking-[-0.035em] text-white leading-[1.12]"
+            className="text-[clamp(1.65rem,min(3.2vw,4.4vh),2.5rem)] font-normal tracking-[-0.035em] text-white leading-[1.12]"
             style={{ textWrap: 'balance' }}
           >
             {lang === 'id' ? 'Pertanyaan yang sering diajukan.' : 'Frequently asked questions.'}
           </h2>
           <p
-            className="mt-4 text-sm text-white/60 leading-relaxed"
+            className="mt-3.5 text-sm text-white/75 leading-relaxed"
             style={{ textWrap: 'pretty' }}
           >
             {lang === 'id'
@@ -117,7 +117,7 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
 
         {/* Right Architectural Hairline Accordion Panel */}
         <div
-          className="lg:col-span-8 rounded-[24px] border border-white/[0.11] backdrop-blur-2xl px-6 sm:px-8 divide-y divide-white/[0.09]"
+          className="lg:col-span-8 rounded-[24px] border border-white/[0.11] backdrop-blur-2xl px-5 sm:px-7 divide-y divide-white/[0.09]"
           style={{
             background: silk.cardSurface,
             boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 24px 60px -20px rgba(0, 0, 0, 0.78)',
@@ -130,18 +130,18 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
                 <button
                   onClick={() => toggle(idx)}
                   aria-expanded={isOpen}
-                  className="w-full text-left py-6 flex items-center justify-between gap-4 cursor-pointer select-none group"
+                  className="w-full text-left py-4 sm:py-5 flex items-center justify-between gap-4 cursor-pointer select-none group"
                 >
                   <span
-                    className={`text-base sm:text-[17px] font-medium tracking-[-0.015em] leading-snug transition-colors duration-200 ${
-                      isOpen ? 'text-white' : 'text-white/80 group-hover:text-white'
+                    className={`text-[15px] sm:text-base font-medium tracking-[-0.015em] leading-snug transition-colors duration-200 ${
+                      isOpen ? 'text-white' : 'text-white/85 group-hover:text-white'
                     }`}
                     style={{ textWrap: 'balance' }}
                   >
                     {faq.q[lang] || faq.q.id}
                   </span>
                   <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border border-white/[0.12] text-white/70 group-hover:text-white transition-[transform,color,border-color] duration-200"
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border border-white/[0.12] text-white/75 group-hover:text-white transition-[transform,color,border-color] duration-200"
                     style={{
                       transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
                       borderColor: isOpen ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.12)',
@@ -152,9 +152,9 @@ export default function FAQSection({ lang = 'id', activeTheme }) {
                 </button>
 
                 {isOpen && (
-                  <div className="pb-6 pr-8 animate-fade-in">
+                  <div className="pb-4 sm:pb-5 pr-8 animate-fade-in">
                     <p
-                      className="text-sm sm:text-[15px] text-white/65 leading-relaxed font-normal"
+                      className="text-sm text-white/78 leading-relaxed font-normal"
                       style={{ textWrap: 'pretty' }}
                     >
                       {faq.a[lang] || faq.a.id}

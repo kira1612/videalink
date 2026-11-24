@@ -234,12 +234,14 @@ export default function FloatingIconWave({ primaryColor = '#06b6d4' }) {
       lastTime = now;
 
       const width = container.clientWidth || window.innerWidth;
-      const isSmall = width < 640;
+      const height = container.clientHeight || 220;
+      const isSmall = width < 640 || height < 200;
       const bubbleSize = isSmall ? 76 : 96;
       const gap = isSmall ? 18 : 24;
       const step = bubbleSize + gap;
       const totalWidth = WAVE_ITEMS.length * step;
-      const amplitude = isSmall ? 26 : 38;
+      const maxSafeAmp = Math.max(12, (height - bubbleSize - 44) * 0.45);
+      const amplitude = Math.min(isSmall ? 24 : 36, maxSafeAmp);
 
       if (!prefersReduced) {
         const targetSpeed = hoveredRef.current ? 0 : 28;
@@ -287,7 +289,7 @@ export default function FloatingIconWave({ primaryColor = '#06b6d4' }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[230px] sm:h-[268px] overflow-hidden select-none"
+      className="relative w-full h-[clamp(176px,29vh,252px)] overflow-hidden select-none"
       style={{
         maskImage: 'linear-gradient(to right, transparent 0%, black 7%, black 93%, transparent 100%)',
         WebkitMaskImage:
@@ -313,10 +315,10 @@ export default function FloatingIconWave({ primaryColor = '#06b6d4' }) {
             }}
             onMouseEnter={() => setHoveredIdx(idx)}
             onMouseLeave={() => setHoveredIdx(null)}
-            className="absolute top-1/2 left-0 -mt-[38px] sm:-mt-[48px] will-change-transform"
+            className="absolute top-1/2 left-0 -mt-[38px] sm:-mt-[48px] [@media(max-height:700px)]:-mt-[38px] will-change-transform"
           >
             <div
-              className="relative w-[76px] h-[76px] sm:w-[96px] sm:h-[96px] rounded-full flex items-center justify-center backdrop-blur-2xl border transition-[transform,border-color,box-shadow,background-color,color] duration-200 cursor-default"
+              className="relative w-[76px] h-[76px] sm:w-[96px] sm:h-[96px] [@media(max-height:700px)]:w-[76px] [@media(max-height:700px)]:h-[76px] rounded-full flex items-center justify-center backdrop-blur-2xl border transition-[transform,border-color,box-shadow,background-color,color] duration-200 cursor-default"
               style={{
                 background: isHovered ? silk.cardOpenSurface : silk.cardSurface,
                 borderColor: isHovered ? `${silk.left}88` : 'rgba(255, 255, 255, 0.14)',

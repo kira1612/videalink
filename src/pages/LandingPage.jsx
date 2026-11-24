@@ -491,7 +491,7 @@ export default function LandingPage() {
       {/* ── WEIGHTLESS EDITORIAL HERO (ANTIGRAVITY.GOOGLE ARCHITECTURE OVER LIVE WEBGL) ── */}
       <section
         id="overview"
-        className="relative z-10 pt-28 sm:pt-36 pb-20 sm:pb-28 px-6 overflow-hidden"
+        className="relative z-10 min-h-[100dvh] flex flex-col justify-center pt-[clamp(76px,10vh,128px)] pb-[clamp(28px,6vh,72px)] px-6 overflow-hidden"
         style={{ position: 'relative' }}
       >
         {/* Seamless radial legibility scrim so bright silk wave crests never wash out hero copy */}
@@ -507,7 +507,7 @@ export default function LandingPage() {
         <div className="w-full max-w-[1160px] mx-auto flex flex-col items-center text-center relative z-10">
           {/* Calm Brand Lockup above Headline */}
           <FadeIn delay={60} className="w-full flex justify-center">
-            <div className="inline-flex items-center gap-2.5 mb-6 select-none">
+            <div className="inline-flex items-center gap-2.5 mb-[clamp(12px,2.4vh,24px)] select-none">
               <img
                 src="/new_videa_link_icon.png"
                 alt="Videa Link Icon"
@@ -522,7 +522,7 @@ export default function LandingPage() {
           {/* Editorial Regular/Medium Display Headline (Antigravity signature weight & spacing) */}
           <FadeIn delay={120} className="w-full">
             <h1
-              className="text-[clamp(2.1rem,7.8vw,5rem)] leading-[1.06] font-normal tracking-[-0.04em] text-white max-w-[920px] mx-auto"
+              className="text-[clamp(2rem,min(6.6vw,8.2vh),4.85rem)] leading-[1.06] font-normal tracking-[-0.04em] text-white max-w-[920px] mx-auto"
               style={{
                 textWrap: 'balance',
                 textShadow: '0 8px 32px rgba(2, 5, 14, 0.75), 0 2px 8px rgba(2, 5, 14, 0.65)',
@@ -532,9 +532,9 @@ export default function LandingPage() {
             </h1>
           </FadeIn>
 
-          <FadeIn delay={180} className="mt-6 flex flex-col items-center w-full">
+          <FadeIn delay={180} className="mt-[clamp(14px,2.4vh,24px)] flex flex-col items-center w-full">
             <p
-              className="text-[15px] sm:text-lg text-white/92 max-w-[600px] mx-auto font-normal leading-relaxed"
+              className="text-[clamp(14.5px,min(1.6vw,2.4vh),18px)] text-white/92 max-w-[600px] mx-auto font-normal leading-relaxed"
               style={{
                 textWrap: 'pretty',
                 textShadow: '0 2px 18px rgba(2, 5, 14, 0.92), 0 1px 4px rgba(2, 5, 14, 0.95)',
@@ -544,7 +544,7 @@ export default function LandingPage() {
             </p>
 
             {/* Stark Monochrome Primary Pill + Crisp Frosted Secondary Pill */}
-            <div className="mt-8 sm:mt-9 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-xs sm:max-w-none">
+            <div className="mt-[clamp(20px,3.6vh,36px)] w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-xs sm:max-w-none">
               <Link
                 to="/login?mode=register"
                 className="min-h-[48px] inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
@@ -564,158 +564,189 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── ANTIGRAVITY SIGNATURE SINUSOIDAL FLOATING ICON WAVE + EDITORIAL MANIFESTO ── */}
-      <section
-        id="connectivity"
-        className="relative py-20 sm:py-28 bg-transparent border-t border-white/[0.08] overflow-hidden z-20"
-      >
-        <div className="w-full relative z-10">
-          {/* Sinusoidal Floating Circular Icon Wave */}
-          <FloatingIconWave primaryColor={primaryColor} />
+      {/* ── UNIFIED DARK TRANSLUCENT CONTAINER (01 / Ekosistem → Footer) ── */}
+      <div className="relative z-10">
+        {/* Continuous frosted dark veil as a sibling layer so position:sticky in FeatureShowcase & FAQ stays intact.
+            Top edge is softly feathered & blurred via maskImage so there is no hard horizontal seam against the Hero waves. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 -top-20 z-0"
+          style={{
+            background: `linear-gradient(180deg, ${silk.deepRgba(0)} 0px, ${silk.deepRgba(0.42)} 68px, ${silk.deepRgba(0.76)} 148px, ${silk.deepRgba(0.84)} 240px, ${silk.deepRgba(0.84)} 100%)`,
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            maskImage:
+              'linear-gradient(180deg, transparent 0px, rgba(0, 0, 0, 0.35) 56px, rgba(0, 0, 0, 0.85) 128px, #000 184px)',
+            WebkitMaskImage:
+              'linear-gradient(180deg, transparent 0px, rgba(0, 0, 0, 0.35) 56px, rgba(0, 0, 0, 0.85) 128px, #000 184px)',
+          }}
+        />
 
-          {/* Left-Aligned Antigravity Editorial Manifesto Statement */}
-          <div className="max-w-[1200px] mx-auto mt-16 sm:mt-24 px-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
-            <div className="lg:col-span-3">
-              <span className="font-mono text-xs tracking-[0.06em] text-white/45">
-                01 / {lang === 'id' ? 'Ekosistem' : 'Ecosystem'}
-              </span>
-            </div>
-            <div className="lg:col-span-9">
-              <p
-                className="text-2xl sm:text-3xl md:text-[2.35rem] font-normal leading-[1.24] tracking-[-0.03em] text-white"
-                style={{ textWrap: 'pretty' }}
-              >
-                {lang === 'id' ? (
-                  <>
-                    Videa Link menyatukan telemetri sensor, Data Bucket Auto-Discovery, dan Editor Ruangan 3D.{' '}
-                    <span className="text-white/50">
-                      Dirancang agar perangkat ESP32, ESP8266, Arduino, hingga Raspberry Pi terhubung dan dapat dikendalikan dalam hitungan detik.
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    Videa Link unifies sensor telemetry, Auto-Discovery Data Buckets, and a 3D Room Editor.{' '}
-                    <span className="text-white/50">
-                      Built so ESP32, ESP8266, Arduino, and Raspberry Pi hardware connect and respond in seconds.
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <div className="relative z-10">
+          {/* ── ANTIGRAVITY SIGNATURE SINUSOIDAL FLOATING ICON WAVE + EDITORIAL MANIFESTO ── */}
+          <section
+            id="connectivity"
+            className="relative min-h-[100dvh] flex flex-col justify-center pt-[clamp(76px,10vh,112px)] pb-[clamp(40px,7vh,96px)] bg-transparent overflow-hidden z-20 scroll-mt-16"
+          >
+            <div className="w-full relative z-10">
+              {/* Sinusoidal Floating Circular Icon Wave */}
+              <FloatingIconWave primaryColor={primaryColor} />
 
-      {/* ── EDITORIAL ARCHITECTURE BEAT (GATEWAY) ── */}
-      <section
-        id="gateway"
-        className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10 scroll-mt-20"
-      >
-        <div className="w-full max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center text-left">
-          {/* Left Column: Calm Editorial Copy + Hairline Spec Rows */}
-          <FadeIn delay={140} direction="right" className="lg:col-span-5 text-left flex flex-col justify-center">
-            <span className="font-mono text-xs tracking-[0.06em] text-white/45 mb-5">
-              02 / {t.univConn}
-            </span>
-
-            <h3
-              className="text-3xl sm:text-4xl md:text-[2.85rem] font-normal tracking-[-0.035em] leading-[1.1] text-white mb-6"
-              style={{ textWrap: 'balance' }}
-            >
-              {t.oneGate} {t.thousands}
-            </h3>
-
-            <p
-              className="text-base text-white/65 leading-relaxed mb-10"
-              style={{ textWrap: 'pretty' }}
-            >
-              {t.gateDesc}
-            </p>
-
-            {/* Clean Architectural Hairline Spec Rows (No stacked heavy card clutter) */}
-            <div className="border-t border-white/[0.10] divide-y divide-white/[0.10]">
-              <div className="py-5 flex items-start gap-4">
-                <Zap size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
-                <div>
-                  <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">{t.rtGate}</h4>
-                  <p className="text-white/60 text-sm mt-1 leading-relaxed" style={{ textWrap: 'pretty' }}>
-                    {t.rtGateDesc}
-                  </p>
+              {/* Left-Aligned Antigravity Editorial Manifesto Statement */}
+              <div className="relative max-w-[1200px] mx-auto mt-[clamp(24px,5.5vh,76px)] px-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-12 items-start">
+                <div className="lg:col-span-3">
+                  <span className="font-mono text-xs tracking-[0.06em] text-white/60">
+                    01 / {lang === 'id' ? 'Ekosistem' : 'Ecosystem'}
+                  </span>
                 </div>
-              </div>
-
-              <div className="py-5 flex items-start gap-4">
-                <Database size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
-                <div>
-                  <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">{t.uniProto}</h4>
-                  <p className="text-white/60 text-sm mt-1 leading-relaxed" style={{ textWrap: 'pretty' }}>
-                    {t.uniProtoDesc}
+                <div className="lg:col-span-9">
+                  <p
+                    className="text-[clamp(1.3rem,min(3vw,4.2vh),2.35rem)] font-normal leading-[1.24] tracking-[-0.03em] text-white"
+                    style={{ textWrap: 'pretty' }}
+                  >
+                    {lang === 'id' ? (
+                      <>
+                        Videa Link menyatukan telemetri sensor, Data Bucket Auto-Discovery, dan Editor Ruangan 3D.{' '}
+                        <span className="text-white/65">
+                          Dirancang agar perangkat ESP32, ESP8266, Arduino, hingga Raspberry Pi terhubung dan dapat dikendalikan dalam hitungan detik.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Videa Link unifies sensor telemetry, Auto-Discovery Data Buckets, and a 3D Room Editor.{' '}
+                        <span className="text-white/65">
+                          Built so ESP32, ESP8266, Arduino, and Raspberry Pi hardware connect and respond in seconds.
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
             </div>
-          </FadeIn>
+          </section>
 
-          {/* Right Column: Serene Frosted Cinema Stage framing IoTAnimation */}
-          <FadeIn delay={220} direction="left" className="lg:col-span-7 relative w-full flex items-center justify-center">
-            <div
-              className="relative w-full aspect-[4/3] sm:aspect-[16/11] rounded-[24px] sm:rounded-[28px] p-2.5 sm:p-5 backdrop-blur-2xl border border-white/[0.12] flex items-center justify-center overflow-hidden"
-              style={{
-                background: silk.cardSurface,
-                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.8)',
-              }}
-            >
-              <IoTAnimation lang={lang} activeTheme={activeTheme} />
+          {/* ── EDITORIAL ARCHITECTURE BEAT (GATEWAY) ── */}
+          <section
+            id="gateway"
+            className="relative min-h-[100dvh] flex flex-col justify-center py-[clamp(68px,8.5vh,108px)] px-6 bg-transparent border-t border-white/[0.08] z-10 scroll-mt-16"
+          >
+            <div className="w-full max-w-[1200px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center text-left">
+              {/* Left Column: Calm Editorial Copy + Hairline Spec Rows */}
+              <FadeIn delay={140} direction="right" className="lg:col-span-5 relative text-left flex flex-col justify-center">
+                <span className="font-mono text-xs tracking-[0.06em] text-white/60 mb-3">
+                  02 / {t.univConn}
+                </span>
+
+                <h3
+                  className="text-[clamp(1.7rem,min(3.4vw,4.5vh),2.8rem)] font-normal tracking-[-0.035em] leading-[1.1] text-white mb-[clamp(12px,2.2vh,22px)]"
+                  style={{ textWrap: 'balance' }}
+                >
+                  {t.oneGate} {t.thousands}
+                </h3>
+
+                <p
+                  className="text-[clamp(13.5px,min(1.35vw,2vh),15.5px)] text-white/80 leading-relaxed mb-[clamp(16px,2.8vh,30px)]"
+                  style={{ textWrap: 'pretty' }}
+                >
+                  {t.gateDesc}
+                </p>
+
+                {/* Clean Architectural Hairline Spec Rows (No stacked heavy card clutter) */}
+                <div className="border-t border-white/[0.12] divide-y divide-white/[0.12]">
+                  <div className="py-3.5 sm:py-4 flex items-start gap-3.5">
+                    <Zap size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
+                    <div>
+                      <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">
+                        {t.rtGate}
+                      </h4>
+                      <p
+                        className="text-white/75 text-sm mt-1 leading-relaxed"
+                        style={{ textWrap: 'pretty' }}
+                      >
+                        {t.rtGateDesc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="py-3.5 sm:py-4 flex items-start gap-3.5">
+                    <Database size={18} strokeWidth={1.7} className="mt-1 flex-shrink-0" style={{ color: silk.left }} />
+                    <div>
+                      <h4 className="text-white font-medium text-[15px] tracking-[-0.01em]">
+                        {t.uniProto}
+                      </h4>
+                      <p
+                        className="text-white/75 text-sm mt-1 leading-relaxed"
+                        style={{ textWrap: 'pretty' }}
+                      >
+                        {t.uniProtoDesc}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </FadeIn>
+
+              {/* Right Column: Serene Frosted Cinema Stage framing IoTAnimation */}
+              <FadeIn delay={220} direction="left" className="lg:col-span-7 relative w-full flex items-center justify-center">
+                <div
+                  className="relative w-full aspect-[4/3] sm:aspect-[16/11] max-h-[min(480px,64vh)] rounded-[24px] sm:rounded-[28px] p-2.5 sm:p-5 backdrop-blur-2xl border border-white/[0.12] flex items-center justify-center overflow-hidden"
+                  style={{
+                    background: silk.cardSurface,
+                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.8)',
+                  }}
+                >
+                  <IoTAnimation lang={lang} activeTheme={activeTheme} />
+                </div>
+              </FadeIn>
             </div>
+          </section>
+
+          {/* ── SCROLL-DRIVEN STICKY FEATURE SHOWCASE ── */}
+          <FeatureShowcase
+            t={t}
+            lang={lang}
+            activeTheme={activeTheme}
+            onThemeChange={setActiveTheme}
+          />
+
+          {/* ── INDUSTRY SHOWCASE (SETELAH FITUR) ── */}
+          <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+            <IndustryShowcase
+              lang={lang}
+              activeTheme={activeTheme}
+            />
           </FadeIn>
+
+          {/* ── PRICING SECTION (DENGAN TOGGLE BULANAN/TAHUNAN & TEMA GLOW) ── */}
+          <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+            <PricingSection
+              lang={lang}
+              activeTheme={activeTheme}
+            />
+          </FadeIn>
+
+          {/* ── FAQ SECTION (ACCORDION & TECHNICAL ARCHITECTURE REFERENCE) ── */}
+          <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
+            <FAQSection
+              lang={lang}
+              activeTheme={activeTheme}
+            />
+          </FadeIn>
+
+          {/* ── CTA BANNER (AKTIVASI NODE & UJI COBA 14 HARI) ── */}
+          <FadeIn delay={60} direction="scale" activeTheme={activeTheme} withGlow={true}>
+            <CTABanner
+              lang={lang}
+              activeTheme={activeTheme}
+            />
+          </FadeIn>
+
+          {/* ── FOOTER MULTI-KOLOM LENGKAP DENGAN BRAND LOGO & SYSTEM STATUS ── */}
+          <FooterSection
+            lang={lang}
+            activeTheme={activeTheme}
+          />
         </div>
-      </section>
-
-      {/* ── SCROLL-DRIVEN STICKY FEATURE SHOWCASE ── */}
-      <FeatureShowcase
-        t={t}
-        lang={lang}
-        activeTheme={activeTheme}
-        onThemeChange={setActiveTheme}
-      />
-
-      {/* ── INDUSTRY SHOWCASE (SETELAH FITUR) ── */}
-      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
-        <IndustryShowcase
-          lang={lang}
-          activeTheme={activeTheme}
-        />
-      </FadeIn>
-
-      {/* ── PRICING SECTION (DENGAN TOGGLE BULANAN/TAHUNAN & TEMA GLOW) ── */}
-      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
-        <PricingSection
-          lang={lang}
-          activeTheme={activeTheme}
-        />
-      </FadeIn>
-
-      {/* ── FAQ SECTION (ACCORDION & TECHNICAL ARCHITECTURE REFERENCE) ── */}
-      <FadeIn delay={60} direction="up" activeTheme={activeTheme} withGlow={true}>
-        <FAQSection
-          lang={lang}
-          activeTheme={activeTheme}
-        />
-      </FadeIn>
-
-      {/* ── CTA BANNER (AKTIVASI NODE & UJI COBA 14 HARI) ── */}
-      <FadeIn delay={60} direction="scale" activeTheme={activeTheme} withGlow={true}>
-        <CTABanner
-          lang={lang}
-          activeTheme={activeTheme}
-        />
-      </FadeIn>
-
-      {/* ── FOOTER MULTI-KOLOM LENGKAP DENGAN BRAND LOGO & SYSTEM STATUS ── */}
-      <FooterSection
-        lang={lang}
-        activeTheme={activeTheme}
-      />
+      </div>
 
     </div>
   );

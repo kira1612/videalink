@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Box, Moon, Sun, Check, Play, Power, X, Cpu, CheckCircle2, Zap } from 'lucide-react';
+import { Plus, Minus, Wifi, Activity, Shield, Layers, Bell, Box, Moon, Sun, Check, Play, Power, X, Cpu, CheckCircle2, Zap, Search, RefreshCw, SlidersHorizontal, Pencil, Database, Share2, Home, Menu, ArrowRight, MoreVertical, AlertCircle } from 'lucide-react';
 import { getSilkPaletteTokens } from './SilkWaveBackground';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,54 +140,107 @@ export const THEMES = [
   },
 ];
 
-// ── CROSSFADE IMAGE VIEWER ─────────────────────────────────────────────────────
-// Dua layer img ditumpuk. Layer "current" selalu opacity:1.
-// Saat src berubah → layer "next" preload di opacity:0, lalu swap ke opacity:1
-// sambil layer lama fade ke opacity:0. Setelah 650ms swap selesai.
-function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = '16 / 10', direction = 1, frameless = false, vertical = false }) {
-  const [current, setCurrent] = useState(src);   // src yang sedang tampil
-  const [next, setNext] = useState(null);  // src baru sedang fade-in
-  const [fading, setFading] = useState(false); // apakah sedang transisi
-  const [entered, setEntered] = useState(false); // trigger animasi masuk layer next
-  const [errorCurr, setErrorCurr] = useState(false); // error load current
-  const [errorNext, setErrorNext] = useState(false); // error load next
-  const timerRef = useRef(null);
+// ── CROSSFADE IMAGE VIEWER (DUAL-SLOT A/B, ZERO-FLICKER, GPU-DECODED) ──────────
+// Menggunakan 2 slot <img> permanen (Slot 0 & Slot 1) tanpa unmount/remount saat
+// pergantian selesai, menunggu decode() gambar baru sebelum animasi dimulai, dan
+// mempertahankan struktur DOM tunggal antara mode frameless & framed agar transisi
+// antar fitur 01..07 benar-benar mulus tanpa kedip atau lompatan layout.
+function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = '16 / 9', direction = 1, frameless = false, vertical = false, pureFade = false }) {
+  const [slots, setSlots] = useState([
+    { src, fit, error: false },
+    { src: null, fit, error: false },
+  ]);
+  const [activeSlot, setActiveSlot] = useState(0);
+  const [preparingSlot, setPreparingSlot] = useState(null);
+  const [animating, setAnimating] = useState(false);
+
+  const activeSlotRef = useRef(0);
+  const currentSrcRef = useRef(src);
+  const reqIdRef = useRef(0);
+  const raf1Ref = useRef(null);
+  const raf2Ref = useRef(null);
+  const doneTimerRef = useRef(null);
 
   useEffect(() => {
-    if (src === current && !fading) return;
-    clearTimeout(timerRef.current);
+    if (!src) return;
 
-    setErrorNext(false);
-    setNext(src);
-    setFading(true);
-    setEntered(false);
+    // Jika src sama, cukup perbarui fit pada slot aktif tanpa memicu transisi ulang
+    if (src === currentSrcRef.current) {
+      setSlots((prev) =>
+        prev.map((s, idx) => (idx === activeSlotRef.current ? { ...s, fit } : s))
+      );
+      return;
+    }
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setEntered(true);
-        timerRef.current = setTimeout(() => {
-          setCurrent(src);
-          setNext(null);
-          setFading(false);
-          setEntered(false);
-          setErrorCurr(false);
-        }, 680);
+    const reqId = ++reqIdRef.current;
+    cancelAnimationFrame(raf1Ref.current);
+    cancelAnimationFrame(raf2Ref.current);
+    clearTimeout(doneTimerRef.current);
+
+    let cancelled = false;
+
+    const startTransition = (hasError = false) => {
+      if (cancelled || reqId !== reqIdRef.current) return;
+
+      const targetSlot = activeSlotRef.current === 0 ? 1 : 0;
+      currentSrcRef.current = src;
+
+      // 1. Siapkan gambar baru di slot tidak aktif pada posisi awal (opacity 0, tanpa transition)
+      setPreparingSlot(targetSlot);
+      setAnimating(false);
+      setSlots((prev) =>
+        prev.map((s, idx) =>
+          idx === targetSlot ? { src, fit, error: hasError } : s
+        )
+      );
+
+      // 2. Setelah browser commit posisi awal, aktifkan transisi halus ke slot baru
+      raf1Ref.current = requestAnimationFrame(() => {
+        raf2Ref.current = requestAnimationFrame(() => {
+          if (cancelled || reqId !== reqIdRef.current) return;
+          activeSlotRef.current = targetSlot;
+          setPreparingSlot(null);
+          setActiveSlot(targetSlot);
+          setAnimating(true);
+
+          const durationMs = pureFade ? 380 : 580;
+          doneTimerRef.current = setTimeout(() => {
+            if (cancelled || reqId !== reqIdRef.current) return;
+            setAnimating(false);
+          }, durationMs);
+        });
       });
-    });
+    };
 
-    return () => clearTimeout(timerRef.current);
-  }, [src]);
+    // Preload + decode gambar baru dulu agar tidak ada flash kosong/hitam saat fade-in
+    const preloader = new Image();
+    preloader.src = src;
 
-  const baseImg = {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    objectFit: fit,
-    display: 'block',
-    willChange: 'opacity, transform',
-    transition: 'opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1), transform 0.68s cubic-bezier(0.22, 1, 0.36, 1)',
-  };
+    if (preloader.complete && preloader.naturalWidth > 0) {
+      if (typeof preloader.decode === 'function') {
+        preloader.decode().then(() => startTransition(false)).catch(() => startTransition(false));
+      } else {
+        startTransition(false);
+      }
+    } else {
+      const onReady = () => {
+        if (typeof preloader.decode === 'function') {
+          preloader.decode().then(() => startTransition(false)).catch(() => startTransition(false));
+        } else {
+          startTransition(false);
+        }
+      };
+      preloader.onload = onReady;
+      preloader.onerror = () => startTransition(true);
+    }
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf1Ref.current);
+      cancelAnimationFrame(raf2Ref.current);
+      clearTimeout(doneTimerRef.current);
+    };
+  }, [src, fit, pureFade]);
 
   const Placeholder = ({ opacity, zIndex, color }) => (
     <div style={{
@@ -195,7 +248,7 @@ function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = 
       inset: 0,
       zIndex,
       opacity,
-      transition: 'opacity 0.6s ease',
+      transition: 'opacity 0.5s ease',
       background: `linear-gradient(135deg, #0d1117 0%, ${color}1a 100%)`,
       display: 'flex',
       flexDirection: 'column',
@@ -203,7 +256,6 @@ function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = 
       justifyContent: 'center',
       gap: 10,
     }}>
-      {/* Animated shimmer bars */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '60%' }}>
         {[80, 60, 70].map((w, i) => (
           <div key={i} style={{
@@ -228,55 +280,103 @@ function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = 
 
   const silk = getSilkPaletteTokens(primary);
 
-  const exitOffset = vertical
-    ? `translate3d(0, ${direction > 0 ? '-20px' : '20px'}, 0) scale(0.98)`
-    : `translate3d(${direction > 0 ? '-24px' : '24px'}, 0, 0) scale(0.98)`;
-  const enterOffset = vertical
-    ? `translate3d(0, ${direction > 0 ? '24px' : '-24px'}, 0) scale(1.015)`
-    : `translate3d(${direction > 0 ? '28px' : '-28px'}, 0, 0) scale(1.015)`;
+  const exitOffset = pureFade
+    ? 'translate3d(0, 0, 0) scale(1)'
+    : vertical
+      ? `translate3d(0, ${direction > 0 ? '-10px' : '10px'}, 0) scale(0.985)`
+      : `translate3d(${direction > 0 ? '-14px' : '14px'}, 0, 0) scale(0.985)`;
 
-  if (frameless) {
-    return (
+  const enterOffset = pureFade
+    ? 'translate3d(0, 0, 0) scale(1)'
+    : vertical
+      ? `translate3d(0, ${direction > 0 ? '14px' : '-14px'}, 0) scale(1.012)`
+      : `translate3d(${direction > 0 ? '18px' : '-18px'}, 0, 0) scale(1.012)`;
+
+  const transitionCss = pureFade
+    ? 'opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1)'
+    : 'opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1), transform 0.56s cubic-bezier(0.22, 1, 0.36, 1)';
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      padding: frameless ? 0 : 8,
+      borderRadius: frameless ? 6 : 26,
+      background: frameless ? 'transparent' : silk.cardSurface,
+      backdropFilter: frameless ? 'none' : 'blur(24px)',
+      WebkitBackdropFilter: frameless ? 'none' : 'blur(24px)',
+      border: frameless ? '1px solid transparent' : '1px solid rgba(255, 255, 255, 0.14)',
+      boxShadow: frameless
+        ? 'none'
+        : `
+          inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+          0 32px 90px -22px ${glow},
+          0 24px 60px -14px rgba(2, 4, 10, 0.85)
+        `,
+      transition: 'padding 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.4s ease, box-shadow 0.55s ease, border-color 0.4s ease, background 0.4s ease',
+    }}>
+      {/* Concentric inner radius: 26px outer - 8px padding = 18px inner */}
       <div style={{
         position: 'relative',
         width: '100%',
-        borderRadius: 6,
+        borderRadius: frameless ? 6 : 18,
         overflow: 'hidden',
         aspectRatio,
-        background: '#02040a',
+        background: frameless ? '#02040a' : '#050811',
+        outline: frameless ? '1px solid transparent' : '1px solid rgba(255, 255, 255, 0.10)',
+        outlineOffset: '-1px',
+        transition: 'border-radius 0.4s ease, outline-color 0.4s ease',
       }}>
-        {errorCurr
-          ? <Placeholder opacity={1} zIndex={1} color={primary} />
-          : <img
-            key={`curr-${current}`}
-            src={current}
-            alt={alt}
-            onError={() => setErrorCurr(true)}
-            style={{
-              ...baseImg,
-              opacity: entered ? 0 : 1,
-              transform: entered ? exitOffset : 'translate3d(0, 0, 0) scale(1)',
-              zIndex: 1,
-            }}
-          />
-        }
-        {next && (
-          errorNext
-            ? <Placeholder opacity={entered ? 1 : 0} zIndex={2} color={primary} />
-            : <img
-              key={`next-${next}`}
-              src={next}
+        {slots.map((slot, idx) => {
+          if (!slot.src) return null;
+          const isActive = idx === activeSlot;
+          const isPreparing = idx === preparingSlot;
+
+          // Slot aktif berada di atas (zIndex 2) & fade-in ke opacity 1.
+          // Slot lama tetap berada di bawah (zIndex 1) dengan opacity 1 selama transisi
+          // agar tidak ada "dark dip" di tengah crossfade, lalu sembunyi setelah selesai.
+          const zIndex = isPreparing ? 3 : isActive ? 2 : 1;
+          const opacity = isPreparing ? 0 : isActive ? 1 : (animating ? 1 : 0);
+          const transform = isPreparing
+            ? enterOffset
+            : isActive
+              ? 'translate3d(0, 0, 0) scale(1)'
+              : exitOffset;
+
+          if (slot.error) {
+            return <Placeholder key={`slot-${idx}`} opacity={opacity} zIndex={zIndex} color={primary} />;
+          }
+
+          return (
+            <img
+              key={`slot-${idx}`}
+              src={slot.src}
               alt={alt}
-              onError={() => setErrorNext(true)}
+              decoding="async"
+              onError={() => {
+                setSlots((prev) =>
+                  prev.map((s, i) => (i === idx ? { ...s, error: true } : s))
+                );
+              }}
               style={{
-                ...baseImg,
-                opacity: entered ? 1 : 0,
-                transform: entered ? 'translate3d(0, 0, 0) scale(1)' : enterOffset,
-                zIndex: 2,
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: slot.fit || fit,
+                display: 'block',
+                opacity,
+                transform,
+                zIndex,
+                willChange: pureFade ? 'opacity' : 'opacity, transform',
+                transition: isPreparing ? 'none' : transitionCss,
+                pointerEvents: 'none',
               }}
             />
-        )}
-        {/* Subtle angled glass display glare */}
+          );
+        })}
+
+        {/* Subtle angled glass display glare (hanya tampil halus saat mode MacBook) */}
         <div
           aria-hidden="true"
           style={{
@@ -284,75 +384,11 @@ function CrossfadeImage({ src, alt, glow, primary, fit = 'cover', aspectRatio = 
             inset: 0,
             zIndex: 4,
             pointerEvents: 'none',
+            opacity: frameless ? 1 : 0,
+            transition: 'opacity 0.4s ease',
             background: 'linear-gradient(122deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.015) 34%, transparent 35%)',
           }}
         />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      position: 'relative',
-      width: '100%',
-      padding: 8,
-      borderRadius: 26,
-      background: silk.cardSurface,
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      border: '1px solid rgba(255, 255, 255, 0.14)',
-      boxShadow: `
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
-        0 32px 90px -22px ${glow},
-        0 24px 60px -14px rgba(2, 4, 10, 0.85)
-      `,
-      transition: 'box-shadow 0.6s ease',
-    }}>
-      {/* Concentric inner radius: 26px outer - 8px padding = 18px inner */}
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        borderRadius: 18,
-        overflow: 'hidden',
-        aspectRatio,
-        background: '#050811',
-        outline: '1px solid rgba(255, 255, 255, 0.10)',
-        outlineOffset: '-1px',
-      }}>
-        {/* ── Layer CURRENT (glides out gently when transitioning) ── */}
-        {errorCurr
-          ? <Placeholder opacity={1} zIndex={1} color={primary} />
-          : <img
-            key={`curr-${current}`}
-            src={current}
-            alt={alt}
-            onError={() => setErrorCurr(true)}
-            style={{
-              ...baseImg,
-              opacity: entered ? 0 : 1,
-              transform: entered ? exitOffset : 'translate3d(0, 0, 0) scale(1)',
-              zIndex: 1,
-            }}
-          />
-        }
-
-        {/* ── Layer NEXT (glides in smoothly) ── */}
-        {next && (
-          errorNext
-            ? <Placeholder opacity={entered ? 1 : 0} zIndex={2} color={primary} />
-            : <img
-              key={`next-${next}`}
-              src={next}
-              alt={alt}
-              onError={() => setErrorNext(true)}
-              style={{
-                ...baseImg,
-                opacity: entered ? 1 : 0,
-                transform: entered ? 'translate3d(0, 0, 0) scale(1)' : enterOffset,
-                zIndex: 2,
-              }}
-            />
-        )}
       </div>
     </div>
   );
@@ -993,19 +1029,20 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
           padding: '13px 15px 14px',
           borderRadius: 16,
           overflow: 'hidden',
-          background: 'linear-gradient(145deg, rgba(6, 13, 38, 0.95) 0%, rgba(10, 20, 52, 0.94) 100%)',
+          background: `linear-gradient(145deg, ${silk.deepRgba(0.95)} 0%, ${silk.surfaceRgba(0.92)} 100%)`,
           backdropFilter: 'blur(22px)',
           WebkitBackdropFilter: 'blur(22px)',
-          border: '1px solid rgba(59, 130, 246, 0.28)',
+          border: `1px solid ${primary}48`,
           boxShadow: `inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 44px -10px rgba(0,0,0,0.9), 0 0 26px -8px ${glow}`,
           pointerEvents: 'none',
+          transition: 'border-color 0.45s ease, box-shadow 0.45s ease',
         }}
       >
         {/* Subtle decorative CPU chip watermark on right */}
         <Cpu
           size={62}
           strokeWidth={1.4}
-          color="rgba(59, 130, 246, 0.16)"
+          color={`${primary}30`}
           style={{
             position: 'absolute',
             top: 8,
@@ -1109,12 +1146,13 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
           padding: '13px 14px 14px',
           borderRadius: 16,
           overflow: 'hidden',
-          background: 'linear-gradient(145deg, rgba(6, 13, 38, 0.96) 0%, rgba(10, 20, 52, 0.95) 100%)',
+          background: `linear-gradient(145deg, ${silk.deepRgba(0.96)} 0%, ${silk.surfaceRgba(0.93)} 100%)`,
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(59, 130, 246, 0.28)',
+          border: `1px solid ${primary}48`,
           boxShadow: `inset 0 1px 0 rgba(255,255,255,0.14), 0 26px 54px -12px rgba(0,0,0,0.92), 0 0 28px -8px ${glow}`,
           pointerEvents: active ? 'auto' : 'none',
+          transition: 'border-color 0.45s ease, box-shadow 0.45s ease',
         }}
       >
         {/* Header Row */}
@@ -1151,7 +1189,7 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
                 fontFamily: 'Inter, system-ui, sans-serif',
               }}
             >
-              <Wifi size={10} color="#2dd4bf" />
+              <Wifi size={10} color={silk.left} />
               <span>MQTT Actuator Control</span>
             </div>
           </div>
@@ -1161,8 +1199,8 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
               width: 26,
               height: 26,
               borderRadius: 8,
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.55)',
+              background: `linear-gradient(135deg, ${primary} 0%, ${silk.right} 100%)`,
+              boxShadow: `0 4px 14px ${primary}77`,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1188,7 +1226,7 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
               style={{
                 padding: '7px 10px',
                 borderRadius: 10,
-                background: 'rgba(13, 21, 46, 0.78)',
+                background: silk.deepRgba(0.75),
                 border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
             >
@@ -1231,7 +1269,7 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
               style={{
                 padding: '7px 10px',
                 borderRadius: 10,
-                background: 'rgba(13, 21, 46, 0.78)',
+                background: silk.deepRgba(0.75),
                 border: '1px solid rgba(255, 255, 255, 0.08)',
               }}
             >
@@ -1283,9 +1321,9 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
               >
                 <defs>
                   <linearGradient id="lampArcGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#14b8a6" />
-                    <stop offset="55%" stopColor="#2563eb" />
-                    <stop offset="100%" stopColor="#1d4ed8" />
+                    <stop offset="0%" stopColor={silk.left} />
+                    <stop offset="55%" stopColor={primary} />
+                    <stop offset="100%" stopColor={silk.right} />
                   </linearGradient>
                 </defs>
                 <path
@@ -1313,10 +1351,10 @@ function DashboardPopUIOverlay({ active, primary, glow, lang }) {
                   borderRadius: '50%',
                   border: 'none',
                   background: lampOn
-                    ? 'radial-gradient(circle at 35% 30%, #2563eb 0%, #155eef 70%, #1d4ed8 100%)'
+                    ? `radial-gradient(circle at 35% 30%, ${silk.left} 0%, ${primary} 70%, ${silk.right} 100%)`
                     : 'rgba(30, 41, 59, 0.9)',
                   boxShadow: lampOn
-                    ? '0 0 22px rgba(37, 99, 235, 0.65), inset 0 1px 1px rgba(255,255,255,0.28)'
+                    ? `0 0 22px ${primary}99, inset 0 1px 1px rgba(255,255,255,0.28)`
                     : 'inset 0 1px 1px rgba(255,255,255,0.08)',
                   color: '#ffffff',
                   display: 'flex',
@@ -1517,15 +1555,68 @@ function MacBookProBase({ visible }) {
   );
 }
 
-// ── THEME PHONE OVERLAY (Live Theme-Synced iPhone Mockup for 'color' feature) ─
+// ── THEME PHONE OVERLAY (Live Theme-Synced iPhone 15/16 Pro Mockup for 'color' feature) ─
 function ThemePhoneOverlay({ active, activeTheme, lang }) {
   const isLight = activeTheme?.mode === 'light';
   const primary = activeTheme?.primary || '#0075ff';
-  const screenBg = isLight ? '#f4f7fb' : '#070c1b';
-  const cardBg = isLight ? '#ffffff' : 'rgba(18, 26, 48, 0.88)';
-  const cardBorder = isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.09)';
+  const accent = activeTheme?.accent || primary;
+  const screenBg = isLight
+    ? `radial-gradient(circle at 85% 6%, ${primary}14 0%, #f4f7fb 46%, #eef2f8 100%)`
+    : `radial-gradient(circle at 88% 8%, ${primary}22 0%, #090a0e 42%, #06070a 100%)`;
+  const cardBg = isLight
+    ? '#ffffff'
+    : `linear-gradient(155deg, ${primary}18 0%, rgba(16, 17, 22, 0.94) 56%, ${primary}12 100%)`;
+  const cardBorder = isLight ? 'rgba(15, 23, 42, 0.08)' : `${primary}36`;
+  const pillBg = isLight ? 'rgba(15, 23, 42, 0.06)' : 'rgba(255, 255, 255, 0.08)';
   const textMain = isLight ? '#0f172a' : '#f8fafc';
-  const textMuted = isLight ? '#64748b' : 'rgba(148, 163, 184, 0.85)';
+  const textMuted = isLight ? '#64748b' : 'rgba(176, 184, 199, 0.78)';
+  const accentText = isLight ? primary : accent;
+
+  // Authentic iPhone 15/16 Pro logical viewport (393 × 852) scaled crisply into 157 × 340 OLED
+  const LOGICAL_W = 393;
+  const LOGICAL_H = 852;
+  const SCREEN_W = 157;
+  const SCALE = SCREEN_W / LOGICAL_W;
+  const SCREEN_H = Math.round(LOGICAL_H * SCALE);
+
+  const kpiCards = [
+    {
+      label: 'TOTAL DEVICES',
+      badge: lang === 'id' ? '2 Terdaftar' : '2 Registered',
+      value: '2 Unit',
+      Icon: Cpu,
+      isGreenBadge: false,
+    },
+    {
+      label: 'ONLINE NOW',
+      badge: 'Standby',
+      value: lang === 'id' ? '0 Aktif' : '0 Active',
+      Icon: Wifi,
+      isGreenBadge: false,
+    },
+    {
+      label: 'DATA POINTS',
+      badge: lang === 'id' ? '+1.2k / jam' : '+1.2k / hr',
+      value: '9,013',
+      Icon: Database,
+      isGreenBadge: true,
+    },
+    {
+      label: 'ACTIVE ENDPOINTS',
+      badge: '0 Endpoint',
+      value: '0 / 0',
+      Icon: Share2,
+      isGreenBadge: false,
+    },
+  ];
+
+  const navItems = [
+    { label: 'Home', Icon: Home, active: true },
+    { label: 'Devices', Icon: Cpu, active: false },
+    { label: 'Buckets', Icon: Database, active: false },
+    { label: 'Rules', Icon: Zap, active: false },
+    { label: 'Menu', Icon: Menu, active: false },
+  ];
 
   return (
     <div
@@ -1535,277 +1626,600 @@ function ThemePhoneOverlay({ active, activeTheme, lang }) {
         right: -20,
         bottom: -14,
         zIndex: 15,
-        width: 158,
-        padding: 2.5,
-        borderRadius: 34,
-        /* Machined Titanium Outer Band */
-        background: 'linear-gradient(145deg, #8b93a6 0%, #3a404f 18%, #161922 48%, #5e6678 82%, #232733 100%)',
+        width: 172,
+        padding: 3,
+        borderRadius: 36,
+        /* Brushed Titanium iPhone 15/16 Pro Outer Chassis */
+        background: 'linear-gradient(145deg, #b4bccb 0%, #5c6475 11%, #1b1f29 33%, #3c4252 54%, #8d95a6 77%, #242834 92%, #767e90 100%)',
         boxShadow: `
-          0 34px 64px -12px rgba(0, 0, 0, 0.96),
-          0 12px 24px -6px rgba(0, 0, 0, 0.85),
-          0 0 36px -10px ${activeTheme?.glow || 'rgba(0,117,255,0.4)'}
+          inset 0 0 0 0.75px rgba(255, 255, 255, 0.34),
+          0 34px 68px -12px rgba(0, 0, 0, 0.96),
+          0 14px 26px -6px rgba(0, 0, 0, 0.88),
+          0 0 40px -10px ${activeTheme?.glow || 'rgba(0,117,255,0.4)'}
         `,
         pointerEvents: 'none',
       }}
     >
-      {/* Machined Titanium Side Buttons */}
+      {/* Subtle Titanium Antenna Bands (iPhone 14/15/16 Pro signature detail) */}
+      <span aria-hidden="true" style={{ position: 'absolute', left: 0, top: 38, width: 3, height: 2, background: 'rgba(10,12,18,0.68)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', right: 0, top: 38, width: 3, height: 2, background: 'rgba(10,12,18,0.68)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', left: 0, bottom: 38, width: 3, height: 2, background: 'rgba(10,12,18,0.68)' }} />
+      <span aria-hidden="true" style={{ position: 'absolute', right: 0, bottom: 38, width: 3, height: 2, background: 'rgba(10,12,18,0.68)' }} />
+
+      {/* Left Titanium Buttons: Action Button + Volume Up + Volume Down */}
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: -2.5, top: 46, width: 2.5, height: 14,
+          position: 'absolute', left: -2.5, top: 52, width: 2.5, height: 13,
           borderRadius: '2px 0 0 2px',
-          background: 'linear-gradient(180deg, #9ca3af 0%, #4b5563 50%, #1f2937 100%)',
+          background: 'linear-gradient(180deg, #aeb6c5 0%, #535b6b 50%, #1d212b 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
         }}
       />
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: -2.5, top: 68, width: 2.5, height: 24,
+          position: 'absolute', left: -2.5, top: 75, width: 2.5, height: 24,
           borderRadius: '2px 0 0 2px',
-          background: 'linear-gradient(180deg, #9ca3af 0%, #4b5563 50%, #1f2937 100%)',
+          background: 'linear-gradient(180deg, #aeb6c5 0%, #535b6b 50%, #1d212b 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
         }}
       />
       <span
         aria-hidden="true"
         style={{
-          position: 'absolute', left: -2.5, top: 98, width: 2.5, height: 24,
+          position: 'absolute', left: -2.5, top: 105, width: 2.5, height: 24,
           borderRadius: '2px 0 0 2px',
-          background: 'linear-gradient(180deg, #9ca3af 0%, #4b5563 50%, #1f2937 100%)',
-        }}
-      />
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute', right: -2.5, top: 72, width: 2.5, height: 34,
-          borderRadius: '0 2px 2px 0',
-          background: 'linear-gradient(180deg, #9ca3af 0%, #4b5563 50%, #1f2937 100%)',
+          background: 'linear-gradient(180deg, #aeb6c5 0%, #535b6b 50%, #1d212b 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
         }}
       />
 
-      {/* Pure Glossy Black Front Glass Bezel */}
+      {/* Right Titanium Buttons: Side Power Button + Camera Control (iPhone 16 Pro) */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute', right: -2.5, top: 82, width: 2.5, height: 38,
+          borderRadius: '0 2px 2px 0',
+          background: 'linear-gradient(180deg, #aeb6c5 0%, #535b6b 50%, #1d212b 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+        }}
+      />
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute', right: -1.5, bottom: 88, width: 1.5, height: 22,
+          borderRadius: '0 2px 2px 0',
+          background: 'linear-gradient(180deg, #646c7d 0%, #2a303d 100%)',
+        }}
+      />
+
+      {/* Ultra-Thin Glossy Black OLED Bezel */}
       <div
         style={{
-          padding: 5,
-          borderRadius: 31.5,
-          background: '#030407',
-          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+          padding: 4.5,
+          borderRadius: 33,
+          background: '#020305',
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09)',
         }}
       >
-        {/* Inner Phone OLED Display */}
+        {/* Clipped OLED Display Viewport */}
         <div
           style={{
             position: 'relative',
-            width: '100%',
-            aspectRatio: '9 / 19.2',
-            borderRadius: 26,
+            width: SCREEN_W,
+            height: SCREEN_H,
+            borderRadius: 28.5,
             overflow: 'hidden',
-            background: screenBg,
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '8px 9px 7px',
-            transition: 'background 0.4s ease',
+            background: isLight ? '#f4f7fb' : '#07080c',
           }}
         >
-          {/* Subtle glass reflection over OLED */}
+          {/* Crisp Glass Reflection Overlay */}
           <div
             aria-hidden="true"
             style={{
               position: 'absolute',
               inset: 0,
-              zIndex: 10,
+              zIndex: 20,
               pointerEvents: 'none',
-              background: 'linear-gradient(130deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.015) 32%, transparent 33%)',
+              background: 'linear-gradient(128deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.015) 30%, transparent 31%)',
             }}
           />
 
-          {/* Dynamic Island with subtle camera lens */}
+          {/* Full 393×852 Logical Mobile Dashboard Canvas (Scaled cleanly to 157×340) */}
           <div
             style={{
+              width: LOGICAL_W,
+              height: LOGICAL_H,
+              transform: `scale(${SCALE})`,
+              transformOrigin: 'top left',
+              background: screenBg,
+              display: 'flex',
+              flexDirection: 'column',
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+              color: textMain,
               position: 'relative',
-              width: 48,
-              height: 12,
-              borderRadius: 999,
-              background: '#020305',
-              margin: '0 auto 8px',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              paddingRight: 4,
-              boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,0.08)',
+              transition: 'background 0.4s ease, color 0.35s ease',
             }}
           >
-            <span
+            {/* iOS Status Bar + Dynamic Island */}
+            <div
               style={{
-                width: 5,
-                height: 5,
-                borderRadius: '50%',
-                background: 'radial-gradient(circle at 35% 35%, #3b82f6 0%, #0f172a 70%)',
-              }}
-            />
-          </div>
-
-          {/* Mini App Top Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 8,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 4,
-                  background: primary,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background 0.35s ease',
-                }}
-              >
-                <Cpu size={8.5} color="#ffffff" strokeWidth={2.5} />
-              </span>
-              <span
-                style={{
-                  fontSize: 8.5,
-                  fontWeight: 700,
-                  color: textMain,
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                }}
-              >
-                Videa Link
-              </span>
-            </div>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 6px rgba(16,185,129,0.7)',
-              }}
-            />
-          </div>
-
-          {/* Mini Theme Banner */}
-          <div
-            style={{
-              padding: '7px 8px',
-              borderRadius: 10,
-              background: `linear-gradient(135deg, ${primary} 0%, ${activeTheme?.accent || primary} 100%)`,
-              marginBottom: 7,
-              transition: 'background 0.4s ease',
-            }}
-          >
-            <div style={{ fontSize: 7, fontWeight: 600, color: 'rgba(255,255,255,0.82)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              {lang === 'id' ? 'Tema Aktif' : 'Active Theme'}
-            </div>
-            <div style={{ fontSize: 9.5, fontWeight: 700, color: '#ffffff', marginTop: 1, fontFamily: 'Inter, system-ui, sans-serif' }}>
-              {activeTheme?.label?.[lang] || activeTheme?.label?.id}
-            </div>
-          </div>
-
-          {/* Mini 2-Col KPI Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 7 }}>
-            {[
-              { label: 'NODES', val: '2 Unit' },
-              { label: 'POINTS', val: '9.0k' },
-            ].map((kpi, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: '6px 6px',
-                  borderRadius: 9,
-                  background: cardBg,
-                  border: `1px solid ${cardBorder}`,
-                  transition: 'background 0.4s ease, border-color 0.4s ease',
-                }}
-              >
-                <div style={{ fontSize: 6.5, fontWeight: 700, color: textMuted, letterSpacing: '0.04em' }}>
-                  {kpi.label}
-                </div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: textMain, marginTop: 2, fontFamily: 'Inter, system-ui, sans-serif' }}>
-                  {kpi.val}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Mini Sparkline Telemetry Card */}
-          <div
-            style={{
-              padding: '7px 8px',
-              borderRadius: 10,
-              background: cardBg,
-              border: `1px solid ${cardBorder}`,
-              marginBottom: 7,
-              transition: 'background 0.4s ease, border-color 0.4s ease',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <span style={{ fontSize: 7, fontWeight: 700, color: textMuted }}>TELEMETRY</span>
-              <span style={{ fontSize: 7, fontWeight: 700, color: primary }}>LIVE</span>
-            </div>
-            <svg width="100%" height="26" viewBox="0 0 110 26" fill="none">
-              <path
-                d="M2 22 C16 20, 22 12, 36 15 C50 18, 62 7, 76 10 C90 13, 98 4, 108 3"
-                stroke={primary}
-                strokeWidth="2.2"
-                strokeLinecap="round"
-              />
-              <circle cx="108" cy="3" r="2.6" fill={primary} />
-            </svg>
-          </div>
-
-          {/* Mini Switch Card */}
-          <div
-            style={{
-              padding: '6px 8px',
-              borderRadius: 10,
-              background: cardBg,
-              border: `1px solid ${cardBorder}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 'auto',
-              transition: 'background 0.4s ease, border-color 0.4s ease',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 8, fontWeight: 700, color: textMain }}>Smart Switch</div>
-              <div style={{ fontSize: 6.5, color: textMuted }}>MQTT · Online</div>
-            </div>
-            <span
-              style={{
-                width: 22,
-                height: 12,
-                borderRadius: 999,
-                background: primary,
-                padding: 1.5,
-                display: 'inline-flex',
-                justifyContent: 'flex-end',
+                height: 48,
+                padding: '10px 22px 0',
+                display: 'flex',
                 alignItems: 'center',
-                transition: 'background 0.35s ease',
+                justifyContent: 'space-between',
+                flexShrink: 0,
               }}
             >
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ffffff' }} />
-            </span>
-          </div>
+              <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: textMain, width: 54 }}>
+                9:41
+              </span>
 
-          {/* iOS Home Indicator */}
-          <div
-            style={{
-              width: 42,
-              height: 3,
-              borderRadius: 999,
-              background: isLight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(255, 255, 255, 0.28)',
-              margin: '6px auto 0',
-            }}
-          />
+              {/* Dynamic Island Pill with TrueDepth Camera Lens */}
+              <div
+                style={{
+                  width: 118,
+                  height: 31,
+                  borderRadius: 999,
+                  background: '#000000',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  paddingRight: 10,
+                  gap: 6,
+                  boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+                }}
+              >
+                <span
+                  style={{
+                    width: 11,
+                    height: 11,
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle at 35% 35%, #3b82f6 0%, #172554 45%, #020617 80%)',
+                    boxShadow: 'inset 0 0 2px rgba(255,255,255,0.28)',
+                  }}
+                />
+              </div>
+
+              {/* iOS Signal, Wi-Fi, Battery */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, width: 58, justifyContent: 'flex-end' }}>
+                <svg width="16" height="11" viewBox="0 0 16 11" fill={textMain}>
+                  <rect x="0" y="7.5" width="2.6" height="3.5" rx="0.8" />
+                  <rect x="4.2" y="5" width="2.6" height="6" rx="0.8" />
+                  <rect x="8.4" y="2.5" width="2.6" height="8.5" rx="0.8" />
+                  <rect x="12.6" y="0" width="2.6" height="11" rx="0.8" />
+                </svg>
+                <svg width="14" height="11" viewBox="0 0 16 12" fill="none" stroke={textMain} strokeWidth="1.7" strokeLinecap="round">
+                  <path d="M1.5 4.2C5.2 0.8 10.8 0.8 14.5 4.2" />
+                  <path d="M4.2 7C6.4 5 9.6 5 11.8 7" />
+                  <circle cx="8" cy="10" r="1.2" fill={textMain} stroke="none" />
+                </svg>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <div
+                    style={{
+                      width: 22,
+                      height: 11,
+                      borderRadius: 3.2,
+                      border: `1.3px solid ${isLight ? 'rgba(15,23,42,0.45)' : 'rgba(255,255,255,0.48)'}`,
+                      padding: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div style={{ width: '82%', height: '100%', borderRadius: 1.4, background: textMain }} />
+                  </div>
+                  <div style={{ width: 1.5, height: 4, borderRadius: '0 1px 1px 0', background: isLight ? 'rgba(15,23,42,0.4)' : 'rgba(255,255,255,0.45)' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* App Top Bar ("Dashboard" + Search / Refresh / Bell) */}
+            <div
+              style={{
+                padding: '10px 18px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.025em', color: textMain }}>
+                Dashboard
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18, color: textMuted }}>
+                <Search size={19} strokeWidth={1.85} />
+                <RefreshCw size={18} strokeWidth={1.85} />
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
+                  <Bell size={19} strokeWidth={1.85} />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -1,
+                      right: -1,
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      background: accent,
+                      boxShadow: `0 0 8px ${primary}`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-header: Icon Badge + IoT Platform Overview + "Atur" pill */}
+            <div
+              style={{
+                padding: '2px 18px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    background: `linear-gradient(135deg, ${primary} 0%, ${accent} 100%)`,
+                    boxShadow: `0 6px 18px -4px ${primary}90`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'background 0.4s ease, box-shadow 0.4s ease',
+                  }}
+                >
+                  <SlidersHorizontal size={18} color="#ffffff" strokeWidth={2.2} />
+                </div>
+                <span
+                  style={{
+                    fontSize: 17.5,
+                    fontWeight: 800,
+                    letterSpacing: '-0.02em',
+                    color: textMain,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  IoT Platform Overview
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '7px 13px',
+                  borderRadius: 999,
+                  background: isLight ? 'rgba(15, 23, 42, 0.05)' : 'rgba(255, 255, 255, 0.07)',
+                  border: `1px solid ${isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.1)'}`,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: textMain,
+                  flexShrink: 0,
+                }}
+              >
+                <Pencil size={12.5} color={accentText} strokeWidth={2.2} />
+                <span>{lang === 'id' ? 'Atur' : 'Edit'}</span>
+              </div>
+            </div>
+
+            {/* 2×2 KPI Cards Grid */}
+            <div
+              style={{
+                padding: '0 18px 14px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 11,
+                flexShrink: 0,
+              }}
+            >
+              {kpiCards.map((kpi, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: 18,
+                    padding: '13px 13px 14px',
+                    background: cardBg,
+                    border: `1px solid ${cardBorder}`,
+                    boxShadow: isLight
+                      ? '0 4px 12px rgba(15, 23, 42, 0.04)'
+                      : `inset 0 1px 0 ${primary}55, 0 8px 20px rgba(0,0,0,0.38)`,
+                    transition: 'background 0.4s ease, border-color 0.4s ease',
+                  }}
+                >
+                  {/* Large Subtle Watermark Icon on Right */}
+                  <kpi.Icon
+                    size={54}
+                    strokeWidth={1.35}
+                    color={primary}
+                    style={{
+                      position: 'absolute',
+                      right: 6,
+                      top: 14,
+                      opacity: isLight ? 0.12 : 0.16,
+                      pointerEvents: 'none',
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      color: textMuted,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {kpi.label}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      marginTop: 7,
+                      padding: '3.5px 9px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: kpi.isGreenBadge ? 'rgba(16, 185, 129, 0.16)' : pillBg,
+                      color: kpi.isGreenBadge ? '#34d399' : (isLight ? '#334155' : 'rgba(241, 245, 249, 0.9)'),
+                      border: kpi.isGreenBadge ? '1px solid rgba(16, 185, 129, 0.32)' : 'none',
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {kpi.badge}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 11,
+                      fontSize: 20,
+                      fontWeight: 800,
+                      letterSpacing: '-0.025em',
+                      color: textMain,
+                      position: 'relative',
+                      zIndex: 1,
+                    }}
+                  >
+                    {kpi.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Welcome Back Hero Card with Isometric 3D Glowing IoT Cube */}
+            <div
+              style={{
+                margin: '0 18px 14px',
+                borderRadius: 22,
+                padding: '18px 18px 16px',
+                position: 'relative',
+                overflow: 'hidden',
+                background: isLight
+                  ? `radial-gradient(circle at 86% 62%, ${primary}28 0%, #ffffff 68%)`
+                  : `radial-gradient(circle at 86% 62%, ${primary}60 0%, ${primary}1e 36%, rgba(15, 16, 22, 0.96) 72%)`,
+                border: `1px solid ${cardBorder}`,
+                boxShadow: isLight
+                  ? '0 8px 22px rgba(15, 23, 42, 0.06)'
+                  : `inset 0 1px 0 ${primary}48, 0 12px 28px rgba(0,0,0,0.45)`,
+                flexShrink: 0,
+                transition: 'background 0.4s ease, border-color 0.4s ease',
+              }}
+            >
+              {/* Isometric 3D Glowing IoT Cube Artwork */}
+              <svg
+                width="126"
+                height="126"
+                viewBox="0 0 120 120"
+                fill="none"
+                style={{
+                  position: 'absolute',
+                  right: 4,
+                  bottom: 24,
+                  pointerEvents: 'none',
+                  opacity: isLight ? 0.85 : 0.95,
+                }}
+              >
+                {/* Circuit base lines */}
+                <path d="M22 86 L60 106 L98 86" stroke={accent} strokeOpacity="0.35" strokeWidth="1" />
+                <path d="M32 76 L60 91 L88 76" stroke={accent} strokeOpacity="0.25" strokeWidth="1" />
+                <circle cx="22" cy="86" r="2" fill={accent} fillOpacity="0.6" />
+                <circle cx="98" cy="86" r="2" fill={accent} fillOpacity="0.6" />
+                {/* Left floating mini cube */}
+                <polygon points="22,48 31,43 40,48 31,53" fill={accent} fillOpacity="0.55" />
+                <polygon points="22,48 31,53 31,63 22,58" fill={primary} fillOpacity="0.45" />
+                <polygon points="40,48 31,53 31,63 40,58" fill={primary} fillOpacity="0.7" />
+                {/* Right floating mini cube */}
+                <polygon points="82,42 91,37 100,42 91,47" fill={accent} fillOpacity="0.6" />
+                <polygon points="82,42 91,47 91,57 82,52" fill={primary} fillOpacity="0.45" />
+                <polygon points="100,42 91,47 91,57 100,52" fill={primary} fillOpacity="0.75" />
+                {/* Main Center Glowing Cube */}
+                <polygon points="60,40 82,52 60,64 38,52" fill={accent} fillOpacity="0.92" />
+                <polygon points="38,52 60,64 60,88 38,76" fill={primary} fillOpacity="0.72" />
+                <polygon points="82,52 60,64 60,88 82,76" fill={primary} fillOpacity="0.95" />
+                {/* Top glowing core diamond */}
+                <polygon points="60,46 69,51 60,56 51,51" fill="#ffffff" fillOpacity="0.82" />
+                {/* Bottom mini cube */}
+                <polygon points="60,90 69,95 60,100 51,95" fill={accent} fillOpacity="0.65" />
+                <polygon points="51,95 60,100 60,108 51,103" fill={primary} fillOpacity="0.55" />
+                <polygon points="69,95 60,100 60,108 69,103" fill={primary} fillOpacity="0.8" />
+              </svg>
+
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 500, color: textMuted }}>
+                  Welcome back,
+                </div>
+                <div
+                  style={{
+                    fontSize: 25,
+                    fontWeight: 800,
+                    letterSpacing: '-0.025em',
+                    color: textMain,
+                    marginTop: 3,
+                  }}
+                >
+                  Viki Ramadhan
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    color: textMuted,
+                    marginTop: 8,
+                    maxWidth: 238,
+                  }}
+                >
+                  Glad to see you again!
+                  <br />
+                  {lang === 'id'
+                    ? 'Pantau telemetri & kendalikan perangkat IoT Anda secara real-time.'
+                    : 'Monitor telemetry & control your IoT devices in real-time.'}
+                </div>
+
+                {/* Live-style Clock */}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 15 }}>
+                  <span
+                    style={{
+                      fontSize: 29,
+                      fontWeight: 800,
+                      letterSpacing: '0.01em',
+                      fontVariantNumeric: 'tabular-nums',
+                      color: textMain,
+                    }}
+                  >
+                    13 : 40
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: accentText }}>
+                    12
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: textMuted, marginTop: 2 }}>
+                  Selasa, 24 Nov 2026
+                </div>
+
+                {/* Bottom CTA */}
+                <div
+                  style={{
+                    marginTop: 22,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    color: textMain,
+                  }}
+                >
+                  <span>{lang === 'id' ? 'Kelola Perangkat IoT' : 'Manage IoT Devices'}</span>
+                  <ArrowRight size={15} strokeWidth={2.3} />
+                </div>
+              </div>
+            </div>
+
+            {/* Connected IoT Devices Card (Peeking above Bottom Nav) */}
+            <div
+              style={{
+                margin: '0 18px',
+                borderRadius: '20px 20px 0 0',
+                padding: '15px 16px 12px',
+                background: cardBg,
+                border: `1px solid ${cardBorder}`,
+                borderBottom: 'none',
+                flex: 1,
+                overflow: 'hidden',
+                transition: 'background 0.4s ease, border-color 0.4s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: textMain }}>
+                  Connected IoT Devices
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: accentText, fontSize: 12, fontWeight: 700 }}>
+                  <span>{lang === 'id' ? 'Lihat Semua →' : 'View All →'}</span>
+                  <MoreVertical size={14} color={textMuted} />
+                </div>
+              </div>
+              <div
+                style={{
+                  marginTop: 7,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  color: textMuted,
+                }}
+              >
+                <AlertCircle size={13.5} strokeWidth={2} />
+                <span>
+                  <strong style={{ color: textMain }}>0 {lang === 'id' ? 'perangkat online' : 'online'}</strong>{' '}
+                  {lang === 'id' ? 'dari 2 terdaftar' : 'of 2 registered'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Navigation Bar + iOS Home Indicator */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(11, 12, 16, 0.95)',
+                borderTop: `1px solid ${isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.08)'}`,
+                padding: '8px 10px 8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                transition: 'background 0.4s ease',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+                {navItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      padding: '6px 4px',
+                      borderRadius: 12,
+                      background: item.active ? `${primary}24` : 'transparent',
+                      color: item.active ? accentText : textMuted,
+                    }}
+                  >
+                    <item.Icon size={18} strokeWidth={item.active ? 2.2 : 1.8} />
+                    <span style={{ fontSize: 10.5, fontWeight: item.active ? 700 : 500 }}>
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* iOS Home Indicator */}
+              <div
+                style={{
+                  width: 134,
+                  height: 5,
+                  borderRadius: 999,
+                  background: isLight ? 'rgba(15, 23, 42, 0.25)' : 'rgba(255, 255, 255, 0.32)',
+                  margin: '0 auto',
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1826,6 +2240,22 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
   const prevIdxRef = useRef(0);
 
   const features = getFeatures(t);
+
+  // Preload & decode all theme + feature screenshots so scrolling across features 01..07 morphs instantly with zero flicker
+  useEffect(() => {
+    const urls = [
+      ...THEMES.map((th) => th?.image),
+      ...features.map((f) => f?.image),
+    ].filter(Boolean);
+
+    urls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+      if (typeof img.decode === 'function') {
+        img.decode().catch(() => {});
+      }
+    });
+  }, []);
 
   // Map vertical scroll progress inside the tall sticky track → active feature index (0..6) on ALL viewports
   useEffect(() => {
@@ -1912,8 +2342,9 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
 
   const activeFeat = features[activeIndex] || features[0];
   const isColorItem = activeFeat?.isColor;
-  const previewSrc = isColorItem ? activeTheme.image : activeFeat.image;
-  const previewGlow = isColorItem ? activeTheme.glow : activeFeat.glow;
+  const usesThemeImage = isColorItem || activeFeat?.id === 'realtime';
+  const previewSrc = usesThemeImage ? activeTheme.image : activeFeat.image;
+  const previewGlow = usesThemeImage ? activeTheme.glow : activeFeat.glow;
   const hasPopUI = activeFeat?.id === 'room3d' || activeFeat?.id === 'realtime';
   const silk = getSilkPaletteTokens(activeTheme?.primary || '#06b6d4');
 
@@ -1938,35 +2369,38 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           style={{
             width: '100%',
             maxWidth: 1240,
-            margin: '0 auto 36px',
+            margin: '0 auto clamp(14px, 3vh, 36px)',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '20px',
+            gap: 'clamp(10px, 2vw, 20px)',
             alignItems: 'end',
           }}
         >
           <div>
             <span
+              className="mac-feat-eyebrow"
               style={{
                 display: 'block',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                 fontSize: '12px',
                 letterSpacing: '0.06em',
                 color: 'rgba(255, 255, 255, 0.45)',
-                marginBottom: '14px',
+                marginBottom: 'clamp(6px, 1.2vh, 14px)',
               }}
             >
               03 / {lang === 'id' ? 'Fitur Inti · Scroll untuk Jelajah' : 'Core Features · Scroll to Explore'}
             </span>
             <h2
+              className="mac-feat-title"
               style={{
-                fontSize: 'clamp(1.9rem, 3.8vw, 2.95rem)',
+                fontSize: 'clamp(1.6rem, min(3.6vw, 4.6vh), 2.9rem)',
                 fontWeight: 400,
                 letterSpacing: '-0.035em',
                 color: '#ffffff',
                 lineHeight: 1.08,
                 textWrap: 'balance',
                 fontFamily: 'Inter, system-ui, sans-serif',
+                margin: 0,
               }}
             >
               {t.featMagic}
@@ -1974,12 +2408,13 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           </div>
 
           <p
+            className="mac-feat-desc"
             style={{
-              fontSize: '15.5px',
+              fontSize: 'clamp(13px, min(1.3vw, 2.1vh), 15.5px)',
               color: 'rgba(255, 255, 255, 0.62)',
               maxWidth: 460,
               marginLeft: 'auto',
-              lineHeight: 1.65,
+              lineHeight: 1.55,
               textWrap: 'pretty',
               fontFamily: 'Inter, system-ui, sans-serif',
               margin: 0,
@@ -1997,8 +2432,8 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
             maxWidth: 1240,
             margin: '0 auto',
             display: 'grid',
-            gridTemplateColumns: 'minmax(280px, 430px) 1fr',
-            gap: 'clamp(32px, 5vw, 64px)',
+            gridTemplateColumns: 'minmax(280px, 420px) minmax(0, 1fr)',
+            gap: 'clamp(22px, 4vw, 60px)',
             alignItems: 'center',
           }}
         >
@@ -2064,17 +2499,20 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                         />
                       ) : null}
 
-                      <span style={{
-                        fontSize: 15,
-                        fontWeight: isOpen ? 600 : 500,
-                        color: isOpen ? '#ffffff' : 'rgba(255,255,255,0.52)',
-                        letterSpacing: '-0.012em',
-                        fontFamily: 'Inter, system-ui, sans-serif',
-                        transition: 'color 0.3s ease',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}>
+                      <span
+                        className="mac-feat-item-label"
+                        style={{
+                          fontSize: 15,
+                          fontWeight: isOpen ? 600 : 500,
+                          color: isOpen ? '#ffffff' : 'rgba(255,255,255,0.52)',
+                          letterSpacing: '-0.012em',
+                          fontFamily: 'Inter, system-ui, sans-serif',
+                          transition: 'color 0.3s ease',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
                         {t[feat.labelKey]}
                       </span>
                     </div>
@@ -2087,10 +2525,13 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                     opacity: isOpen ? 1 : 0,
                     transition: 'max-height 0.52s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease',
                   }}>
-                    <div style={{
-                      paddingBottom: 18,
-                      paddingLeft: (feat.icon || feat.isColor) ? 32 : 0,
-                    }}>
+                    <div
+                      className="mac-feat-item-body"
+                      style={{
+                        paddingBottom: 18,
+                        paddingLeft: (feat.icon || feat.isColor) ? 32 : 0,
+                      }}
+                    >
                       {feat.isColor && (() => {
                         const currentMode = activeTheme.mode || 'dark';
                         const currentAccentKey = activeTheme.id.replace('dark-', '').replace('light-', '');
@@ -2252,13 +2693,16 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                         );
                       })()}
 
-                      <p style={{
-                        fontSize: 13.5,
-                        color: 'rgba(255, 255, 255, 0.72)',
-                        lineHeight: 1.68,
-                        fontFamily: 'Inter, system-ui, sans-serif',
-                        margin: 0,
-                      }}>
+                      <p
+                        className="mac-feat-item-desc"
+                        style={{
+                          fontSize: 13.5,
+                          color: 'rgba(255, 255, 255, 0.72)',
+                          lineHeight: 1.65,
+                          fontFamily: 'Inter, system-ui, sans-serif',
+                          margin: 0,
+                        }}
+                      >
                         {t[feat.descKey]}
                       </p>
                     </div>
@@ -2332,35 +2776,36 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                       }}
                     >
                       {/* Authentic MacBook Pro Camera Notch */}
-                      {isColorItem && (
-                        <div
-                          aria-hidden="true"
+                      <div
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 72,
+                          height: 12,
+                          borderRadius: '0 0 8px 8px',
+                          background: '#030407',
+                          zIndex: 6,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: isColorItem ? 1 : 0,
+                          pointerEvents: 'none',
+                          transition: 'opacity 0.35s ease',
+                        }}
+                      >
+                        <span
                           style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            width: 72,
-                            height: 12,
-                            borderRadius: '0 0 8px 8px',
-                            background: '#030407',
-                            zIndex: 6,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            width: 4.5,
+                            height: 4.5,
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle at 35% 35%, #38bdf8 0%, #0f172a 75%)',
+                            boxShadow: '0 0 0 1px rgba(255,255,255,0.08)',
                           }}
-                        >
-                          <span
-                            style={{
-                              width: 4.5,
-                              height: 4.5,
-                              borderRadius: '50%',
-                              background: 'radial-gradient(circle at 35% 35%, #38bdf8 0%, #0f172a 75%)',
-                              boxShadow: '0 0 0 1px rgba(255,255,255,0.08)',
-                            }}
-                          />
-                        </div>
-                      )}
+                        />
+                      </div>
 
                       <CrossfadeImage
                         src={previewSrc}
@@ -2368,9 +2813,10 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                         glow={previewGlow}
                         primary={activeTheme.primary}
                         fit={(hasPopUI || isColorItem) ? 'contain' : 'cover'}
-                        aspectRatio={(hasPopUI || isColorItem) ? '16 / 9' : '16 / 10'}
+                        aspectRatio="16 / 9"
                         direction={direction}
                         frameless={isColorItem}
+                        pureFade={isColorItem}
                         vertical={isMobileView}
                       />
                     </div>
@@ -2383,13 +2829,13 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
 
               {/* Smooth Scroll Progress Indicator + Feature Pill */}
               <div
-                className="mac-feat-indicator"
+                className={`mac-feat-indicator ${hasPopUI ? 'mac-feat-indicator-pop' : ''}`}
                 style={{
-                  marginTop: hasPopUI ? 38 : 20,
+                  marginTop: hasPopUI ? 34 : 20,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 10,
                   transition: 'margin-top 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
               >
@@ -2576,12 +3022,48 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: clamp(84px, 9vh, 108px) clamp(24px, 4vw, 48px) clamp(36px, 5vh, 56px);
+          padding: clamp(68px, 7.5vh, 96px) clamp(20px, 4vw, 48px) clamp(16px, 3vh, 44px);
+          box-sizing: border-box;
+        }
+        .mac-feat-device-wrap {
+          width: 100%;
+          max-width: min(100%, calc((100dvh - 255px) * 1.62));
+          margin: 0 auto;
+        }
+        .mac-feat-device-wrap.mac-feat-device-macbook {
+          max-width: min(100%, calc((100dvh - 285px) * 1.62));
         }
 
-        @media (max-width: 1100px) and (min-width: 641px) {
+        /* ── Medium-width desktops / laptops (861px–1280px) ── */
+        @media (max-width: 1280px) and (min-width: 861px) {
+          .mac-feat-grid {
+            grid-template-columns: minmax(260px, 370px) minmax(0, 1fr) !important;
+            gap: clamp(20px, 3vw, 40px) !important;
+          }
           .pop-ui-card {
-            zoom: 0.82;
+            zoom: 0.86;
+          }
+          .pop-card-tr,
+          .pop-card-mr,
+          .pop-card-br,
+          .pop-card-phone {
+            right: -6px !important;
+          }
+          .pop-card-tl,
+          .pop-card-ml,
+          .pop-card-bl {
+            left: -6px !important;
+          }
+        }
+
+        /* ── Narrow desktop / landscape tablet (861px–1100px) ── */
+        @media (max-width: 1100px) and (min-width: 861px) {
+          .mac-feat-grid {
+            grid-template-columns: minmax(250px, 330px) minmax(0, 1fr) !important;
+            gap: 24px !important;
+          }
+          .pop-ui-card {
+            zoom: 0.78;
           }
           .pop-card-tr,
           .pop-card-mr,
@@ -2598,6 +3080,150 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           .pop-backdrop-br { right: -4px !important; }
         }
 
+        /* ── Short-height laptops (e.g. 1366x768, 1280x720, 1440x900 @ 125% scaling) ── */
+        @media (max-height: 820px) and (min-width: 861px) {
+          .mac-feat-sticky-stage {
+            padding: 68px clamp(20px, 3.5vw, 42px) 18px !important;
+          }
+          .mac-feat-heading {
+            margin-bottom: 18px !important;
+            gap: 14px !important;
+          }
+          .mac-feat-eyebrow {
+            margin-bottom: 6px !important;
+            font-size: 11px !important;
+          }
+          .mac-feat-accordion {
+            padding: 4px 18px !important;
+            border-radius: 20px !important;
+          }
+          .mac-feat-item-header {
+            padding: 11px 0 !important;
+          }
+          .mac-feat-item-label {
+            font-size: 14px !important;
+          }
+          .mac-feat-item-body {
+            padding-bottom: 12px !important;
+          }
+          .mac-feat-item-desc {
+            font-size: 12.5px !important;
+            line-height: 1.54 !important;
+          }
+          .mac-feat-device-wrap {
+            max-width: min(100%, calc((100dvh - 220px) * 1.56));
+          }
+          .mac-feat-device-wrap.mac-feat-device-macbook {
+            max-width: min(100%, calc((100dvh - 245px) * 1.56));
+          }
+          .pop-ui-card {
+            zoom: 0.80;
+          }
+          .pop-card-tr,
+          .pop-card-tl {
+            top: -12px !important;
+          }
+          .pop-card-bl,
+          .pop-card-br {
+            bottom: -14px !important;
+          }
+          .pop-card-tr,
+          .pop-card-mr,
+          .pop-card-br,
+          .pop-card-phone {
+            right: -4px !important;
+          }
+          .pop-card-tl,
+          .pop-card-ml,
+          .pop-card-bl {
+            left: -4px !important;
+          }
+          .mac-feat-indicator {
+            margin-top: 16px !important;
+            gap: 8px !important;
+          }
+          .mac-feat-indicator.mac-feat-indicator-pop {
+            margin-top: 22px !important;
+          }
+        }
+
+        /* ── Very short laptop viewports (<= 690px height, e.g. 1366x768 w/ browser chrome + taskbar) ── */
+        @media (max-height: 690px) and (min-width: 861px) {
+          .mac-feat-sticky-stage {
+            padding: 62px clamp(18px, 3vw, 36px) 12px !important;
+          }
+          .mac-feat-heading {
+            margin-bottom: 12px !important;
+            gap: 10px !important;
+          }
+          .mac-feat-eyebrow {
+            margin-bottom: 4px !important;
+            font-size: 10.5px !important;
+          }
+          .mac-feat-title {
+            font-size: clamp(1.35rem, 3.6vh, 2.05rem) !important;
+          }
+          .mac-feat-desc {
+            font-size: 12.5px !important;
+            line-height: 1.45 !important;
+          }
+          .mac-feat-accordion {
+            padding: 3px 16px !important;
+            border-radius: 18px !important;
+          }
+          .mac-feat-item-header {
+            padding: 8px 0 !important;
+          }
+          .mac-feat-item-label {
+            font-size: 13px !important;
+          }
+          .mac-feat-item-body {
+            padding-bottom: 9px !important;
+          }
+          .mac-feat-item-desc {
+            font-size: 12px !important;
+            line-height: 1.46 !important;
+          }
+          .mac-feat-device-wrap {
+            max-width: min(100%, calc((100dvh - 195px) * 1.54));
+          }
+          .mac-feat-device-wrap.mac-feat-device-macbook {
+            max-width: min(100%, calc((100dvh - 225px) * 1.52));
+          }
+          .pop-ui-card {
+            zoom: 0.68;
+          }
+          .pop-card-tr,
+          .pop-card-tl {
+            top: -8px !important;
+          }
+          .pop-card-bl,
+          .pop-card-br {
+            bottom: -10px !important;
+          }
+          .pop-card-tr,
+          .pop-card-mr,
+          .pop-card-br,
+          .pop-card-phone {
+            right: 2px !important;
+          }
+          .pop-card-tl,
+          .pop-card-ml,
+          .pop-card-bl {
+            left: 2px !important;
+          }
+          .mac-feat-indicator {
+            margin-top: 12px !important;
+            gap: 6px !important;
+          }
+          .mac-feat-indicator.mac-feat-indicator-pop {
+            margin-top: 16px !important;
+          }
+          .mac-feat-progress-bar {
+            display: none !important;
+          }
+        }
+
         @media (max-width: 860px) {
           .mac-feat-track {
             height: 340vh !important;
@@ -2607,25 +3233,39 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
             top: 0 !important;
             min-height: 100dvh !important;
             justify-content: center !important;
-            padding: 68px 16px 24px !important;
+            padding: 66px 16px 20px !important;
           }
           .mac-feat-heading {
-            margin-bottom: 14px !important;
-            gap: 8px !important;
+            margin-bottom: 12px !important;
+            gap: 6px !important;
+          }
+          .mac-feat-eyebrow {
+            margin-bottom: 4px !important;
+            font-size: 11px !important;
           }
           .mac-feat-heading p {
             display: none !important;
           }
           .mac-feat-grid {
             grid-template-columns: 1fr !important;
-            gap: 18px !important;
+            gap: 14px !important;
           }
           .mac-feat-accordion {
             padding: 4px 14px !important;
             border-radius: 18px !important;
           }
           .mac-feat-item-header {
-            padding: 10px 0 !important;
+            padding: 9px 0 !important;
+          }
+          .mac-feat-item-label {
+            font-size: 14px !important;
+          }
+          .mac-feat-item-body {
+            padding-bottom: 10px !important;
+          }
+          .mac-feat-item-desc {
+            font-size: 12.5px !important;
+            line-height: 1.5 !important;
           }
           /* Keep sticky stage within 100dvh on mobile by showing only the active scrolled feature card above the preview */
           .mac-feat-item-closed {
@@ -2634,8 +3274,29 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           .mac-feat-item-open {
             border-top: none !important;
           }
+          .mac-feat-device-wrap {
+            max-width: min(100%, calc((100dvh - 330px) * 1.65)) !important;
+          }
           .mac-feat-device-macbook {
-            padding: 0 7% !important;
+            padding: 0 6% !important;
+          }
+          .pop-ui-card {
+            zoom: 0.72;
+          }
+          .pop-card-tr,
+          .pop-card-mr,
+          .pop-card-br,
+          .pop-card-phone {
+            right: 4px !important;
+          }
+          .pop-card-tl,
+          .pop-card-ml,
+          .pop-card-bl {
+            left: 4px !important;
+          }
+          .mac-feat-indicator {
+            margin-top: 18px !important;
+            gap: 8px !important;
           }
         }
 
@@ -2662,14 +3323,14 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
           }
           .pop-card-bl {
             left: 4px !important;
-            bottom: -18px !important;
+            bottom: -14px !important;
           }
           .pop-card-br {
             right: 4px !important;
-            bottom: -18px !important;
+            bottom: -14px !important;
           }
           .pop-card-phone {
-            zoom: 0.64;
+            zoom: 0.62;
             right: 2px !important;
             bottom: -8px !important;
           }
@@ -2682,7 +3343,7 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
             right: -2px !important;
           }
           .mac-feat-indicator {
-            margin-top: 22px !important;
+            margin-top: 18px !important;
             gap: 8px !important;
           }
         }

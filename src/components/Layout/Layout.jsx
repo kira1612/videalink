@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation, NavLink } from 'react-router-dom';
 import { Home, Cpu, Database, Zap, Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -29,6 +29,16 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const mainRef = useRef(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
 
   const key = Object.keys(pageMeta).find(k => location.pathname.startsWith(k)) || '/app/dashboard';
   const { title, subtitle } = pageMeta[key];
@@ -86,7 +96,7 @@ export default function Layout() {
           subtitle={resolvedSubtitle}
           onOpenMobileNav={() => setMobileOpen(true)}
         />
-        <main className="flex-1 px-3 sm:px-6 pb-24 lg:pb-8 pt-2 overflow-x-hidden overflow-y-auto">
+        <main ref={mainRef} className="flex-1 px-3 sm:px-6 pb-24 lg:pb-8 pt-2 overflow-x-hidden overflow-y-auto">
           <Outlet />
         </main>
       </div>

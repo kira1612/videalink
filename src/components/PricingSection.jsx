@@ -133,30 +133,30 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
     <section
       ref={sectionRef}
       id="pricing"
-      className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10"
-      style={{ scrollMarginTop: '88px' }}
+      className="relative min-h-[100dvh] flex flex-col justify-center py-[clamp(64px,7.5vh,104px)] px-5 sm:px-6 bg-transparent border-t border-white/[0.08] z-10"
+      style={{ scrollMarginTop: '72px' }}
     >
-      <div className="max-w-[1320px] mx-auto relative z-20">
+      <div className="w-full max-w-[1320px] mx-auto relative z-20">
         {/* Editorial Left-Right Header Row + Minimal Monochrome Billing Switch */}
         <div
-          className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-12 md:mb-14 transition-[opacity,transform] duration-700 ease-out"
+          className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-[clamp(18px,3vh,40px)] transition-[opacity,transform] duration-700 ease-out"
           style={{
             opacity: inView ? 1 : 0,
             transform: inView ? 'translateY(0)' : 'translateY(25px)',
           }}
         >
-          <div>
-            <span className="block font-mono text-xs tracking-[0.06em] text-white/45 mb-4">
+          <div className="relative">
+            <span className="block font-mono text-xs tracking-[0.06em] text-white/60 mb-2">
               05 / {isId ? 'Paket & Kuota' : 'Pricing & Quotas'}
             </span>
             <h2
-              className="text-3xl sm:text-4xl md:text-[3rem] font-normal tracking-[-0.035em] text-white leading-[1.08]"
+              className="text-[clamp(1.65rem,min(3.4vw,4.5vh),2.85rem)] font-normal tracking-[-0.035em] text-white leading-[1.08]"
               style={{ textWrap: 'balance' }}
             >
               {isId ? 'Pilih paket sesuai skala Anda.' : 'Transparent plans, built to scale.'}
             </h2>
             <p
-              className="text-white/62 text-sm sm:text-base mt-3 max-w-xl leading-relaxed"
+              className="text-white/75 text-[clamp(13px,min(1.3vw,1.95vh),15.5px)] mt-2 max-w-xl leading-relaxed"
               style={{ textWrap: 'pretty' }}
             >
               {isId
@@ -173,8 +173,8 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
             <button
               type="button"
               onClick={() => setIsYearly(false)}
-              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer ${
-                !isYearly ? 'bg-white text-[#07090f]' : 'text-white/65 hover:text-white'
+              className={`min-h-[36px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer ${
+                !isYearly ? 'bg-white text-[#07090f]' : 'text-white/70 hover:text-white'
               }`}
             >
               {isId ? 'Bulanan' : 'Monthly'}
@@ -182,8 +182,8 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
             <button
               type="button"
               onClick={() => setIsYearly(true)}
-              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer inline-flex items-center gap-2 ${
-                isYearly ? 'bg-white text-[#07090f]' : 'text-white/65 hover:text-white'
+              className={`min-h-[36px] px-4 py-1.5 rounded-full text-xs font-medium transition-[background-color,color,transform] duration-200 active:scale-[0.96] cursor-pointer inline-flex items-center gap-2 ${
+                isYearly ? 'bg-white text-[#07090f]' : 'text-white/70 hover:text-white'
               }`}
             >
               <span>{isId ? 'Tahunan' : 'Yearly'}</span>
@@ -199,7 +199,7 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
         </div>
 
         {/* 5 Real VideaLink Architectural Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 items-stretch">
           {plans.map((plan, idx) => {
             const isFree = plan.monthly === 0;
             const amount = isYearly ? plan.yearly : plan.monthly;
@@ -213,7 +213,7 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
             return (
               <div
                 key={plan.id}
-                className={`relative rounded-[24px] p-6 flex flex-col justify-between backdrop-blur-2xl border transition-[border-color,transform] duration-300 ${
+                className={`relative rounded-[22px] p-4 xl:p-5 flex flex-col justify-between backdrop-blur-2xl border transition-[border-color,transform] duration-300 ${
                   plan.popular
                     ? 'border-white/[0.28]'
                     : 'border-white/[0.11] hover:border-white/[0.22]'
@@ -231,13 +231,13 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
                 }}
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <h3 className="text-lg font-medium text-white tracking-[-0.02em]">{plan.name}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <h3 className="text-base xl:text-[17px] font-medium text-white tracking-[-0.02em]">{plan.name}</h3>
                     <span
-                      className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      className={`font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${
                         plan.popular
                           ? 'bg-white text-[#07090f] font-semibold'
-                          : 'text-white/45'
+                          : 'text-white/55'
                       }`}
                     >
                       {plan.popular ? (isId ? 'Populer' : 'Popular') : plan.tier}
@@ -245,23 +245,23 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
                   </div>
 
                   <p
-                    className="text-xs text-white/60 leading-relaxed min-h-[36px]"
+                    className="text-xs text-white/70 leading-relaxed min-h-[48px]"
                     style={{ textWrap: 'pretty' }}
                   >
                     {plan.description}
                   </p>
 
-                  <div className="my-6">
-                    <div className="text-2xl sm:text-[26px] font-medium text-white tracking-[-0.03em] tabular-nums">
+                  <div className="my-3.5 xl:my-4">
+                    <div className="text-xl xl:text-[23px] font-medium text-white tracking-[-0.03em] tabular-nums">
                       {priceLabel}
                     </div>
-                    <div className="font-mono text-[10px] text-white/50 mt-1">
+                    <div className="font-mono text-[10px] text-white/60 mt-0.5">
                       {periodLabel}
                     </div>
                   </div>
 
                   {/* Clean Hairline Specs */}
-                  <ul className="space-y-2.5 pt-5 pb-6 border-t border-white/[0.09]">
+                  <ul className="space-y-1.5 pt-3.5 pb-4 border-t border-white/[0.09]">
                     {plan.specs.map((spec) => {
                       const SpecIcon = spec.icon;
                       return (
@@ -269,18 +269,18 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
                           key={spec.label}
                           className="flex items-center justify-between text-xs py-0.5"
                         >
-                          <span className="flex items-center gap-2 text-white/60">
+                          <span className="flex items-center gap-1.5 text-white/70">
                             <SpecIcon
                               size={13}
                               strokeWidth={1.6}
                               className="flex-shrink-0"
-                              style={{ color: spec.muted ? 'rgba(255,255,255,0.28)' : silk.left }}
+                              style={{ color: spec.muted ? 'rgba(255,255,255,0.32)' : silk.left }}
                             />
                             <span>{spec.label}</span>
                           </span>
                           <span
                             className={`font-medium tabular-nums ${
-                              spec.muted ? 'text-white/35 font-normal' : 'text-white/95'
+                              spec.muted ? 'text-white/40 font-normal' : 'text-white/95'
                             }`}
                           >
                             {spec.value}
@@ -294,10 +294,10 @@ export default function PricingSection({ lang = 'id', activeTheme }) {
                 {/* Action CTA (Stark White on Popular, Minimal Hairline on Others) */}
                 <Link
                   to="/login?mode=register"
-                  className={`min-h-[42px] w-full py-2.5 rounded-full text-center text-xs font-medium tracking-[-0.01em] transition-[transform,background-color,border-color,color] duration-200 flex items-center justify-center gap-1.5 active:scale-[0.96] ${
+                  className={`min-h-[38px] w-full py-2 rounded-full text-center text-xs font-medium tracking-[-0.01em] transition-[transform,background-color,border-color,color] duration-200 flex items-center justify-center gap-1.5 active:scale-[0.96] ${
                     plan.popular
                       ? 'bg-white text-[#07090f] hover:bg-white/90'
-                      : 'text-white/90 hover:text-white bg-white/[0.05] hover:bg-white/[0.11] border border-white/[0.14] hover:border-white/[0.26]'
+                      : 'text-white/90 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.15] hover:border-white/[0.28]'
                   }`}
                 >
                   <span>{plan.cta}</span>

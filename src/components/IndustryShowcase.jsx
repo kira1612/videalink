@@ -131,42 +131,42 @@ export default function IndustryShowcase({ lang = 'id', activeTheme }) {
     <section
       ref={sectionRef}
       id="industri"
-      className="relative py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] z-10"
-      style={{ scrollMarginTop: '88px' }}
+      className="relative min-h-[100dvh] flex flex-col justify-center py-[clamp(64px,8vh,104px)] px-6 bg-transparent border-t border-white/[0.08] z-10"
+      style={{ scrollMarginTop: '72px' }}
     >
-      <div className="max-w-[1200px] mx-auto relative z-20">
+      <div className="w-full max-w-[1200px] mx-auto relative z-20">
         {/* Editorial Section Header + Quiet Tab Filter Bar */}
         <div
-          className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-10 md:mb-12 transition-[opacity,transform] duration-700 ease-out"
+          className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 lg:gap-6 mb-[clamp(18px,3vh,36px)] transition-[opacity,transform] duration-700 ease-out"
           style={{
             opacity: inView ? 1 : 0,
             transform: inView ? 'translateY(0)' : 'translateY(25px)',
           }}
         >
           <div>
-            <span className="block font-mono text-xs tracking-[0.06em] text-white/45 mb-4">
+            <span className="block font-mono text-xs tracking-[0.06em] text-white/60 mb-2.5">
               04 / {lang === 'id' ? 'Skenario Penggunaan' : 'Use Cases'}
             </span>
             <h2
-              className="text-3xl sm:text-4xl md:text-[3rem] font-normal tracking-[-0.035em] text-white leading-[1.08] max-w-xl"
-              style={{ textWrap: 'balance' }}
+              className="text-[clamp(1.65rem,min(3.4vw,4.5vh),2.85rem)] font-normal tracking-[-0.035em] text-white leading-[1.08] max-w-xl"
+              style={{ textWrap: 'balance', textShadow: '0 4px 18px rgba(2, 5, 14, 0.78)' }}
             >
               {lang === 'id' ? 'Satu platform, berbagai skala penerapan.' : 'One platform, every deployment scale.'}
             </h2>
           </div>
 
           {/* Minimal Monochrome Pill Tabs (Stark White Active) */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap xl:flex-nowrap gap-1.5 sm:gap-2">
             {INDUSTRIES.map((item) => {
               const isActive = item.id === activeTab;
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`min-h-[40px] px-4 py-2 rounded-full text-xs sm:text-[13px] font-medium tracking-[-0.01em] transition-[transform,background-color,border-color,color] duration-200 backdrop-blur-xl cursor-pointer select-none active:scale-[0.96] ${
+                  className={`min-h-[38px] px-3.5 py-2 rounded-full text-xs font-medium tracking-[-0.01em] whitespace-nowrap transition-[transform,background-color,border-color,color] duration-200 backdrop-blur-xl cursor-pointer select-none active:scale-[0.96] ${
                     isActive
                       ? 'bg-white text-[#07090f] border border-white'
-                      : 'text-white/65 hover:text-white bg-white/[0.04] hover:bg-white/[0.09] border border-white/[0.11]'
+                      : 'text-white/75 hover:text-white bg-white/[0.06] hover:bg-white/[0.11] border border-white/[0.13]'
                   }`}
                 >
                   {item.tab[lang] || item.tab.id}
@@ -178,7 +178,7 @@ export default function IndustryShowcase({ lang = 'id', activeTheme }) {
 
         {/* Clean Architectural 2-Column Showcase Panel */}
         <div
-          className="rounded-[28px] border border-white/[0.11] backdrop-blur-2xl p-6 sm:p-10 md:p-12 grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-12 items-center"
+          className="rounded-[24px] sm:rounded-[28px] border border-white/[0.11] backdrop-blur-2xl p-5 sm:p-7 lg:p-9 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-9 items-center"
           style={{
             background: silk.cardSurface,
             boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 32px 80px -24px rgba(0, 0, 0, 0.82)',
@@ -190,13 +190,13 @@ export default function IndustryShowcase({ lang = 'id', activeTheme }) {
           {/* Left Column: Editorial Details */}
           <div className="lg:col-span-6 flex flex-col justify-center">
             <h3
-              className="text-2xl sm:text-[1.9rem] font-normal tracking-[-0.03em] text-white mb-4 leading-snug"
+              className="text-[clamp(1.25rem,min(2.3vw,3.2vh),1.85rem)] font-normal tracking-[-0.03em] text-white mb-3 leading-snug"
               style={{ textWrap: 'balance' }}
             >
               {current.title[lang] || current.title.id}
             </h3>
             <p
-              className="text-white/65 text-sm sm:text-base font-normal leading-relaxed mb-8 max-w-xl"
+              className="text-white/75 text-[clamp(13px,min(1.3vw,1.95vh),15px)] font-normal leading-relaxed mb-5 max-w-xl"
               style={{ textWrap: 'pretty' }}
             >
               {current.desc[lang] || current.desc.id}
@@ -207,7 +207,7 @@ export default function IndustryShowcase({ lang = 'id', activeTheme }) {
               {(current.bullets[lang] || current.bullets.id).map((bullet, idx) => (
                 <li
                   key={idx}
-                  className="py-3.5 flex items-start gap-3 text-sm text-white/80 leading-relaxed"
+                  className="py-2.5 sm:py-3 flex items-start gap-3 text-[13px] sm:text-sm text-white/85 leading-relaxed"
                   style={{ textWrap: 'pretty' }}
                 >
                   <span
@@ -223,7 +223,7 @@ export default function IndustryShowcase({ lang = 'id', activeTheme }) {
           {/* Right Column: Concentric Radius Framed Image */}
           <div className="lg:col-span-6 relative group">
             <div
-              className="relative w-full aspect-[16/10] sm:aspect-[16/11] rounded-[22px] p-2 bg-white/[0.03] border border-white/[0.11]"
+              className="relative w-full aspect-[16/10] max-h-[min(360px,46vh)] rounded-[22px] p-2 bg-white/[0.03] border border-white/[0.11]"
               style={{
                 boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 20px 44px -14px rgba(0, 0, 0, 0.82)',
               }}

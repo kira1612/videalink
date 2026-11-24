@@ -29,11 +29,11 @@ export default function CTABanner({ lang = 'id', activeTheme }) {
   return (
     <section
       id="cta-banner"
-      className="relative z-10 py-24 sm:py-32 px-6 bg-transparent border-t border-white/[0.08] overflow-hidden"
+      className="relative z-10 py-[clamp(48px,7vh,96px)] px-6 bg-transparent border-t border-white/[0.08] overflow-hidden"
     >
       <div className="max-w-[1200px] mx-auto relative z-10">
         <div
-          className="relative rounded-[32px] p-10 sm:p-16 md:p-24 text-center overflow-hidden backdrop-blur-2xl border border-white/[0.12]"
+          className="relative rounded-[28px] sm:rounded-[32px] p-7 sm:p-11 md:p-14 lg:p-16 text-center overflow-hidden backdrop-blur-2xl border border-white/[0.12]"
           style={{
             background: silk.cardSurface,
             boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 36px 90px -24px rgba(0, 0, 0, 0.85)',
@@ -46,19 +46,19 @@ export default function CTABanner({ lang = 'id', activeTheme }) {
           />
 
           <div className="relative z-10 flex flex-col items-center">
-            <span className="font-mono text-xs tracking-[0.06em] text-white/45 mb-6">
+            <span className="font-mono text-xs tracking-[0.06em] text-white/60 mb-4">
               {t.index}
             </span>
 
             <h2
-              className="text-3xl sm:text-5xl md:text-[3.5rem] font-normal tracking-[-0.04em] text-white mb-6 max-w-3xl leading-[1.08]"
+              className="text-[clamp(1.65rem,min(4vw,5.2vh),3.25rem)] font-normal tracking-[-0.04em] text-white mb-4 max-w-3xl leading-[1.08]"
               style={{ textWrap: 'balance' }}
             >
               {t.title}
             </h2>
 
             <p
-              className="text-white/65 text-base sm:text-lg max-w-2xl leading-relaxed mb-10 font-normal"
+              className="text-white/80 text-[clamp(14px,min(1.45vw,2.1vh),17px)] max-w-2xl leading-relaxed mb-7 font-normal"
               style={{ textWrap: 'pretty' }}
             >
               {t.desc}
@@ -67,7 +67,7 @@ export default function CTABanner({ lang = 'id', activeTheme }) {
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link
                 to="/login?mode=register"
-                className="group min-h-[48px] inline-flex items-center gap-2 px-8 py-3.5 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
+                className="group min-h-[46px] inline-flex items-center gap-2 px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] bg-white text-[#07090f] hover:bg-white/90 transition-[transform,background-color] duration-200 active:scale-[0.96] select-none"
               >
                 <span>{t.primary}</span>
                 <ArrowRight
@@ -78,7 +78,7 @@ export default function CTABanner({ lang = 'id', activeTheme }) {
 
               <Link
                 to="/login"
-                className="min-h-[48px] inline-flex items-center px-8 py-3.5 rounded-full font-medium text-sm tracking-[-0.01em] text-white/90 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.15] transition-[transform,background-color,border-color,color] duration-200 active:scale-[0.96] select-none"
+                className="min-h-[46px] inline-flex items-center px-7 py-3 rounded-full font-medium text-sm tracking-[-0.01em] text-white/90 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.15] transition-[transform,background-color,border-color,color] duration-200 active:scale-[0.96] select-none"
               >
                 {t.secondary}
               </Link>
