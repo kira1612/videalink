@@ -257,44 +257,26 @@ export default function Rooms() {
       </div>
 
       {activeTab === '3d' ? (
-        <div className="vision-card overflow-hidden relative flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
-          {rooms.length > 0 && (
-            <div className="p-3 bg-slate-950/90 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0 z-20">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xs font-bold text-slate-400 shrink-0">Ruangan Aktif:</span>
-                <select
-                  value={selectedRoomId || rooms[0]?.id || ''}
-                  onChange={(e) => setSelectedRoomId(Number(e.target.value) || e.target.value)}
-                  className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs font-extrabold text-slate-100 focus:outline-none focus:border-primary-500 cursor-pointer"
-                >
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.devices_count || 0} Perangkat)
-                    </option>
-                  ))}
-                </select>
+        <div className="vision-card overflow-hidden relative flex flex-col border border-slate-800/90 rounded-2xl shadow-2xl" style={{ height: 'calc(100vh - 165px)', minHeight: '640px' }}>
+          {(selectedRoomId || (rooms.length > 0 ? rooms[0].id : null)) ? (() => {
+            const activeRoomId = selectedRoomId || rooms[0].id;
+            const activeRoomObj = rooms.find(r => String(r.id) === String(activeRoomId)) || rooms[0];
+            return (
+              <div className="flex-1 relative overflow-hidden">
+                <FloorPlan
+                  hideHeader={true}
+                  roomId={activeRoomId}
+                  roomName={activeRoomObj?.name || 'Kantor 4 Ruang'}
+                  roomsList={rooms}
+                  onSelectRoom={(id) => setSelectedRoomId(Number(id) || id)}
+                  isPinned={pinnedRoomIds.has(String(activeRoomId))}
+                  onTogglePin={() => activeRoomObj && handleTogglePinRoom(activeRoomObj)}
+                  onBackToList={() => { setActiveTab('list'); fetchRooms(); }}
+                  key={activeRoomId}
+                />
               </div>
-
-              <button
-                type="button"
-                onClick={() => { setActiveTab('list'); fetchRooms(); }}
-                className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Daftar Ruangan →
-              </button>
-            </div>
-          )}
-
-          {(selectedRoomId || (rooms.length > 0 ? rooms[0].id : null)) ? (
-            <div className="flex-1 relative overflow-hidden">
-              <FloorPlan
-                hideHeader={true}
-                roomId={selectedRoomId || rooms[0].id}
-                roomName={rooms.find(r => r.id === (selectedRoomId || rooms[0].id))?.name || 'Ruangan 3D'}
-                key={selectedRoomId || rooms[0].id}
-              />
-            </div>
-          ) : (
+            );
+          })() : (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
               <div className="vision-icon-box w-14 h-14 rounded-2xl mb-4">
                 <Box size={28} />
