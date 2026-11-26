@@ -425,9 +425,12 @@ function PinnedWidgetItem({
   const typeInfo = CHART_TYPES.find((c) => c.value === widget?.type);
   const typeLabel = typeInfo?.label || widget?.type || 'Widget';
 
-  const fieldSubtitle = isMulti
-    ? (widget?.config?.fields?.length > 0 ? widget.config.fields.join(' + ') : (widget?.field !== 'multi' ? widget?.field : 'Multi-Series'))
-    : `${widget?.field || 'telemetry'}${widget?.unit ? ` (${widget.unit})` : ''}`;
+  const fieldSubtitle =
+    widget?.type === 'container'
+      ? `${Array.isArray(widget?.children) ? widget.children.length : 0} widgets • ${widget?.config?.layout || 'grid-2'}`
+      : isMulti
+        ? (widget?.config?.fields?.length > 0 ? widget.config.fields.join(' + ') : (widget?.field !== 'multi' ? widget?.field : 'Multi-Series'))
+        : `${widget?.field || 'telemetry'}${widget?.unit ? ` (${widget.unit})` : ''}`;
 
   const latestRecord = records && records.length > 0 ? records[records.length - 1] : null;
   const color = widget?.color || widget?.config?.color || 'rgb(var(--primary-400))';

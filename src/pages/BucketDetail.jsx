@@ -587,30 +587,6 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
     return result;
   }, [rawChartData, widget?.config?.fields, widget?.field]);
 
-  if (widget?.type === 'container') {
-    const layout = overrideVariant || widget.config?.layout || 'grid-2';
-    return (
-      <div className="w-full h-full min-h-[160px] flex flex-col items-center justify-center p-6 text-center rounded-2xl border-2 border-dashed border-primary-500/30 bg-gradient-to-b from-primary-500/5 to-transparent">
-        <div className="w-12 h-12 rounded-2xl bg-primary-500/20 text-primary-400 flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(var(--primary-500),0.25)]">
-          <Boxes size={24} />
-        </div>
-        <h5 className="text-sm font-extrabold text-slate-100 mb-1">{widget.title || 'Container Group'}</h5>
-        <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-          Wadah grup multi-widget • Layout: <span className="text-primary-400 font-semibold">{layout}</span>. Tarik widget lain ke dalam container ini pada dashboard.
-        </p>
-      </div>
-    );
-  }
-
-  if (!chartData || chartData.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-500 py-6">
-        <Database size={24} className="mb-2 opacity-40 animate-pulse text-primary-400" />
-        <p className="text-xs font-semibold text-slate-400">Belum ada data telemetri</p>
-      </div>
-    );
-  }
-
   const isMulti = MULTI_SERIES_TYPES.includes(widget?.type);
 
   // Available telemetry sensor keys in chartData (ignoring system timestamps and IDs)
@@ -643,6 +619,66 @@ export function WidgetChart({ widget, chartData: rawChartData, color, overrideVa
       : (availableSensorFields[0] || 'value');
     return [singleField];
   }, [isMulti, widget?.config?.fields, widget?.field, availableSensorFields]);
+
+  if (widget?.type === 'container') {
+    const layout = overrideVariant || widget.config?.layout || 'grid-2';
+    const childList = Array.isArray(widget.children) ? widget.children : [];
+    if (childList.length > 0) {
+      const gridClass =
+        layout === 'grid-3'
+          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+          : layout === 'stack'
+            ? 'grid-cols-1'
+            : 'grid-cols-1 sm:grid-cols-2';
+      return (
+        <div className={`w-full grid ${gridClass} gap-3 py-1`}>
+          {childList.map((child, idx) => (
+            <div
+              key={child.id || idx}
+              className="rounded-xl bg-slate-900/75 border border-slate-700/60 p-3 flex flex-col justify-between min-h-[145px] overflow-hidden"
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <p className="text-xs font-bold text-slate-200 truncate">
+                  {child.title || child.field || 'Widget'}
+                </p>
+                <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                  {child.field || child.type}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <WidgetChart
+                  widget={{ ...child, h: 'compact' }}
+                  chartData={rawChartData}
+                  color={child.config?.color || color}
+                  overrideVariant={child.config?.variant}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="w-full h-full min-h-[160px] flex flex-col items-center justify-center p-6 text-center rounded-2xl border-2 border-dashed border-primary-500/30 bg-gradient-to-b from-primary-500/5 to-transparent">
+        <div className="w-12 h-12 rounded-2xl bg-primary-500/20 text-primary-400 flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(var(--primary-500),0.25)]">
+          <Boxes size={24} />
+        </div>
+        <h5 className="text-sm font-extrabold text-slate-100 mb-1">{widget.title || 'Container Group'}</h5>
+        <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+          Wadah grup multi-widget • Layout: <span className="text-primary-400 font-semibold">{layout}</span>. Tarik widget lain ke dalam container ini pada dashboard.
+        </p>
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-slate-500 py-6">
+        <Database size={24} className="mb-2 opacity-40 animate-pulse text-primary-400" />
+        <p className="text-xs font-semibold text-slate-400">Belum ada data telemetri</p>
+      </div>
+    );
+  }
 
   const primaryField = widget?.field !== 'multi' && widget?.field ? widget.field : renderFields[0];
   const latestVal = chartData[chartData.length - 1]?.[primaryField] ?? '-';
@@ -2584,6 +2620,31 @@ function ContainerWidget({
           </div>
           )}
 
+          {onTogglePin && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(container);
+              }}
+              className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
+                pinnedWidgetIds?.has(container.id)
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                  : 'bg-slate-800/80 text-slate-400 hover:text-amber-400 hover:bg-slate-700 border-slate-700/60'
+              }`}
+              title={
+                pinnedWidgetIds?.has(container.id)
+                  ? 'Lepas Container dari Sidebar Dashboard'
+                  : 'Sematkan Container Group ke Sidebar Dashboard'
+              }
+            >
+              <Pin
+                size={14}
+                className={pinnedWidgetIds?.has(container.id) ? 'fill-amber-400 text-amber-400' : ''}
+              />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onAddChild(container.id)}
@@ -2757,6 +2818,10 @@ export default function BucketDetail() {
           iconColor: '#38bdf8',
         });
       } else {
+        const isContainerWidget = widget.type === 'container';
+        const containerChildren = isContainerWidget
+          ? widgets.filter((w) => w.containerId === widget.id)
+          : undefined;
         const newItem = {
           id: pinId,
           widgetId: widget.id,
@@ -2764,12 +2829,13 @@ export default function BucketDetail() {
           bucketName: bucket?.name || 'Data Bucket',
           widget: {
             ...widget,
-            title: widget.title || `${widget.field} ${widget.type}`,
+            title: widget.title || (isContainerWidget ? 'Container Group' : `${widget.field} ${widget.type}`),
             field: widget.field,
             type: widget.type,
             unit: widget.unit,
             color: widget.config?.color,
             config: widget.config,
+            ...(isContainerWidget ? { children: containerChildren } : {}),
           },
           pinnedAt: new Date().toISOString(),
         };
@@ -3344,20 +3410,6 @@ export default function BucketDetail() {
         <div className="flex-1">
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-100">{bucket.name}</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={bucket.enabled ? 'online' : 'offline'} label={bucket.enabled ? 'Active' : 'Disabled'} />
-
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wide ${cloudConnected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
-                <div className={`w-2 h-2 rounded-full ${cloudConnected ? 'bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-rose-500'}`} />
-                {cloudConnected ? 'Broker Connected' : 'Broker Disconnected'}
-              </div>
-
-              {isStale && bucket.enabled && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/20 text-[11px] font-semibold uppercase tracking-wide">
-                  ⚠️ Stale Data (&gt; 5m)
-                </div>
-              )}
-            </div>
           </div>
           <p className="text-slate-400 text-sm mt-1">{bucket.description || 'Customizable IoT Dashboard'}</p>
         </div>
@@ -4409,9 +4461,11 @@ export default function BucketDetail() {
                             {previewWidget.title || `${previewWidget.field || 'Field'} ${previewWidget.type}`}
                           </h4>
                           <p className="text-[10px] text-slate-400 font-mono">
-                            {MULTI_SERIES_TYPES.includes(previewWidget.type)
-                              ? (previewWidget.config?.fields?.length > 0 ? previewWidget.config.fields.join(' + ') : 'Multi-Series')
-                              : `field: ${previewWidget.field || bucket?.fields?.[0] || 'telemetry'}`}
+                            {previewWidget.type === 'container'
+                              ? `layout: ${currentVariant || previewWidget.config?.layout || 'grid-2'}`
+                              : MULTI_SERIES_TYPES.includes(previewWidget.type)
+                                ? (previewWidget.config?.fields?.length > 0 ? previewWidget.config.fields.join(' + ') : 'Multi-Series')
+                                : `field: ${previewWidget.field || bucket?.fields?.[0] || 'telemetry'}`}
                           </p>
                         </div>
                         <div

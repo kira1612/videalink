@@ -2451,9 +2451,11 @@ export default function Dashboard() {
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                   {typeLabel} • <span className="font-mono text-primary-400">
-                    {Array.isArray(MULTI_SERIES_TYPES) && MULTI_SERIES_TYPES.includes(widgetDef.type)
-                      ? (widgetDef.config?.fields?.length > 0 ? widgetDef.config.fields.join(' + ') : (widgetDef.field !== 'multi' ? widgetDef.field : 'Multi-Series'))
-                      : `${widgetDef.field || 'telemetry'}${widgetDef.unit ? ` (${widgetDef.unit})` : ''}`}
+                    {widgetDef.type === 'container'
+                      ? `${Array.isArray(widgetDef.children) ? widgetDef.children.length : 0} widgets • ${activeVariant}`
+                      : Array.isArray(MULTI_SERIES_TYPES) && MULTI_SERIES_TYPES.includes(widgetDef.type)
+                        ? (widgetDef.config?.fields?.length > 0 ? widgetDef.config.fields.join(' + ') : (widgetDef.field !== 'multi' ? widgetDef.field : 'Multi-Series'))
+                        : `${widgetDef.field || 'telemetry'}${widgetDef.unit ? ` (${widgetDef.unit})` : ''}`}
                   </span>
                   {widget.bucketName && (
                     <span className="text-slate-500"> • {widget.bucketName}</span>

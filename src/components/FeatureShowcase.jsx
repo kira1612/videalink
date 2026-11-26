@@ -416,7 +416,7 @@ function getFeatures(t) {
   return [
     {
       id: 'room3d', icon: Box, labelKey: 'featRoom3D', descKey: 'featRoom3DDesc',
-      image: '/assets/room3d-editor.jpg?v=3',
+      image: '/assets/room3d-editor.jpg?v=4',
       glow: 'rgba(6,182,212,0.4)',
     },
     {
@@ -631,7 +631,7 @@ function Room3DPopUIOverlay({ active, primary, glow, lang }) {
           }}
         >
           <img
-            src="/assets/room3d-avatar.jpg"
+            src="/assets/room3d-avatar.jpg?v=2"
             alt={lang === 'id' ? 'Mode Jelajah Avatar 3D' : '3D Avatar Walkthrough Mode'}
             style={{
               width: '100%',
@@ -2839,44 +2839,6 @@ export default function FeatureShowcase({ t, lang, activeTheme: propTheme, onThe
                   transition: 'margin-top 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
               >
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 14px',
-                  borderRadius: 999,
-                  background: 'rgba(8, 10, 20, 0.62)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.14)',
-                }}>
-                  {activeFeat.icon ? (
-                    <activeFeat.icon size={13} color={activeTheme.primary} style={{ flexShrink: 0 }} />
-                  ) : (
-                    <span style={{
-                      width: 10, height: 10, borderRadius: '50%',
-                      background: activeTheme.swatch, display: 'inline-block',
-                    }} />
-                  )}
-                  <span style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'rgba(255, 255, 255, 0.86)',
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                  }}>
-                    {t[activeFeat?.labelKey]}
-                  </span>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'rgba(255, 255, 255, 0.42)',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  }}>
-                    {String(activeIndex + 1).padStart(2, '0')}/{String(features.length).padStart(2, '0')}
-                  </span>
-                </div>
-
                 {/* Scroll Step Dots Indicator (non-clickable — pure scroll-driven) */}
                 <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {features.map((f, idx) => {

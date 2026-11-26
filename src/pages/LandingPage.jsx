@@ -631,52 +631,78 @@ export default function LandingPage() {
             className="relative min-h-[100dvh] flex flex-col justify-center py-[clamp(68px,8.5vh,108px)] px-6 bg-transparent border-t border-white/[0.08] z-10 scroll-mt-16"
           >
             <div className="w-full max-w-[1220px] mx-auto relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center text-left">
-              {/* Left Column: Restrained Editorial Copy + Matte Operational Spec Cards */}
+              {/* Left Column: Editorial Copy + Luminous Left-Accent Spec Cards */}
               <FadeIn delay={140} direction="right" className="lg:col-span-5 relative text-left flex flex-col justify-center items-start">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4 bg-white/[0.03] border border-white/[0.08]">
+                <div
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-5 border transition-colors duration-300"
+                  style={{
+                    backgroundColor: silk.surfaceRgba(0.85),
+                    borderColor: silk.leftRgba(0.26),
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                  }}
+                >
                   <span
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: silk.left }}
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors duration-300"
+                    style={{
+                      backgroundColor: silk.left,
+                      boxShadow: `0 0 8px ${silk.left}`,
+                    }}
                   />
-                  <span className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-white/70">
+                  <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-300">
                     02 / {t.univConn}
                   </span>
                 </div>
 
                 <h3
-                  className="text-[clamp(1.75rem,min(3.4vw,4.5vh),2.75rem)] font-medium tracking-[-0.035em] leading-[1.1] text-white mb-[clamp(12px,2.2vh,20px)]"
+                  className="text-[clamp(1.85rem,min(3.5vw,4.7vh),2.9rem)] font-bold tracking-[-0.03em] leading-[1.12] mb-[clamp(14px,2.2vh,20px)]"
                   style={{ textWrap: 'balance' }}
                 >
-                  <span className="block">{t.oneGate}</span>
-                  <span className="block text-white/65">{t.thousands}</span>
+                  <span className="block text-white">{t.oneGate}</span>
+                  <span
+                    className="block mt-0.5 transition-all duration-300"
+                    style={{
+                      backgroundImage: `linear-gradient(90deg, ${silk.mid} 0%, ${silk.left} 55%, ${silk.right} 100%)`,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >
+                    {t.thousands}
+                  </span>
                 </h3>
 
                 <p
-                  className="text-[clamp(13.5px,min(1.3vw,1.95vh),15px)] text-white/70 leading-[1.65] mb-[clamp(18px,2.8vh,28px)]"
+                  className="text-[clamp(13.5px,min(1.25vw,1.95vh),15px)] text-slate-300/80 leading-[1.7] mb-[clamp(20px,3vh,28px)]"
                   style={{ textWrap: 'pretty' }}
                 >
                   {t.gateDesc}
                 </p>
 
-                {/* Matte Operational Spec Cards (crisp 1px border, no decorative glow blobs) */}
-                <div className="w-full flex flex-col gap-3">
+                {/* Two Luminous Left-Accent Spec Cards (Theme-Reactive) */}
+                <div className="w-full flex flex-col gap-3.5">
                   <div
-                    className="rounded-2xl p-4 flex items-start gap-3.5 bg-white/[0.025] border border-white/[0.08] transition-colors duration-200 hover:border-white/[0.15]"
+                    className="relative rounded-2xl p-4 pl-5 flex items-start gap-4 border overflow-hidden transition-all duration-300"
                     style={{
-                      boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+                      background: `linear-gradient(135deg, ${silk.surfaceRgba(0.92)}, ${silk.deepRgba(0.94)})`,
+                      borderColor: silk.leftRgba(0.24),
+                      boxShadow: `inset 3px 0 0 0 ${silk.left}, -6px 0 24px -10px ${silk.leftRgba(0.4)}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
                     }}
                   >
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-white/[0.04] border border-white/[0.08]"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all duration-300"
+                      style={{
+                        backgroundColor: silk.leftRgba(0.12),
+                        borderColor: silk.leftRgba(0.32),
+                        boxShadow: `0 0 16px ${silk.leftRgba(0.16)}`,
+                      }}
                     >
-                      <Zap size={16} strokeWidth={1.75} style={{ color: silk.left }} />
+                      <Zap size={18} strokeWidth={1.8} style={{ color: silk.left }} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-white font-medium text-[14.5px] tracking-[-0.01em]">
+                      <h4 className="text-white font-bold text-[14.5px] tracking-[-0.01em]">
                         {t.rtGate}
                       </h4>
                       <p
-                        className="text-white/60 text-[13px] mt-1 leading-relaxed"
+                        className="text-slate-300/75 text-[13px] mt-1 leading-relaxed"
                         style={{ textWrap: 'pretty' }}
                       >
                         {t.rtGateDesc}
@@ -685,22 +711,29 @@ export default function LandingPage() {
                   </div>
 
                   <div
-                    className="rounded-2xl p-4 flex items-start gap-3.5 bg-white/[0.025] border border-white/[0.08] transition-colors duration-200 hover:border-white/[0.15]"
+                    className="relative rounded-2xl p-4 pl-5 flex items-start gap-4 border overflow-hidden transition-all duration-300"
                     style={{
-                      boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+                      background: `linear-gradient(135deg, ${silk.surfaceRgba(0.9)}, ${silk.deepRgba(0.94)})`,
+                      borderColor: silk.midRgba(0.26),
+                      boxShadow: `inset 3px 0 0 0 ${silk.mid}, -6px 0 24px -10px ${silk.midRgba(0.4)}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
                     }}
                   >
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-white/[0.04] border border-white/[0.08]"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 border transition-all duration-300"
+                      style={{
+                        backgroundColor: silk.midRgba(0.14),
+                        borderColor: silk.midRgba(0.35),
+                        boxShadow: `0 0 16px ${silk.midRgba(0.18)}`,
+                      }}
                     >
-                      <Database size={16} strokeWidth={1.75} style={{ color: silk.left }} />
+                      <Database size={18} strokeWidth={1.8} style={{ color: silk.right }} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-white font-medium text-[14.5px] tracking-[-0.01em]">
+                      <h4 className="text-white font-bold text-[14.5px] tracking-[-0.01em]">
                         {t.uniProto}
                       </h4>
                       <p
-                        className="text-white/60 text-[13px] mt-1 leading-relaxed"
+                        className="text-slate-300/75 text-[13px] mt-1 leading-relaxed"
                         style={{ textWrap: 'pretty' }}
                       >
                         {t.uniProtoDesc}
@@ -710,13 +743,14 @@ export default function LandingPage() {
                 </div>
               </FadeIn>
 
-              {/* Right Column: Clean Matte Schematic Stage Framing IoTAnimation */}
+              {/* Right Column: Luminous Cybernetic Hub Schematic Stage (Theme-Reactive) */}
               <FadeIn delay={220} direction="left" className="lg:col-span-7 relative w-full flex items-center justify-center">
                 <div
-                  className="relative w-full aspect-[4/3] sm:aspect-[16/11] max-h-[min(490px,65vh)] rounded-[24px] p-3 sm:p-4 border border-white/[0.09] flex items-center justify-center overflow-hidden"
+                  className="relative w-full aspect-[4/3] sm:aspect-[16/11] max-h-[min(510px,68vh)] rounded-[24px] p-2 sm:p-3 border flex items-center justify-center overflow-hidden transition-all duration-300"
                   style={{
-                    background: 'rgba(8, 12, 24, 0.82)',
-                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 24px 64px -20px rgba(0, 0, 0, 0.75)',
+                    background: `radial-gradient(circle at 50% 48%, ${silk.surfaceRgba(0.96)} 0%, ${silk.deepRgba(0.96)} 68%, rgba(5, 9, 20, 0.98) 100%)`,
+                    borderColor: silk.leftRgba(0.18),
+                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 28px 70px -20px rgba(0, 0, 0, 0.85)',
                   }}
                 >
                   <IoTAnimation lang={lang} activeTheme={activeTheme} />

@@ -88,20 +88,23 @@ export const FLOOR_MATERIALS = {
   slate_tile: { id: 'slate_tile', label: 'Granit Abu Muda', color: '#cbd0d8', lineColor: '#b5bcc7' },
 };
 
-function getWallMatProps(wall, isSelected, hovered) {
+function getWallMatProps(wall, isSelected, hovered, isLightMode = true) {
   const isGlass = wall?.type === 'glass_wall' || wall?.materialPreset === 'glass_frosted';
   const presetKey = isGlass ? 'glass_frosted' : (wall?.materialPreset || 'matte_slate');
   const preset = WALL_MATERIALS[presetKey] || WALL_MATERIALS.matte_slate;
-  const baseColor = wall?.customColor || preset.color;
-  const hColor = wall?.customColor || preset.hoverColor;
+  const darkDefaultOverride = !isLightMode && !wall?.customColor && presetKey === 'matte_slate';
+  const baseColor = wall?.customColor || (darkDefaultOverride ? '#334155' : preset.color);
+  const hColor = wall?.customColor || (darkDefaultOverride ? '#475569' : preset.hoverColor);
   const baseOpacity = wall?.opacity !== undefined ? wall.opacity : preset.opacity;
+  const isTransparent = baseOpacity < 0.99;
 
   return {
     color: isSelected ? '#3b82f6' : (hovered ? hColor : baseColor),
     roughness: preset.roughness,
     metalness: preset.metalness,
-    transparent: true,
-    opacity: isSelected ? Math.min(0.88, Math.max(0.45, baseOpacity)) : baseOpacity,
+    transparent: isTransparent,
+    opacity: baseOpacity,
+    depthWrite: !isTransparent,
   };
 }
 
@@ -188,8 +191,9 @@ function ThirdPersonAvatar({ orbitRef, walls, isExploreMode = false }) {
     };
   }, [orbitRef, isExploreMode]);
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
     if (!avatarRef.current) return;
+    const delta = Math.min(rawDelta, 0.05);
     
     const speed = keys.current.shift ? 7 : 3.5;
     
@@ -225,46 +229,159 @@ function ThirdPersonAvatar({ orbitRef, walls, isExploreMode = false }) {
       const dx = Math.sin(moveAngle) * speed * delta;
       const dz = Math.cos(moveAngle) * speed * delta;
       
-      // Collision Detection Sederhana
+      // Collision Detection Akurat: Tembok padat memblokir, hanya celah pintu/bukaan yang bisa dilewati
       let nextX = pos.current[0] + dx;
       let nextZ = pos.current[2] + dz;
       const avatarRadius = 0.35;
       
       if (walls) {
+        const toLocal = (px, pz, cx, cz, rotY) => {
+          const distX = px - cx;
+          const distZ = pz - cz;
+          const cosR = Math.cos(rotY);
+          const sinR = Math.sin(rotY);
+          return {
+            lx: distX * cosR - distZ * sinR,
+            lz: distX * sinR + distZ * cosR,
+          };
+        };
+
+        const checkSolidBox = (lx, lz, cxOff, czOff, w, d) =>
+          Math.abs(lx - cxOff) < (w / 2 + avatarRadius) &&
+          Math.abs(lz - czOff) < (d / 2 + avatarRadius);
+
+        const checkItemCollision = (px, pz, item, cx, cy, cz, sx, sy, sz, rotY) => {
+          const t = item.type || 'wall';
+          if (item.hidden || t === 'text_label') return false;
+          // Lewati balok plafon yang berada di atas kepala avatar (> 2m dari lantai)
+          if (cy - sy / 2 > 2.0) return false;
+
+          const { lx, lz } = toLocal(px, pz, cx, cz, rotY);
+
+          // Pilar bulat
+          if (t === 'cylinder_column') {
+            const colR = Math.max(sx, sz) * 0.46;
+            return Math.hypot(px - cx, pz - cz) < colR + avatarRadius;
+          }
+
+          // Dinding sudut L & jendela sudut
+          if (t === 'wall_l_shape' || t === 'corner_window') {
+            const legT = t === 'corner_window' ? 0.1 * Math.max(sx, sz) : 0.09 * Math.max(sx, sz);
+            const hitNorth = checkSolidBox(lx, lz, 0, (-0.5 + 0.045) * sz, sx, legT);
+            const hitWest = checkSolidBox(lx, lz, (-0.5 + 0.045) * sx, 0, legT, sz);
+            return hitNorth || hitWest;
+          }
+
+          // Dinding bentuk U
+          if (t === 'wall_u_shape') {
+            const legT = 0.09 * Math.max(sx, sz);
+            const hitBack = checkSolidBox(lx, lz, 0, (-0.5 + 0.045) * sz, sx, legT);
+            const hitLeft = checkSolidBox(lx, lz, (-0.5 + 0.045) * sx, 0, legT, sz);
+            const hitRight = checkSolidBox(lx, lz, (0.5 - 0.045) * sx, 0, legT, sz);
+            return hitBack || hitLeft || hitRight;
+          }
+
+          // Pintu & bukaan yang bisa dilewati: hanya sisi dinding kiri & kanan yang memblokir
+          const isPassableOpening =
+            t === 'door_wall' ||
+            t === 'door_wall_left' ||
+            t === 'door_wall_right' ||
+            t === 'door_wall_double' ||
+            t === 'sliding_door' ||
+            t === 'square_opening' ||
+            t === 'arch_opening';
+
+          if (isPassableOpening) {
+            if (Math.abs(lz) >= sz / 2 + avatarRadius) return false;
+            if (Math.abs(lx) >= sx / 2 + avatarRadius) return false;
+
+            let gapMin = 0;
+            let gapMax = 0;
+            if (t === 'door_wall_double') {
+              const openRatio = Math.min(4 / sx, 0.75);
+              gapMin = (-openRatio / 2) * sx;
+              gapMax = (openRatio / 2) * sx;
+            } else if (t === 'sliding_door') {
+              const openRatio = Math.min(3.4 / sx, 0.72);
+              gapMin = (-openRatio / 2) * sx;
+              gapMax = (openRatio / 2) * sx;
+            } else if (t === 'square_opening') {
+              const openRatio = Math.min(2.6 / sx, 0.62);
+              gapMin = (-openRatio / 2) * sx;
+              gapMax = (openRatio / 2) * sx;
+            } else if (t === 'arch_opening') {
+              const openRatio = Math.min(2.4 / sx, 0.56);
+              gapMin = (-openRatio / 2) * sx;
+              gapMax = (openRatio / 2) * sx;
+            } else {
+              const doorRatio = Math.min(2 / sx, 0.6);
+              let centerRatio = 0;
+              if (t === 'door_wall_left') centerRatio = -0.5 + doorRatio / 2 + 0.05;
+              if (t === 'door_wall_right') centerRatio = 0.5 - doorRatio / 2 - 0.05;
+              gapMin = (centerRatio - doorRatio / 2) * sx;
+              gapMax = (centerRatio + doorRatio / 2) * sx;
+            }
+
+            // Avatar hanya boleh lewat jika benar-benar di dalam celah pintu
+            const clearance = Math.min(avatarRadius * 0.7, (gapMax - gapMin) * 0.25);
+            const inDoorGap = lx >= gapMin + clearance && lx <= gapMax - clearance;
+            return !inDoorGap;
+          }
+
+          // Semua dinding padat lainnya (wall, glass_wall, window_wall, french_window, bay_window, dll.)
+          return checkSolidBox(lx, lz, 0, 0, sx, sz);
+        };
+
         const checkCollision = (px, pz) => {
           for (const w of walls) {
             if (w.hidden || w.type === 'text_label') continue;
-            
-            const checkRect = (cx, cz, sx, sz, rotY) => {
-              const distX = px - cx;
-              const distZ = pz - cz;
-              const localX = distX * Math.cos(-rotY) - distZ * Math.sin(-rotY);
-              const localZ = distX * Math.sin(-rotY) + distZ * Math.cos(-rotY);
-              return Math.abs(localX) < (sx / 2 + avatarRadius) && Math.abs(localZ) < (sz / 2 + avatarRadius);
-            };
 
             if (w.type === 'custom_group' && w.children) {
+              const gx = w.position?.[0] || 0;
+              const gy = w.position?.[1] || 0;
+              const gz = w.position?.[2] || 0;
               const groupRot = w.rotation?.[1] || 0;
+              const cosG = Math.cos(groupRot);
+              const sinG = Math.sin(groupRot);
+              const gsx = w.scale?.[0] || 1;
+              const gsy = w.scale?.[1] || 1;
+              const gsz = w.scale?.[2] || 1;
+
               for (const c of w.children) {
-                 if (c.hidden || c.type?.startsWith('door_wall')) continue;
-                 const cx = (w.position?.[0]||0) + c.position[0];
-                 const cz = (w.position?.[2]||0) + c.position[2];
-                 const rotY = groupRot + (c.rotation?.[1] || 0);
-                 const sx = (w.scale?.[0]||1) * c.scale[0];
-                 const sz = (w.scale?.[2]||1) * c.scale[2];
-                 if (checkRect(cx, cz, sx, sz, rotY)) return true;
+                if (c.hidden || c.type === 'text_label') continue;
+                const clx = (c.position?.[0] || 0) * gsx;
+                const cly = (c.position?.[1] || 0) * gsy;
+                const clz = (c.position?.[2] || 0) * gsz;
+                const cx = gx + clx * cosG + clz * sinG;
+                const cy = gy + cly;
+                const cz = gz - clx * sinG + clz * cosG;
+                const rotY = groupRot + (c.rotation?.[1] || 0);
+                const sx = gsx * (c.scale?.[0] || 1);
+                const sy = gsy * (c.scale?.[1] || 1);
+                const sz = gsz * (c.scale?.[2] || 1);
+                if (checkItemCollision(px, pz, c, cx, cy, cz, sx, sy, sz, rotY)) return true;
               }
-            } else if (w.type === 'wall') {
-              if (checkRect(w.position[0], w.position[2], w.scale[0], w.scale[2], w.rotation?.[1] || 0)) return true;
+            } else {
+              const cx = w.position?.[0] || 0;
+              const cy = w.position?.[1] || 2;
+              const cz = w.position?.[2] || 0;
+              const sx = w.scale?.[0] || 1;
+              const sy = w.scale?.[1] || 4;
+              const sz = w.scale?.[2] || 1;
+              const rotY = w.rotation?.[1] || 0;
+              if (checkItemCollision(px, pz, w, cx, cy, cz, sx, sy, sz, rotY)) return true;
             }
           }
           return false;
         };
 
-        if (checkCollision(nextX, nextZ)) {
-           // Sliding
-           if (!checkCollision(nextX, pos.current[2])) nextZ = pos.current[2];
-           else if (!checkCollision(pos.current[0], nextZ)) nextX = pos.current[0];
+        // Cek titik tengah juga supaya tidak menembus tembok tipis saat bergerak cepat
+        const midX = (pos.current[0] + nextX) / 2;
+        const midZ = (pos.current[2] + nextZ) / 2;
+        if (checkCollision(nextX, nextZ) || checkCollision(midX, midZ)) {
+           // Sliding sepanjang dinding
+           if (!checkCollision(nextX, pos.current[2]) && !checkCollision(midX, pos.current[2])) nextZ = pos.current[2];
+           else if (!checkCollision(pos.current[0], nextZ) && !checkCollision(pos.current[0], midZ)) nextX = pos.current[0];
            else { nextX = pos.current[0]; nextZ = pos.current[2]; }
         }
       }
@@ -584,9 +701,27 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
       )}
 
       {!showPopup && (
-        <Html position={[0, 0.35, 0]} zIndexRange={[20, 0]} pointerEvents="none" style={{ pointerEvents: 'none' }}>
-          <div className="flex flex-col items-center pointer-events-none select-none" style={{ transform: 'translate(-50%, -100%)', width: 'max-content' }}>
-            <div className={`px-2.5 py-1 rounded-full backdrop-blur-md border font-bold text-[11px] whitespace-nowrap shadow-xl flex items-center gap-1.5 transition-colors ${hovered ? 'bg-slate-950/95 border-cyan-400 text-white' : 'bg-slate-950/85 border-cyan-500/45 text-slate-100'}`}>
+        <Html
+          position={[0, 0.35, 0]}
+          zIndexRange={[20, 0]}
+          pointerEvents={isEditMode ? 'none' : 'auto'}
+          style={{ pointerEvents: isEditMode ? 'none' : 'auto' }}
+        >
+          <div
+            onClick={(e) => {
+              if (!isEditMode) {
+                e.stopPropagation();
+                setShowPopup(true);
+                onNodeClick && onNodeClick();
+              }
+            }}
+            onMouseEnter={() => !isEditMode && setHovered(true)}
+            onMouseLeave={() => !isEditMode && setHovered(false)}
+            className={`flex flex-col items-center select-none ${isEditMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'}`}
+            style={{ transform: 'translate(-50%, -100%)', width: 'max-content' }}
+            title={!isEditMode ? 'Klik untuk melihat data sensor' : undefined}
+          >
+            <div className={`px-2.5 py-1 rounded-full backdrop-blur-md border font-bold text-[11px] whitespace-nowrap shadow-xl flex items-center gap-1.5 transition-all ${hovered ? 'bg-slate-950/95 border-cyan-400 text-white scale-105' : 'bg-slate-950/85 border-cyan-500/45 text-slate-100'}`}>
               <span className={`w-2 h-2 rounded-full ${status ? 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]' : 'bg-slate-500'}`} />
               <span>{device.name}</span>
               {status && (
@@ -596,7 +731,7 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
                 </>
               )}
             </div>
-            <div className="w-px h-5" style={{ background: 'linear-gradient(to bottom, rgba(56,189,248,0.85), rgba(56,189,248,0.1))' }} />
+            <div className="w-px h-5 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(56,189,248,0.85), rgba(56,189,248,0.1))' }} />
           </div>
         </Html>
 
@@ -607,16 +742,23 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
         <Html position={[0, 0.8, 0]} center zIndexRange={[100, 10]}>
           <div className="w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-fade-in text-left">
             <div className="flex justify-between items-center px-4 py-3 border-b border-slate-800 bg-slate-800/50">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 truncate">{device.name}</span>
-              <button onClick={(e) => { e.stopPropagation(); setShowPopup(false); }} className="text-slate-500 hover:text-slate-100"><X size={16} /></button>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-200 truncate">{device.name}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setShowPopup(false); }} className="text-slate-400 hover:text-slate-100 cursor-pointer"><X size={16} /></button>
             </div>
             <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-2.5 h-2.5 rounded-full ${status ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
-                <span className="text-sm font-semibold text-slate-300">{status ? 'Online' : 'Offline'}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-2.5 h-2.5 rounded-full ${status ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+                  <span className="text-sm font-semibold text-slate-200">{status ? 'Online' : 'Offline'}</span>
+                </div>
+                {device.type && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                    {device.type}
+                  </span>
+                )}
               </div>
               
-              {/* Data Bucket Widgets / Dummy Section */}
+              {/* Data Bucket Widgets / Live Telemetry Resources */}
               <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-700/50">
                 {(() => {
                   let popupWidgets = [];
@@ -638,19 +780,40 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
                       const rawVal = device.resources?.[w.field] ?? '-';
                       const displayValue = rawVal !== '-' ? `${rawVal} ${w.unit || ''}` : '-';
                       return (
-                        <div key={idx} className="bg-slate-950/50 rounded-lg p-2.5 text-center border border-slate-800">
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 truncate">{w.title || w.field}</div>
-                          <div className="text-sm font-bold text-slate-200 truncate">{status ? displayValue : '-'}</div>
+                        <div key={idx} className="bg-slate-950/60 rounded-lg p-2.5 text-center border border-slate-800">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 truncate">{w.title || w.field}</div>
+                          <div className="text-sm font-bold text-cyan-300 font-mono truncate">{status ? displayValue : '-'}</div>
                         </div>
                       );
                     });
                   }
 
-                  // Tampilkan fallback jika kosong
+                  // Fallback ke telemetry live device.resources jika ada data masuk
+                  const resourceEntries = Object.entries(device.resources || {}).filter(
+                    ([k, v]) => v !== null && v !== undefined && v !== '' && typeof v !== 'object' && !k.startsWith('_')
+                  );
+                  if (resourceEntries.length > 0) {
+                    return resourceEntries.slice(0, 6).map(([key, val]) => {
+                      const lk = key.toLowerCase();
+                      const unit = lk.includes('temp') || lk.includes('suhu') ? '°C'
+                        : lk.includes('hum') || lk.includes('lembab') ? '%'
+                        : lk.includes('volt') || lk.includes('tegangan') ? 'V'
+                        : lk.includes('watt') || lk.includes('power') || lk.includes('daya') ? 'W'
+                        : '';
+                      return (
+                        <div key={key} className="bg-slate-950/60 rounded-lg p-2.5 text-center border border-slate-800">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 truncate">{key}</div>
+                          <div className="text-sm font-bold text-cyan-300 font-mono truncate">{status ? `${val}${unit ? ` ${unit}` : ''}` : '-'}</div>
+                        </div>
+                      );
+                    });
+                  }
+
+                  // Tampilkan info jika benar-benar belum ada data
                   return (
-                    <div className="col-span-2 bg-slate-950/50 rounded-lg p-3 text-center border border-rose-800/50">
-                      <div className="text-xs text-rose-400 mb-1 font-bold uppercase tracking-wider">⚠️ Belum Ada Data</div>
-                      <div className="text-[10px] text-slate-500 leading-relaxed">Centang "Tampilkan di 3D Room" pada widget di Data Buckets.</div>
+                    <div className="col-span-2 bg-slate-950/50 rounded-lg p-3 text-center border border-slate-800">
+                      <div className="text-xs text-amber-400 mb-1 font-bold uppercase tracking-wider">Belum Ada Data Sensor</div>
+                      <div className="text-[10px] text-slate-400 leading-relaxed">Kirim data telemetri atau centang &quot;Tampilkan di 3D Room&quot; pada widget di Data Buckets.</div>
                     </div>
                   );
                 })()}
@@ -680,35 +843,11 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
   const matRef = useRef();
   const capMatRef = useRef();
   const [hovered, setHovered] = useState(false);
+  const isLightMode = useIsLightMode();
   useCursor(hovered);
 
-  const matProps = getWallMatProps(wall, isSelected, hovered);
+  const matProps = getWallMatProps(wall, isSelected, hovered, isLightMode);
   const isGlass = wall?.type === 'glass_wall' || wall?.materialPreset === 'glass_frosted';
-  const worldPosVec = useRef(new THREE.Vector3());
-
-  // HomeByMe Automatic Camera-Facing Wall Cutaway:
-  // Perimeter walls on the camera-facing side of the room automatically become semi-transparent (0.24)
-  useFrame(({ camera }) => {
-    const g = (ref && ref.current) || groupRef.current;
-    if (!g || !matRef.current || isGlass || wall?.opacity !== undefined) return;
-    g.getWorldPosition(worldPosVec.current);
-    const wx = worldPosVec.current.x;
-    const wz = worldPosVec.current.z;
-    const isOuterPerimeter = Math.abs(wx) > 3.2 || Math.abs(wz) > 3.2;
-    if (!isOuterPerimeter) {
-      matRef.current.opacity = isSelected ? 0.85 : 1;
-      if (capMatRef.current) capMatRef.current.opacity = 1;
-      return;
-    }
-    const camDot = wx * camera.position.x + wz * camera.position.z;
-    const isCutaway = camDot > 22 && camera.position.y < 26;
-    const targetOp = isSelected ? 0.78 : (isCutaway ? 0.22 : 1);
-    matRef.current.opacity += (targetOp - matRef.current.opacity) * 0.18;
-    matRef.current.depthWrite = matRef.current.opacity > 0.6;
-    if (capMatRef.current) {
-      capMatRef.current.opacity = isCutaway ? 0.35 : 1;
-    }
-  });
 
   const setCombinedRef = (node) => {
     groupRef.current = node;
@@ -734,11 +873,11 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
       >
         <meshStandardMaterial ref={matRef} {...matProps} />
       </RoundedBox>
-      {/* Crisp white architectural wall-top cap trim (HomeByMe signature detail) */}
+      {/* Crisp architectural wall-top cap trim */}
       {!isGlass && (
         <mesh position={[0, 0.502, 0]}>
           <boxGeometry args={[1.004, 0.018, 1.02]} />
-          <meshStandardMaterial ref={capMatRef} color="#ffffff" roughness={0.35} transparent opacity={1} />
+          <meshStandardMaterial ref={capMatRef} color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} />
         </mesh>
       )}
     </group>
@@ -1100,6 +1239,8 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
   const labelText = ((wall.text && !wall.text.includes('undefined')) ? wall.text.replace(/^Ruangan:\s*/i, '') : 'RUANGAN').toUpperCase();
   const calculatedFontSize = wall.fontSize || Math.min(1.15, Math.max(0.68, 9.5 / (labelText.length || 7)));
 
+  const isAlreadyFlat = Math.abs((wall.rotation?.[0] || 0) + Math.PI / 2) < 0.2;
+
   return (
     <group 
       ref={ref}
@@ -1111,17 +1252,19 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
       onPointerOut={() => setHovered(false)}
     >
       <Text
+        position={[0, 0.04, 0]}
+        rotation={isAlreadyFlat ? [0, 0, 0] : [-Math.PI / 2, 0, 0]}
         font={wall.fontFamily || undefined}
         fontSize={calculatedFontSize}
-        maxWidth={4.4}
+        maxWidth={5.2}
         lineHeight={1.15}
         textAlign="center"
-        color={isCapturing ? '#000000' : (isSelected ? '#38bdf8' : (hovered ? '#bae6fd' : (wall.color || (isLightMode ? '#1e293b' : '#cbd5e1'))))}
+        color={isCapturing ? '#000000' : (isSelected ? '#38bdf8' : (hovered ? '#60a5fa' : (wall.color || (isLightMode ? '#1e293b' : '#cbd5e1'))))}
         anchorX="center"
         anchorY="middle"
         fontStyle={wall.italic ? 'italic' : 'normal'}
         fontWeight={wall.bold || isCapturing ? 'bold' : '800'}
-        fillOpacity={isSelected || hovered ? 0.95 : (wall.opacity !== undefined ? wall.opacity : (isLightMode ? 0.78 : 0.72))}
+        fillOpacity={isSelected || hovered ? 0.95 : (wall.opacity !== undefined ? wall.opacity : (isLightMode ? 0.82 : 0.78))}
       >
         {labelText}
       </Text>
@@ -1186,7 +1329,7 @@ const CustomGroupBlock = React.forwardRef(({ wall, isSelected, onClick, selected
 
   const handleChildClick = (e, child) => {
     e.stopPropagation();
-    if (editMode && activeTab === 'walls') {
+    if (editMode) {
       if (isSelected) {
         // Jika grup sudah terpilih, klik lagi akan memilih anak spesifik di dalamnya
         setSelectedObj({ type: 'wall', id: child.id });
@@ -1205,7 +1348,7 @@ const CustomGroupBlock = React.forwardRef(({ wall, isSelected, onClick, selected
       scale={wall.scale}
       onClick={(e) => { 
         e.stopPropagation(); 
-        if (editMode && activeTab === 'walls') onClick && onClick(); 
+        if (editMode) onClick && onClick(); 
       }}
       onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
       onPointerOut={() => setHovered(false)}
@@ -1224,7 +1367,7 @@ const CustomGroupBlock = React.forwardRef(({ wall, isSelected, onClick, selected
         if (child.type === 'furniture') {
           return <FurnitureBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} />;
         }
-        if (child.type?.startsWith('door_wall') || child.type === 'window_wall') {
+        if (isArchSpecialType(child.type)) {
           return <DoorWallBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} isCapturing={isCapturing} />;
         }
         return <WallBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} />;
@@ -1496,7 +1639,7 @@ function ChildInGroupTransform({ child, parentGroup, transformMode, setWalls, or
     <>
       {child.type === 'furniture' ? (
         <FurnitureBlock ref={wallRef} wall={wallData} isSelected={true} onClick={() => {}} />
-      ) : (child.type?.startsWith('door_wall') || child.type === 'window_wall') ? (
+      ) : isArchSpecialType(child.type) ? (
         <DoorWallBlock ref={wallRef} wall={wallData} isSelected={true} onClick={() => {}} />
       ) : (
         <WallBlock ref={wallRef} wall={wallData} isSelected={true} onClick={() => {}} />
@@ -1542,47 +1685,37 @@ function ChildInGroupTransform({ child, parentGroup, transformMode, setWalls, or
   );
 }
 
+const ARCH_SPECIAL_TYPES = new Set([
+  'door_wall',
+  'door_wall_left',
+  'door_wall_right',
+  'door_wall_double',
+  'sliding_door',
+  'window_wall',
+  'french_window',
+  'bay_window',
+  'corner_window',
+  'square_opening',
+  'arch_opening',
+  'cylinder_column',
+  'wall_l_shape',
+  'wall_u_shape',
+  'stair_block',
+]);
+
+const isArchSpecialType = (type) => Boolean(type && (type.startsWith('door_wall') || ARCH_SPECIAL_TYPES.has(type)));
+
 /* ─────────────────────────────────────────────────────────────────────────
-   Door & Panoramic Window Wall Block
-   - door_wall        = 1 door in center
-   - door_wall_left   = 1 door on the left side
-   - door_wall_right  = 1 door on the right side
-   - door_wall_double = 2 doors symmetrically placed
-   - window_wall      = Panoramic window with lower sill, upper lintel, and glass pane
+   Door, Window & Architectural Structure 3D Block
 ───────────────────────────────────────────────────────────────────────── */
 const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing }, ref) => {
   const [hovered, setHovered] = useState(false);
-  const [cutawayOpacity, setCutawayOpacity] = useState(1);
   const isLightMode = useIsLightMode();
   const localGroupRef = useRef();
-  const worldPos = useRef(new THREE.Vector3());
   useCursor(hovered);
 
-  useFrame(({ camera }) => {
-    const node = (ref && typeof ref === 'object' && ref.current) ? ref.current : localGroupRef.current;
-    if (!node || wall.type === 'glass_wall' || wall.materialPreset === 'glass_frosted') return;
-    node.getWorldPosition(worldPos.current);
-    const wx = worldPos.current.x;
-    const wz = worldPos.current.z;
-    const distFromCenter = Math.hypot(wx, wz);
-    if (distFromCenter < 2.2) {
-      if (cutawayOpacity !== 1) setCutawayOpacity(1);
-      return;
-    }
-    const cx = camera.position.x;
-    const cz = camera.position.z;
-    const camLen = Math.hypot(cx, cz) || 1;
-    const wallLen = distFromCenter || 1;
-    const dot = (wx * cx + wz * cz) / (wallLen * camLen);
-    const shouldCutaway = dot > 0.38 && camera.position.y < 26;
-    const targetOp = shouldCutaway ? 0.24 : 1;
-    if (Math.abs(cutawayOpacity - targetOp) > 0.05) {
-      setCutawayOpacity(targetOp);
-    }
-  });
-
   const rawMatProps = getWallMatProps(wall, isSelected, hovered, isLightMode);
-  const finalOpacity = Math.min(rawMatProps.opacity ?? 1, cutawayOpacity);
+  const finalOpacity = rawMatProps.opacity ?? 1;
   const isTransparent = rawMatProps.transparent || finalOpacity < 0.99;
   const matProps = {
     ...rawMatProps,
@@ -1643,7 +1776,7 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
         {/* Crisp White Architectural Top Trim */}
         <mesh position={[0, 0.502, 0]} receiveShadow>
           <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
         </mesh>
         {/* Translucent glass pane */}
         {!isCapturing && (
@@ -1651,6 +1784,468 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
             <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.15} />
           </RoundedBox>
         )}
+      </group>
+    );
+  }
+
+  // Sliding Glass Door (Pintu Geser)
+  if (wall.type === 'sliding_door') {
+    const openW = Math.min(3.4 / wallW, 0.72);
+    const sideW = (1 - openW) / 2;
+    const lintelH = 0.16;
+    const panelH = 1 - lintelH;
+    const panelW = openW * 0.54;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        {sideW > 0.01 && (
+          <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        {sideW > 0.01 && (
+          <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        {!isCapturing && (
+          <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[openW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        <mesh position={[0, 0.502, 0]}>
+          <boxGeometry args={[1.002, 0.025, 1.02]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+        {!isCapturing && (
+          <>
+            {/* Left sliding glass leaf */}
+            <mesh position={[-openW * 0.22, -lintelH / 2, 0.16]}>
+              <boxGeometry args={[panelW, panelH, 0.14]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
+            </mesh>
+            <mesh position={[-openW * 0.22, -lintelH / 2, 0.16]}>
+              <boxGeometry args={[panelW + 0.012, 0.025, 0.18]} />
+              <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
+            </mesh>
+            {/* Right sliding glass leaf (slightly offset in Z) */}
+            <mesh position={[openW * 0.22, -lintelH / 2, -0.16]}>
+              <boxGeometry args={[panelW, panelH, 0.14]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
+            </mesh>
+            <mesh position={[openW * 0.22, -lintelH / 2, -0.16]}>
+              <boxGeometry args={[panelW + 0.012, 0.025, 0.18]} />
+              <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
+            </mesh>
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // French Window (Floor-to-ceiling tall panoramic glass with vertical mullions)
+  if (wall.type === 'french_window') {
+    const winW = Math.min(4.8 / wallW, 0.8);
+    const sideW = (1 - winW) / 2;
+    const sillH = 0.05;
+    const lintelH = 0.12;
+    const glassH = 1 - sillH - lintelH;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        {sideW > 0.01 && (
+          <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        {sideW > 0.01 && (
+          <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        <RoundedBox position={[0, -0.5 + sillH / 2, 0]} args={[winW, sillH, 1]} radius={0.005} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {!isCapturing && (
+          <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[winW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        <mesh position={[0, 0.502, 0]}>
+          <boxGeometry args={[1.002, 0.025, 1.02]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+        {!isCapturing && (
+          <>
+            <mesh position={[0, (sillH - lintelH) / 2, 0]}>
+              <boxGeometry args={[winW, glassH, 0.18]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.26 * finalOpacity} roughness={0.1} metalness={0.18} />
+            </mesh>
+            {[-winW / 6, winW / 6].map((mx, idx) => (
+              <mesh key={idx} position={[mx, (sillH - lintelH) / 2, 0]}>
+                <boxGeometry args={[0.016, glassH, 0.28]} />
+                <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.4} />
+              </mesh>
+            ))}
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // Bay Window (Protruding 3-sided window alcove)
+  if (wall.type === 'bay_window') {
+    const bayW = 0.62;
+    const sideW = (1 - bayW) / 2;
+    const sillH = 0.28;
+    const lintelH = 0.2;
+    const glassH = 1 - sillH - lintelH;
+    const depth = 2.4;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {/* Protruding bottom bay seat / sill */}
+        <RoundedBox position={[0, -0.5 + sillH / 2, depth / 2]} args={[bayW, sillH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {/* Protruding top bay soffit */}
+        {!isCapturing && (
+          <RoundedBox position={[0, 0.5 - lintelH / 2, depth / 2]} args={[bayW + 0.04, lintelH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        {/* Front + left + right glass panes */}
+        {!isCapturing && (
+          <>
+            <mesh position={[0, (sillH - lintelH) / 2, depth]}>
+              <boxGeometry args={[bayW, glassH, 0.22]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+            </mesh>
+            <mesh position={[-bayW / 2, (sillH - lintelH) / 2, depth / 2]}>
+              <boxGeometry args={[0.025, glassH, depth]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+            </mesh>
+            <mesh position={[bayW / 2, (sillH - lintelH) / 2, depth / 2]}>
+              <boxGeometry args={[0.025, glassH, depth]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+            </mesh>
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // Corner Window (L-shaped wrap-around glass corner)
+  if (wall.type === 'corner_window') {
+    const sillH = 0.26;
+    const lintelH = 0.18;
+    const glassH = 1 - sillH - lintelH;
+    const legT = 0.1;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Corner slim pillar */}
+        <RoundedBox position={[-0.45, 0, -0.45]} args={[legT, 1, legT]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.35} />
+        </RoundedBox>
+        {/* End jambs */}
+        <RoundedBox position={[0.45, 0, -0.45]} args={[0.12, 1, legT]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[-0.45, 0, 0.45]} args={[legT, 1, 0.12]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {/* X-leg sill & lintel */}
+        <RoundedBox position={[0, -0.5 + sillH / 2, -0.45]} args={[0.92, sillH, legT]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[0, 0.5 - lintelH / 2, -0.45]} args={[0.92, lintelH, legT]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {/* Z-leg sill & lintel */}
+        <RoundedBox position={[-0.45, -0.5 + sillH / 2, 0]} args={[legT, sillH, 0.92]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[-0.45, 0.5 - lintelH / 2, 0]} args={[legT, lintelH, 0.92]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {/* Wrap-around corner glass */}
+        {!isCapturing && (
+          <>
+            <mesh position={[0, (sillH - lintelH) / 2, -0.45]}>
+              <boxGeometry args={[0.84, glassH, 0.04]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.3 * finalOpacity} roughness={0.12} metalness={0.18} />
+            </mesh>
+            <mesh position={[-0.45, (sillH - lintelH) / 2, 0]}>
+              <boxGeometry args={[0.04, glassH, 0.84]} />
+              <meshStandardMaterial color="#bae6fd" transparent opacity={0.3 * finalOpacity} roughness={0.12} metalness={0.18} />
+            </mesh>
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // Square Wall Opening (Bukaan Kotak tanpa daun pintu)
+  if (wall.type === 'square_opening') {
+    const openW = Math.min(2.6 / wallW, 0.62);
+    const sideW = (1 - openW) / 2;
+    const lintelH = 0.22;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {!isCapturing && (
+          <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[openW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+            <meshStandardMaterial {...matProps} />
+          </RoundedBox>
+        )}
+        <mesh position={[0, 0.502, 0]}>
+          <boxGeometry args={[1.002, 0.025, 1.02]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Arched Wall Opening (Bukaan Lengkung Arsitektural)
+  if (wall.type === 'arch_opening') {
+    const openW = Math.min(2.4 / wallW, 0.56);
+    const sideW = (1 - openW) / 2;
+    const lintelH = 0.14;
+    const archH = 0.24;
+    const steps = 6;
+
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        {!isCapturing && (
+          <>
+            <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[openW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+              <meshStandardMaterial {...matProps} />
+            </RoundedBox>
+            {/* Stepped curved spandrels forming the archway */}
+            {Array.from({ length: steps }).map((_, i) => {
+              const t = (i + 0.5) / steps;
+              const yOff = 0.5 - lintelH - t * archH;
+              const sliceH = archH / steps + 0.008;
+              const halfGap = (openW / 2) * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+              const spandrelW = Math.max(0.01, openW / 2 - halfGap);
+              return (
+                <React.Fragment key={i}>
+                  <mesh position={[-openW / 2 + spandrelW / 2, yOff, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[spandrelW, sliceH, 1]} />
+                    <meshStandardMaterial {...matProps} />
+                  </mesh>
+                  <mesh position={[openW / 2 - spandrelW / 2, yOff, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[spandrelW, sliceH, 1]} />
+                    <meshStandardMaterial {...matProps} />
+                  </mesh>
+                </React.Fragment>
+              );
+            })}
+          </>
+        )}
+        <mesh position={[0, 0.502, 0]}>
+          <boxGeometry args={[1.002, 0.025, 1.02]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Cylinder Column (Pilar Bulat)
+  if (wall.type === 'cylinder_column') {
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <mesh castShadow receiveShadow>
+          <cylinderGeometry args={[0.46, 0.46, 1, 32]} />
+          <meshStandardMaterial {...matProps} />
+        </mesh>
+        {/* Top capital & base plinth rings */}
+        <mesh position={[0, 0.485, 0]} receiveShadow>
+          <cylinderGeometry args={[0.52, 0.52, 0.03, 32]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.35} />
+        </mesh>
+        <mesh position={[0, -0.485, 0]} receiveShadow>
+          <cylinderGeometry args={[0.52, 0.52, 0.03, 32]} />
+          <meshStandardMaterial color="#cbd5e1" roughness={0.45} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // L-Shape Corner Wall (Dinding Sudut L)
+  if (wall.type === 'wall_l_shape') {
+    const t = 0.09;
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <RoundedBox position={[0, 0, -0.5 + t / 2]} args={[1, 1, t]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[-0.5 + t / 2, 0, 0]} args={[t, 1, 1]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <mesh position={[0, 0.502, -0.5 + t / 2]}>
+          <boxGeometry args={[1.004, 0.02, t + 0.01]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+        <mesh position={[-0.5 + t / 2, 0.502, 0]}>
+          <boxGeometry args={[t + 0.01, 0.02, 1.004]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // U-Shape Alcove Wall (Dinding Bentuk U)
+  if (wall.type === 'wall_u_shape') {
+    const t = 0.09;
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <RoundedBox position={[0, 0, -0.5 + t / 2]} args={[1, 1, t]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[-0.5 + t / 2, 0, 0]} args={[t, 1, 1]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <RoundedBox position={[0.5 - t / 2, 0, 0]} args={[t, 1, 1]} radius={0.01} castShadow receiveShadow>
+          <meshStandardMaterial {...matProps} />
+        </RoundedBox>
+        <mesh position={[0, 0.502, -0.5 + t / 2]}>
+          <boxGeometry args={[1.004, 0.02, t + 0.01]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+        <mesh position={[-0.5 + t / 2, 0.502, 0]}>
+          <boxGeometry args={[t + 0.01, 0.02, 1.004]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+        <mesh position={[0.5 - t / 2, 0.502, 0]}>
+          <boxGeometry args={[t + 0.01, 0.02, 1.004]} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+      </group>
+    );
+  }
+
+  // Architectural Staircase Block (Tangga 3D)
+  if (wall.type === 'stair_block') {
+    const stepCount = 7;
+    return (
+      <group
+        ref={setRefs}
+        position={wall.position}
+        rotation={wall.rotation}
+        scale={wall.scale}
+        onClick={(e) => { e.stopPropagation(); onClick && onClick(e); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        {Array.from({ length: stepCount }).map((_, idx) => {
+          const stepH = (idx + 1) / stepCount;
+          const stepD = 1 / stepCount;
+          const zPos = 0.5 - (idx + 0.5) * stepD;
+          return (
+            <RoundedBox
+              key={idx}
+              position={[0, -0.5 + stepH / 2, zPos]}
+              args={[1, stepH, stepD]}
+              radius={0.008}
+              castShadow
+              receiveShadow
+            >
+              <meshStandardMaterial {...matProps} />
+            </RoundedBox>
+          );
+        })}
       </group>
     );
   }
@@ -1696,7 +2291,7 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
         {/* Crisp White Architectural Top Trim */}
         <mesh position={[0, 0.502, 0]} receiveShadow>
           <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
         </mesh>
       </group>
     );
@@ -1886,7 +2481,7 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
           ref={wallRef}
           wall={wall}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+          onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
         />
       ) : wall.type === 'custom_group' ? (
         <>
@@ -1899,7 +2494,7 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
             editMode={editMode}
             activeTab={activeTab}
             setSelectedObj={setSelectedObj}
-            onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+            onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
             isCapturing={isCapturing}
           />
           {wall.children && wall.children.map(child => {
@@ -1920,12 +2515,12 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
             return null;
           })}
         </>
-      ) : (wall.type?.startsWith('door_wall') || wall.type === 'window_wall') ? (
+      ) : isArchSpecialType(wall.type) ? (
         <DoorWallBlock 
           ref={wallRef}
           wall={wall}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+          onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
           isCapturing={isCapturing}
         />
       ) : wall.type === 'furniture' ? (
@@ -1933,14 +2528,14 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
           ref={wallRef}
           wall={wall}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+          onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
         />
       ) : wall.type === 'text_label' ? (
         <TextLabelBlock 
           ref={wallRef}
           wall={wall}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+          onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
           isCapturing={isCapturing}
         />
       ) : (
@@ -1948,7 +2543,7 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
           ref={wallRef}
           wall={wall}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'walls') setSelectedObj({ type: 'wall', id: wall.id }) }}
+          onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
         />
       )}
       {!wall.locked && showGizmo && transformMode === 'scale' && wallRef.current && !['room', 'custom_group', 'text_label', 'furniture'].includes(wall.type) && (
@@ -2036,7 +2631,7 @@ function DeviceNodeWithTransform({ dev, isSelected, editMode, activeTab, setSele
           position={[0, 0, 0]} 
           isEditMode={editMode}
           isSelected={isSelected}
-          onClick={() => { if(editMode && activeTab === 'devices') setSelectedObj({ type: 'device', id: dev.id }) }} 
+          onClick={() => { if(editMode) setSelectedObj({ type: 'device', id: dev.id }) }} 
           isCapturing={isCapturing}
         />
       </group>
@@ -2826,8 +3421,8 @@ function RoomLayout({
       />
       
       <group position={[0, -1, 0]}>
-        {/* HomeByMe 3D Mannequin Avatar + Floor Navigation Disc */}
-        {(isExploreMode || showAvatar) && !isCapturing && !isSidebarPreview && (
+        {/* Avatar 3D hanya muncul saat Mode Jelajah aktif */}
+        {isExploreMode && !isCapturing && !isSidebarPreview && (
           <ThirdPersonAvatar orbitRef={orbitRef} walls={walls} isExploreMode={isExploreMode} />
         )}
         
@@ -2856,25 +3451,25 @@ function RoomLayout({
             onPointerOut={() => { document.body.style.cursor = 'auto'; }}
           >
             <meshStandardMaterial 
-              color="#f3f4f6" 
-              roughness={0.75} 
-              metalness={0.02} 
+              color={isLightMode ? '#f3f4f6' : '#0f172a'} 
+              roughness={isLightMode ? 0.75 : 0.85} 
+              metalness={0.04} 
             />
           </RoundedBox>
         )}
 
-        {/* HomeByMe Subtle Architectural Tile Grid */}
+        {/* Architectural Tile Grid (Follows Light / Dark Theme) */}
         {!isCapturing && (
-          <>
+          <React.Fragment key={isLightMode ? 'grid-light' : 'grid-dark'}>
             <gridHelper 
-              args={[floorSize, floorSize, '#dcdfe6', '#e5e7eb']} 
+              args={[floorSize, floorSize, isLightMode ? '#dcdfe6' : '#1e293b', isLightMode ? '#e5e7eb' : '#172033']} 
               position={[0, 0.005, 0]} 
             />
             <gridHelper 
-              args={[floorSize, Math.round(floorSize / 4), '#cbd0d9', '#dcdfe6']} 
+              args={[floorSize, Math.round(floorSize / 4), isLightMode ? '#cbd0d9' : '#334155', isLightMode ? '#dcdfe6' : '#1e293b']} 
               position={[0, 0.009, 0]} 
             />
-          </>
+          </React.Fragment>
         )}
 
         {/* Warm Oak Hardwood Interior Floor inside Room Footprint */}
@@ -2916,7 +3511,7 @@ function RoomLayout({
           if (wall.hidden) return null;
 
           // If a child of this group is selected, pass selectedObj down so group knows to skip it
-          const isSelected = editMode && activeTab === 'walls' && (selectedObj?.id === wall.id || selectedForGroup.includes(wall.id));
+          const isSelected = editMode && ((selectedObj?.type === 'wall' && selectedObj?.id === wall.id) || selectedForGroup.includes(wall.id));
           
           return (
             <WallBlockWithTransform 
@@ -2942,7 +3537,7 @@ function RoomLayout({
           const pos = dev.broker_config?.position;
           if (!pos) return null;
 
-          const isSelected = editMode && activeTab === 'devices' && selectedObj?.id === dev.id;
+          const isSelected = editMode && selectedObj?.type === 'device' && selectedObj?.id === dev.id;
 
           return (
             <DeviceNodeWithTransform 
@@ -2960,7 +3555,7 @@ function RoomLayout({
           );
         })}
       </group>
-      {editMode && activeTab === 'walls' && (
+      {editMode && (
         <MultiSelectGizmo 
           selectedForGroup={selectedForGroup} 
           walls={walls} 
@@ -2984,6 +3579,157 @@ function createBlankRoomDefault() {
     { id: 'wall_west', name: 'Dinding Barat', type: 'wall', materialPreset: 'matte_slate', position: [-4.5, 2, 0], scale: [0.35, 4, 8.65], rotation: [0, 0, 0] },
     { id: 'wall_east', name: 'Dinding Timur', type: 'wall', materialPreset: 'matte_slate', position: [4.5, 2, 0], scale: [0.35, 4, 8.65], rotation: [0, 0, 0] },
   ];
+}
+
+function createFloorPlanTemplate(templateId) {
+  const ts = Date.now();
+  const w = (suffix, name, type, position, scale, rotation = [0, 0, 0], materialPreset = 'matte_slate') => ({
+    id: `${templateId}_${suffix}_${ts}`,
+    name,
+    type,
+    materialPreset,
+    position,
+    scale,
+    rotation,
+  });
+
+  if (templateId === 'tpl_studio') {
+    return [
+      w('n', 'Dinding Utara (Jendela)', 'window_wall', [0, 2, -4.2], [10.35, 4, 0.35]),
+      w('s', 'Dinding Selatan (Pintu)', 'door_wall', [0, 2, 4.2], [10.35, 4, 0.35]),
+      w('w', 'Dinding Barat', 'wall', [-5, 2, 0], [0.35, 4, 8.05]),
+      w('e', 'Dinding Timur (Jendela)', 'window_wall', [5, 2, 0], [8.05, 4, 0.35], [0, Math.PI / 2, 0]),
+    ];
+  }
+
+  if (templateId === 'tpl_l_room') {
+    return [
+      w('n1', 'Dinding Utara Kiri', 'window_wall', [-2.5, 2, -5], [5.35, 4, 0.35]),
+      w('e1', 'Dinding Dalam Tengah', 'wall', [0, 2, -2.5], [0.35, 4, 5]),
+      w('n2', 'Dinding Sayap Kanan (Jendela)', 'window_wall', [2.6, 2, 0], [5.2, 4, 0.35]),
+      w('e2', 'Dinding Timur', 'wall', [5, 2, 2.5], [0.35, 4, 5]),
+      w('s', 'Dinding Selatan (Pintu)', 'door_wall_left', [0, 2, 5], [10.35, 4, 0.35]),
+      w('w', 'Dinding Barat', 'wall', [-5, 2, 0], [0.35, 4, 10]),
+    ];
+  }
+
+  if (templateId === 'tpl_two_zone') {
+    return [
+      w('n', 'Dinding Utara (Jendela)', 'window_wall', [0, 2, -4], [12.35, 4, 0.35]),
+      w('s', 'Dinding Selatan (Pintu)', 'door_wall_left', [0, 2, 4], [12.35, 4, 0.35]),
+      w('w', 'Dinding Barat', 'wall', [-6, 2, 0], [0.35, 4, 7.65]),
+      w('e', 'Dinding Timur (Jendela)', 'window_wall', [6, 2, 0], [7.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      w('mid', 'Sekat Tengah (Pintu)', 'door_wall', [0, 2, 0], [7.65, 4, 0.32], [0, Math.PI / 2, 0]),
+    ];
+  }
+
+  if (templateId === 'tpl_office_4') {
+    return [
+      // Perimeter 14 x 10
+      w('n', 'Dinding Utara (Jendela)', 'french_window', [0, 2, -5], [14.35, 4, 0.35]),
+      w('s', 'Dinding Selatan (Pintu Ganda)', 'door_wall_double', [0, 2, 5], [14.35, 4, 0.35]),
+      w('w', 'Dinding Barat', 'wall', [-7, 2, 0], [0.35, 4, 9.65]),
+      w('e', 'Dinding Timur', 'wall', [7, 2, 0], [0.35, 4, 9.65]),
+      // 2 Glass Offices (North Wing)
+      w('g1', 'Partisi Kaca Utara Kiri', 'glass_wall', [-3.5, 2, -1.2], [6.65, 4, 0.22], [0, 0, 0], 'glass_frosted'),
+      w('g2', 'Partisi Kaca Utara Kanan', 'glass_wall', [3.5, 2, -1.2], [6.65, 4, 0.22], [0, 0, 0], 'glass_frosted'),
+      w('div_n', 'Sekat Ruang Utara', 'wall', [0, 2, -3.1], [0.3, 4, 3.6]),
+      // 2 Rooms (South Wing)
+      w('s1', 'Sekat Ruang Selatan Kiri', 'door_wall', [-4.2, 2, 1.4], [5.2, 4, 0.28]),
+      w('s2', 'Sekat Ruang Selatan Kanan', 'door_wall', [4.2, 2, 1.4], [5.2, 4, 0.28]),
+      w('div_sl', 'Pembatas Koridor Kiri', 'wall', [-1.7, 2, 3.2], [0.28, 4, 3.4]),
+      w('div_sr', 'Pembatas Koridor Kanan', 'wall', [1.7, 2, 3.2], [0.28, 4, 3.4]),
+    ];
+  }
+
+  if (templateId === 'tpl_house_3br') {
+    return [
+      // Perimeter 14 x 10
+      w('n', 'Dinding Utara (Jendela)', 'window_wall', [0, 2, -5], [14.35, 4, 0.35]),
+      w('s', 'Dinding Selatan (Pintu Utama)', 'door_wall', [0, 2, 5], [14.35, 4, 0.35]),
+      w('w', 'Dinding Barat', 'window_wall', [-7, 2, 0], [9.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      w('e', 'Dinding Timur', 'window_wall', [7, 2, 0], [9.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      // 2 Bedrooms on West Side
+      w('br_spine', 'Dinding Kamar Kiri (Pintu)', 'door_wall_left', [-2.2, 2, 0], [9.65, 4, 0.3], [0, Math.PI / 2, 0]),
+      w('br_mid', 'Sekat Antar Kamar', 'wall', [-4.6, 2, 0], [4.5, 4, 0.3]),
+      // 1 Room on North-East Corner
+      w('ne_w', 'Dinding Ruang Kanan (Pintu)', 'door_wall', [2.2, 2, -2.5], [4.7, 4, 0.3], [0, Math.PI / 2, 0]),
+      w('ne_s', 'Sekat Ruang Kanan', 'wall', [4.6, 2, -0.2], [4.6, 4, 0.3]),
+      // Arch Opening into Living Center
+      w('arch', 'Bukaan Lengkung Tengah', 'arch_opening', [0, 2, -0.2], [4.4, 4, 0.3]),
+    ];
+  }
+
+  if (templateId === 'tpl_iot_lab') {
+    return [
+      // Perimeter 12 x 9
+      w('n', 'Dinding Server Utara', 'wall', [0, 2, -4.5], [12.35, 4, 0.35], [0, 0, 0], 'dark_obsidian'),
+      w('s', 'Dinding Selatan (Pintu Ganda)', 'door_wall_double', [0, 2, 4.5], [12.35, 4, 0.35]),
+      w('w', 'Dinding Barat (Jendela)', 'window_wall', [-6, 2, 0], [8.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      w('e', 'Dinding Timur (Jendela)', 'window_wall', [6, 2, 0], [8.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      // Server Zone Glass Partition + Sliding Door
+      w('srv_glass_l', 'Partisi Kaca Server Kiri', 'glass_wall', [-3.6, 2, -1.0], [4.4, 4, 0.22], [0, 0, 0], 'glass_frosted'),
+      w('srv_door', 'Pintu Geser Ruang Server', 'sliding_door', [0, 2, -1.0], [3.2, 4, 0.28]),
+      w('srv_glass_r', 'Partisi Kaca Server Kanan', 'glass_wall', [3.6, 2, -1.0], [4.4, 4, 0.22], [0, 0, 0], 'glass_frosted'),
+    ];
+  }
+
+  if (templateId === 'tpl_warehouse') {
+    return [
+      // Gudang IoT 16 x 10
+      w('n', 'Dinding Gudang Utara', 'wall', [0, 2, -5], [16.35, 4, 0.35], [0, 0, 0], 'concrete_white'),
+      w('s', 'Pintu Bongkar Muat (Ganda)', 'door_wall_double', [0, 2, 5], [16.35, 4, 0.35], [0, 0, 0], 'concrete_white'),
+      w('w', 'Dinding Gudang Barat', 'window_wall', [-8, 2, 0], [9.65, 4, 0.35], [0, Math.PI / 2, 0], 'concrete_white'),
+      w('e', 'Dinding Gudang Timur', 'window_wall', [8, 2, 0], [9.65, 4, 0.35], [0, Math.PI / 2, 0], 'concrete_white'),
+      // Ruang Kontrol Kaca di pojok kanan atas
+      w('ctrl_w', 'Partisi Kaca Kontrol', 'glass_wall', [3.2, 2, -2.5], [4.7, 4, 0.22], [0, Math.PI / 2, 0], 'glass_frosted'),
+      w('ctrl_s', 'Pintu Ruang Kontrol', 'door_wall', [5.6, 2, -0.2], [4.6, 4, 0.28]),
+    ];
+  }
+
+  if (templateId === 'tpl_greenhouse') {
+    return [
+      // Smart Greenhouse 14 x 8 (dinding kaca penuh sekeliling + pintu geser)
+      w('n', 'Kaca Utara Greenhouse', 'french_window', [0, 2, -4], [14.35, 4, 0.3]),
+      w('s', 'Pintu Geser Greenhouse', 'sliding_door', [0, 2, 4], [14.35, 4, 0.3]),
+      w('w', 'Kaca Barat Greenhouse', 'french_window', [-7, 2, 0], [7.65, 4, 0.3], [0, Math.PI / 2, 0]),
+      w('e', 'Kaca Timur Greenhouse', 'french_window', [7, 2, 0], [7.65, 4, 0.3], [0, Math.PI / 2, 0]),
+      // Sekat rendah pembagi zona tanam
+      w('bed1', 'Sekat Zona Tanam 1', 'wall', [-2.2, 0.75, 0], [0.25, 1.5, 4.6], [0, 0, 0], 'warm_wood'),
+      w('bed2', 'Sekat Zona Tanam 2', 'wall', [2.2, 0.75, 0], [0.25, 1.5, 4.6], [0, 0, 0], 'warm_wood'),
+    ];
+  }
+
+  if (templateId === 'tpl_cafe_shop') {
+    return [
+      // Kafe / Toko 12 x 9 (fasad kaca depan, counter sekat rendah, ruang belakang)
+      w('n', 'Dinding Belakang', 'wall', [0, 2, -4.5], [12.35, 4, 0.35], [0, 0, 0], 'accent_espresso'),
+      w('s', 'Fasad Kaca & Pintu Masuk', 'sliding_door', [0, 2, 4.5], [12.35, 4, 0.32]),
+      w('w', 'Dinding Kiri (Jendela)', 'french_window', [-6, 2, 0], [8.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      w('e', 'Dinding Kanan', 'wall', [6, 2, 0], [0.35, 4, 8.65], [0, 0, 0], 'warm_wood'),
+      // Ruang Dapur / Gudang Belakang
+      w('back', 'Sekat Ruang Belakang', 'door_wall_left', [0, 2, -1.6], [11.65, 4, 0.3]),
+      // Meja Counter Sekat Rendah
+      w('counter', 'Sekat Counter Kasir', 'wall', [1.8, 0.75, 0.8], [5.2, 1.5, 0.32], [0, 0, 0], 'warm_wood'),
+    ];
+  }
+
+  if (templateId === 'tpl_apartment') {
+    return [
+      // Apartemen Studio 12 x 9 (balkon geser, bay window, kamar tidur + kamar mandi)
+      w('n', 'Pintu Balkon Geser', 'sliding_door', [0, 2, -4.5], [12.35, 4, 0.35]),
+      w('s', 'Pintu Masuk Apartemen', 'door_wall_right', [0, 2, 4.5], [12.35, 4, 0.35]),
+      w('w', 'Jendela Teluk Barat', 'bay_window', [-6, 2, 0], [8.65, 4, 0.35], [0, Math.PI / 2, 0]),
+      w('e', 'Dinding Timur', 'wall', [6, 2, 0], [0.35, 4, 8.65]),
+      // Kamar Tidur (kiri atas) dengan bukaan kotak
+      w('bed_div', 'Sekat Kamar Tidur', 'square_opening', [-0.4, 2, -1.8], [5.2, 4, 0.28], [0, Math.PI / 2, 0]),
+      // Kamar Mandi (kiri bawah)
+      w('bath_n', 'Dinding Kamar Mandi', 'wall', [-3.6, 2, 1.0], [4.6, 4, 0.28]),
+      w('bath_e', 'Pintu Kamar Mandi', 'door_wall', [-1.4, 2, 2.7], [3.3, 4, 0.28], [0, Math.PI / 2, 0]),
+    ];
+  }
+
+  return createBlankRoomDefault();
 }
 
 function createHomeByMeDefaultSuite(cleanRoomName = 'Bedroom bis') {
@@ -3069,6 +3815,325 @@ function createHomeByMeDefaultSuite(cleanRoomName = 'Bedroom bis') {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   Architectural 2D CAD Plan-View Symbols (Coohom / AutoCAD Style)
+───────────────────────────────────────────────────────────────────────── */
+function ArchSymbol({ type, active = false, dark = false }) {
+  const stroke = active ? (dark ? '#60a5fa' : '#2563eb') : (dark ? '#cbd5e1' : '#475569');
+  const fill = active ? (dark ? '#1e3a8a' : '#bfdbfe') : (dark ? '#334155' : '#cbd5e1');
+  const accentFill = active ? '#93c5fd' : '#6b4c45';
+  const faint = active ? '#60a5fa' : (dark ? '#64748b' : '#94a3b8');
+
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className="w-10 h-10 shrink-0 transition-transform duration-150 group-hover:scale-105"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      {type === 'draw_wall' && (
+        <>
+          <path
+            d="M37 11H11V37H37V31H17V17H37V11Z"
+            fill={fill}
+            stroke={stroke}
+            strokeWidth="1.4"
+            strokeLinejoin="miter"
+          />
+          <path
+            d="M36 14H14V34H36"
+            stroke={active ? '#1d4ed8' : '#1e293b'}
+            strokeWidth="1"
+            strokeDasharray="2.5 2"
+          />
+        </>
+      )}
+
+      {type === 'draw_room' && (
+        <>
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M10 10H38V38H10V10ZM16 16V32H32V16H16Z"
+            fill={fill}
+            stroke={stroke}
+            strokeWidth="1.4"
+            strokeLinejoin="miter"
+          />
+        </>
+      )}
+
+      {type === 'empty_canvas' && (
+        <>
+          <rect
+            x="11"
+            y="11"
+            width="26"
+            height="26"
+            rx="1.5"
+            stroke={faint}
+            strokeWidth="1.4"
+            strokeDasharray="3.5 3"
+          />
+          <path d="M19 19L29 29M29 19L19 29" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" />
+        </>
+      )}
+
+      {type === 'wall_white' && (
+        <rect x="7" y="20" width="34" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+      )}
+
+      {type === 'wall_espresso' && (
+        <rect x="7" y="20" width="34" height="8" fill={accentFill} stroke={stroke} strokeWidth="1.4" />
+      )}
+
+      {type === 'glass_wall' && (
+        <>
+          <rect x="6" y="20" width="7" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="35" y="20" width="7" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <line x1="13" y1="22.5" x2="35" y2="22.5" stroke={stroke} strokeWidth="1.2" strokeDasharray="3 2" />
+          <line x1="13" y1="25.5" x2="35" y2="25.5" stroke={stroke} strokeWidth="1.2" strokeDasharray="3 2" />
+        </>
+      )}
+
+      {type === 'window_wall' && (
+        <>
+          <rect x="6" y="20" width="7" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="35" y="20" width="7" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="13" y="21" width="22" height="6" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <line x1="13" y1="24" x2="35" y2="24" stroke={stroke} strokeWidth="1.2" />
+        </>
+      )}
+
+      {type === 'door_wall' && (
+        <>
+          <rect x="7" y="30" width="8" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="33" y="30" width="8" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="30.5" y="13" width="2.5" height="17" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <path d="M15 30A18 18 0 0 1 30.5 13" stroke={stroke} strokeWidth="1.3" />
+        </>
+      )}
+
+      {type === 'door_wall_left' && (
+        <>
+          <rect x="6" y="30" width="5" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="26" y="30" width="16" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="11" y="15" width="2.5" height="15" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <path d="M13.5 15A15 15 0 0 1 26 30" stroke={stroke} strokeWidth="1.3" />
+        </>
+      )}
+
+      {type === 'door_wall_right' && (
+        <>
+          <rect x="6" y="30" width="16" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="37" y="30" width="5" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="34.5" y="15" width="2.5" height="15" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <path d="M22 30A15 15 0 0 1 34.5 15" stroke={stroke} strokeWidth="1.3" />
+        </>
+      )}
+
+      {type === 'door_wall_double' && (
+        <>
+          <rect x="6" y="30" width="6" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="36" y="30" width="6" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="12" y="17" width="2.2" height="13" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <rect x="33.8" y="17" width="2.2" height="13" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <path d="M14.2 17A12 12 0 0 1 24 30" stroke={stroke} strokeWidth="1.3" />
+          <path d="M24 30A12 12 0 0 1 33.8 17" stroke={stroke} strokeWidth="1.3" />
+        </>
+      )}
+
+      {type === 'sliding_door' && (
+        <>
+          <rect x="6" y="20" width="6" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="36" y="20" width="6" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="12" y="21.5" width="14" height="2.4" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+          <rect x="22" y="24.2" width="14" height="2.4" fill="#ffffff" stroke={stroke} strokeWidth="1.2" />
+        </>
+      )}
+
+      {type === 'french_window' && (
+        <>
+          <rect x="6" y="20" width="6" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="36" y="20" width="6" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <line x1="12" y1="21.5" x2="36" y2="21.5" stroke={stroke} strokeWidth="1.2" strokeDasharray="2.5 2" />
+          <line x1="12" y1="24" x2="36" y2="24" stroke={stroke} strokeWidth="1.3" />
+          <line x1="12" y1="26.5" x2="36" y2="26.5" stroke={stroke} strokeWidth="1.2" strokeDasharray="2.5 2" />
+        </>
+      )}
+
+      {type === 'bay_window' && (
+        <>
+          <rect x="6" y="29" width="6" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="36" y="29" width="6" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <path d="M9 29V13H39V29" stroke={stroke} strokeWidth="1.4" />
+          <path d="M13 29V17H35V29" stroke={stroke} strokeWidth="1.2" />
+          <path d="M11 29V15H37V29" stroke={faint} strokeWidth="1" />
+        </>
+      )}
+
+      {type === 'corner_window' && (
+        <>
+          <rect x="11" y="10" width="7" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <rect x="31" y="30" width="7" height="7" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <path d="M13 17V35H31" stroke={stroke} strokeWidth="1.3" />
+          <path d="M16 17V32H31" stroke={stroke} strokeWidth="1.3" />
+        </>
+      )}
+
+      {type === 'wall_wood' && (
+        <>
+          <rect x="7" y="20" width="34" height="8" fill={active ? '#93c5fd' : '#c9a178'} stroke={stroke} strokeWidth="1.4" />
+          <line x1="15" y1="20" x2="15" y2="28" stroke={stroke} strokeWidth="1" opacity="0.45" />
+          <line x1="24" y1="20" x2="24" y2="28" stroke={stroke} strokeWidth="1" opacity="0.45" />
+          <line x1="33" y1="20" x2="33" y2="28" stroke={stroke} strokeWidth="1" opacity="0.45" />
+        </>
+      )}
+
+      {type === 'wall_half' && (
+        <>
+          <rect x="7" y="21" width="34" height="6" fill={fill} stroke={stroke} strokeWidth="1.3" strokeDasharray="3 2" />
+          <line x1="7" y1="24" x2="41" y2="24" stroke={stroke} strokeWidth="1" opacity="0.6" />
+        </>
+      )}
+
+      {type === 'wall_l_shape' && (
+        <path d="M11 11H37V18H18V37H11V11Z" fill={fill} stroke={stroke} strokeWidth="1.4" strokeLinejoin="miter" />
+      )}
+
+      {type === 'wall_u_shape' && (
+        <path d="M10 12H38V36H31V19H17V36H10V12Z" fill={fill} stroke={stroke} strokeWidth="1.4" strokeLinejoin="miter" />
+      )}
+
+      {type === 'square_opening' && (
+        <path d="M10 14H38V34H30V22H18V34H10V14Z" fill={fill} stroke={stroke} strokeWidth="1.4" strokeLinejoin="miter" />
+      )}
+
+      {type === 'arch_opening' && (
+        <path d="M10 14H38V34H31V27C31 23.134 27.866 20 24 20C20.134 20 17 23.134 17 27V34H10V14Z" fill={fill} stroke={stroke} strokeWidth="1.4" strokeLinejoin="miter" />
+      )}
+
+      {type === 'square_column' && (
+        <rect x="13" y="13" width="22" height="22" fill={fill} stroke={stroke} strokeWidth="1.4" />
+      )}
+
+      {type === 'cylinder_column' && (
+        <circle cx="24" cy="24" r="11.5" fill={fill} stroke={stroke} strokeWidth="1.4" />
+      )}
+
+      {type === 'girder_beam' && (
+        <>
+          <rect x="8" y="20" width="32" height="8" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <line x1="8" y1="24" x2="40" y2="24" stroke={stroke} strokeWidth="1" strokeDasharray="2.5 2" />
+        </>
+      )}
+
+      {type === 'stair_block' && (
+        <>
+          <rect x="11" y="11" width="26" height="26" fill={fill} stroke={stroke} strokeWidth="1.4" />
+          <line x1="11" y1="16" x2="37" y2="16" stroke={stroke} strokeWidth="1.1" />
+          <line x1="11" y1="21" x2="37" y2="21" stroke={stroke} strokeWidth="1.1" />
+          <line x1="11" y1="26" x2="37" y2="26" stroke={stroke} strokeWidth="1.1" />
+          <line x1="11" y1="31" x2="37" y2="31" stroke={stroke} strokeWidth="1.1" />
+          <path d="M24 34V14M20 18L24 14L28 18" stroke={active ? '#1d4ed8' : '#1e293b'} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+
+      {type === 'tpl_studio' && (
+        <>
+          <rect x="9" y="11" width="30" height="26" fill={fill} fillOpacity="0.45" stroke={stroke} strokeWidth="1.6" />
+          <line x1="17" y1="11" x2="31" y2="11" stroke="#ffffff" strokeWidth="2.2" />
+          <line x1="17" y1="11" x2="31" y2="11" stroke={stroke} strokeWidth="0.9" />
+          <line x1="20" y1="37" x2="28" y2="37" stroke="#ffffff" strokeWidth="2.4" />
+          <path d="M20 37A8 8 0 0 1 28 29" stroke={stroke} strokeWidth="1.1" />
+        </>
+      )}
+
+      {type === 'tpl_l_room' && (
+        <>
+          <path d="M10 10H26V22H38V38H10V10Z" fill={fill} fillOpacity="0.45" stroke={stroke} strokeWidth="1.6" strokeLinejoin="miter" />
+          <line x1="16" y1="38" x2="24" y2="38" stroke="#ffffff" strokeWidth="2.4" />
+          <path d="M16 38A7 7 0 0 1 23 31" stroke={stroke} strokeWidth="1.1" />
+        </>
+      )}
+
+      {type === 'tpl_two_zone' && (
+        <>
+          <rect x="8" y="12" width="32" height="24" fill={fill} fillOpacity="0.45" stroke={stroke} strokeWidth="1.6" />
+          <line x1="24" y1="12" x2="24" y2="21" stroke={stroke} strokeWidth="1.5" />
+          <line x1="24" y1="28" x2="24" y2="36" stroke={stroke} strokeWidth="1.5" />
+          <line x1="14" y1="36" x2="20" y2="36" stroke="#ffffff" strokeWidth="2.4" />
+        </>
+      )}
+
+      {type === 'tpl_office_4' && (
+        <>
+          <rect x="8" y="10" width="32" height="28" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <line x1="24" y1="10" x2="24" y2="20" stroke={stroke} strokeWidth="1.3" />
+          <line x1="24" y1="28" x2="24" y2="38" stroke={stroke} strokeWidth="1.3" />
+          <line x1="8" y1="20" x2="40" y2="20" stroke={stroke} strokeWidth="1.2" strokeDasharray="3 2" />
+          <line x1="8" y1="28" x2="40" y2="28" stroke={stroke} strokeWidth="1.2" strokeDasharray="3 2" />
+          <line x1="20" y1="38" x2="28" y2="38" stroke="#ffffff" strokeWidth="2.4" />
+        </>
+      )}
+
+      {type === 'tpl_house_3br' && (
+        <>
+          <rect x="8" y="10" width="32" height="28" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <line x1="19" y1="10" x2="19" y2="38" stroke={stroke} strokeWidth="1.3" />
+          <line x1="8" y1="24" x2="19" y2="24" stroke={stroke} strokeWidth="1.3" />
+          <line x1="29" y1="10" x2="29" y2="22" stroke={stroke} strokeWidth="1.3" />
+          <line x1="29" y1="22" x2="40" y2="22" stroke={stroke} strokeWidth="1.3" />
+          <line x1="21" y1="38" x2="28" y2="38" stroke="#ffffff" strokeWidth="2.4" />
+        </>
+      )}
+
+      {type === 'tpl_iot_lab' && (
+        <>
+          <rect x="8" y="11" width="32" height="26" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <line x1="8" y1="21" x2="40" y2="21" stroke={stroke} strokeWidth="1.3" strokeDasharray="2.5 2" />
+          <line x1="20" y1="37" x2="28" y2="37" stroke="#ffffff" strokeWidth="2.4" />
+        </>
+      )}
+
+      {type === 'tpl_warehouse' && (
+        <>
+          <rect x="7" y="12" width="34" height="24" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <rect x="28" y="12" width="13" height="11" fill={fill} fillOpacity="0.65" stroke={stroke} strokeWidth="1.2" strokeDasharray="2 2" />
+          <line x1="18" y1="36" x2="30" y2="36" stroke="#ffffff" strokeWidth="2.6" />
+        </>
+      )}
+
+      {type === 'tpl_greenhouse' && (
+        <>
+          <rect x="8" y="12" width="32" height="24" fill="#dcfce7" fillOpacity="0.65" stroke={stroke} strokeWidth="1.5" strokeDasharray="3 1.5" />
+          <line x1="18" y1="17" x2="18" y2="31" stroke={stroke} strokeWidth="1.4" />
+          <line x1="30" y1="17" x2="30" y2="31" stroke={stroke} strokeWidth="1.4" />
+        </>
+      )}
+
+      {type === 'tpl_cafe_shop' && (
+        <>
+          <rect x="8" y="11" width="32" height="26" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <line x1="8" y1="19" x2="40" y2="19" stroke={stroke} strokeWidth="1.4" />
+          <rect x="20" y="24" width="14" height="3.5" fill={stroke} opacity="0.6" />
+          <line x1="17" y1="37" x2="31" y2="37" stroke="#ffffff" strokeWidth="2.5" />
+        </>
+      )}
+
+      {type === 'tpl_apartment' && (
+        <>
+          <rect x="8" y="11" width="32" height="26" fill={fill} fillOpacity="0.4" stroke={stroke} strokeWidth="1.6" />
+          <line x1="22" y1="11" x2="22" y2="23" stroke={stroke} strokeWidth="1.3" />
+          <rect x="8" y="25" width="12" height="12" fill={fill} fillOpacity="0.6" stroke={stroke} strokeWidth="1.2" />
+          <line x1="18" y1="11" x2="30" y2="11" stroke="#ffffff" strokeWidth="2.4" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    Main Page
 ───────────────────────────────────────────────────────────────────────── */
 export default function FloorPlan({ 
@@ -3086,8 +4151,8 @@ export default function FloorPlan({
 }) {
   const isStudioEditor = !isWidget && !isSidebarPreview;
   const [devices, setDevices] = useState(() => (Array.isArray(initialDevices) && initialDevices.length > 0 ? initialDevices : []));
-  const [editMode, setEditMode] = useState(() => !isWidget && !isSidebarPreview);
-  const [activeTab, setActiveTab] = useState('walls'); // 'walls' | 'furniture' | 'devices' | 'material'
+  const [editMode, setEditMode] = useState(false); // Default ke Mode Preview agar sensor langsung bisa diklik
+  const [activeTab, setActiveTab] = useState('walls'); // 'walls' | 'devices' | 'material'
 
   // HomeByMe Floating UI & Studio Controls
   const [cameraViewMode, setCameraViewMode] = useState('orbit'); // 'orbit' | 'top2d'
@@ -3103,7 +4168,7 @@ export default function FloorPlan({
   const [expandedGroups, setExpandedGroups] = useState({});
   const [activeMaterialPreset, setActiveMaterialPreset] = useState('matte_slate');
   const [pressedKeys, setPressedKeys] = useState({ w: false, a: false, s: false, d: false });
-  const [activeDrawer, setActiveDrawer] = useState('build'); // Open Build drawer by default so user can immediately start building
+  const [activeDrawer, setActiveDrawer] = useState(null); // Terbuka otomatis saat masuk Mode Edit
   const [drawWallMode, setDrawWallMode] = useState(false);
   const [showSettingsPopover, setShowSettingsPopover] = useState(false);
   const [showHelpPopover, setShowHelpPopover] = useState(false);
@@ -3138,8 +4203,9 @@ export default function FloorPlan({
   const [isExploreMode, setIsExploreMode] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hiddenDevices, setHiddenDevices] = useState([]);
-  const [transformMode, setTransformMode] = useState('select');
+  const [transformMode, setTransformMode] = useState('translate');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [layersPanelOpen, setLayersPanelOpen] = useState(false);
@@ -3277,17 +4343,157 @@ export default function FloorPlan({
   };
 
   const handleAddWall = (customProps = {}) => {
+    const { spawnY, ...restProps } = customProps;
+    const basePos = getSpawnPosition();
+    const targetScale = restProps.scale || [4, 4, 0.5];
+    const resolvedY = spawnY !== undefined ? spawnY : (targetScale[1] ? targetScale[1] / 2 : basePos[1]);
     const newWall = {
       id: 'wall_' + Date.now(),
-      position: getSpawnPosition(),
-      scale: [4, 4, 0.5],
+      position: [basePos[0], resolvedY, basePos[2]],
+      scale: targetScale,
       rotation: [0, 0, 0],
       materialPreset: activeMaterialPreset,
-      ...customProps,
+      ...restProps,
     };
     setWallsWithHistory(prev => [...prev, newWall]);
     setSelectedObj({ type: 'wall', id: newWall.id });
     if (transformMode === 'select') setTransformMode('translate');
+  };
+
+  // Tambah template denah tanpa menimpa denah yang sudah ada (bisa digabung beberapa template)
+  const handleAddTemplate = (templateId, templateLabel = 'Template Ruangan') => {
+    setDrawWallMode(false);
+    const ts = Date.now();
+    const rawChildren =
+      templateId === 'blank_room'
+        ? createBlankRoomDefault().map((item, idx) => ({ ...item, id: `blank_${idx}_${ts}` }))
+        : createFloorPlanTemplate(templateId);
+
+    const getRotatedHalfX = (sx, sz, rotY = 0) =>
+      (Math.abs(Math.cos(rotY)) * sx + Math.abs(Math.sin(rotY)) * sz) / 2;
+
+    let tplMinX = Infinity;
+    let tplMaxX = -Infinity;
+    rawChildren.forEach((c) => {
+      const cx = c.position?.[0] || 0;
+      const hx = getRotatedHalfX(c.scale?.[0] || 1, c.scale?.[2] || 1, c.rotation?.[1] || 0);
+      tplMinX = Math.min(tplMinX, cx - hx);
+      tplMaxX = Math.max(tplMaxX, cx + hx);
+    });
+    if (!Number.isFinite(tplMinX)) {
+      tplMinX = -4.5;
+      tplMaxX = 4.5;
+    }
+
+    let offsetX = 0;
+    let existingMinX = Infinity;
+    let existingMaxX = -Infinity;
+
+    if (walls.length > 0) {
+      walls.forEach((w) => {
+        if (w.hidden || w.type === 'text_label') return;
+        if (w.type === 'custom_group' && Array.isArray(w.children)) {
+          const gx = w.position?.[0] || 0;
+          const gRot = w.rotation?.[1] || 0;
+          const cosG = Math.cos(gRot);
+          const sinG = Math.sin(gRot);
+          const gsx = w.scale?.[0] || 1;
+          const gsz = w.scale?.[2] || 1;
+          w.children.forEach((c) => {
+            if (c.hidden || c.type === 'text_label') return;
+            const clx = (c.position?.[0] || 0) * gsx;
+            const clz = (c.position?.[2] || 0) * gsz;
+            const wx = gx + clx * cosG + clz * sinG;
+            const totalRot = gRot + (c.rotation?.[1] || 0);
+            const hx = getRotatedHalfX((c.scale?.[0] || 1) * gsx, (c.scale?.[2] || 1) * gsz, totalRot);
+            existingMinX = Math.min(existingMinX, wx - hx);
+            existingMaxX = Math.max(existingMaxX, wx + hx);
+          });
+        } else {
+          const wx = w.position?.[0] || 0;
+          const hx = getRotatedHalfX(w.scale?.[0] || 1, w.scale?.[2] || 1, w.rotation?.[1] || 0);
+          existingMinX = Math.min(existingMinX, wx - hx);
+          existingMaxX = Math.max(existingMaxX, wx + hx);
+        }
+      });
+
+      if (Number.isFinite(existingMaxX)) {
+        offsetX = Math.round((existingMaxX - tplMinX + 0.25) * 4) / 4;
+      }
+    }
+
+    const groupId = `tpl_group_${templateId}_${ts}`;
+    const newGroup = {
+      id: groupId,
+      name: templateLabel,
+      type: 'custom_group',
+      materialPreset: 'matte_slate',
+      position: [offsetX, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      children: rawChildren,
+    };
+
+    setWallsWithHistory((prev) => [...prev, newGroup]);
+    setSelectedObj({ type: 'wall', id: groupId });
+    setTransformMode('translate');
+
+    // Arahkan kamera agar gabungan template langsung terlihat jelas di layar
+    if (orbitRef.current) {
+      const combinedMinX = Number.isFinite(existingMinX) ? Math.min(existingMinX, offsetX + tplMinX) : offsetX + tplMinX;
+      const combinedMaxX = Number.isFinite(existingMaxX) ? Math.max(existingMaxX, offsetX + tplMaxX) : offsetX + tplMaxX;
+      const centerX = (combinedMinX + combinedMaxX) / 2;
+      const spanX = combinedMaxX - combinedMinX;
+      orbitRef.current.target.set(centerX, 0, 0);
+      const cam = orbitRef.current.object;
+      if (cam && spanX > 14) {
+        cam.position.set(centerX + spanX * 0.45, Math.max(cam.position.y, spanX * 0.72), Math.max(cam.position.z, spanX * 0.65));
+      }
+      orbitRef.current.update();
+    }
+
+    Swal.fire({
+      target: containerRef.current || document.body,
+      toast: true,
+      position: 'top',
+      icon: 'success',
+      title: `Template "${templateLabel}" ditambahkan ke kanvas`,
+      showConfirmButton: false,
+      timer: 1800,
+      background: '#0f172a',
+      color: '#f8fafc',
+    });
+  };
+
+  const handleAddTextLabel = async () => {
+    const { value: labelText } = await Swal.fire({
+      target: containerRef.current || document.body,
+      title: 'Tambah Label Zona / Ruangan',
+      input: 'text',
+      inputPlaceholder: 'misal: Ruang Tamu, Server, Dapur...',
+      inputValue: '',
+      showCancelButton: true,
+      confirmButtonText: 'Tambahkan',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#2563eb',
+      background: isLightMode ? '#ffffff' : '#0f172a',
+      color: isLightMode ? '#0f172a' : '#f8fafc',
+    });
+    if (!labelText || !labelText.trim()) return;
+    const basePos = getSpawnPosition();
+    const newLabel = {
+      id: 'label_' + Date.now(),
+      type: 'text_label',
+      name: `Label: ${labelText.trim()}`,
+      text: labelText.trim(),
+      position: [basePos[0], 0.08, basePos[2]],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      fontSize: 0.9,
+    };
+    setWallsWithHistory((prev) => [...prev, newLabel]);
+    setSelectedObj({ type: 'wall', id: newLabel.id });
+    setTransformMode('translate');
   };
 
   const handleDuplicateWall = () => {
@@ -3677,12 +4883,41 @@ export default function FloorPlan({
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen?.().catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+    const el = containerRef.current;
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+    if (fsEl || isFallbackFullscreen) {
+      if (fsEl) {
+        const exitFn = document.exitFullscreen || document.webkitExitFullscreen;
+        try {
+          const res = exitFn?.call(document);
+          if (res && typeof res.catch === 'function') {
+            res.catch(() => {});
+          }
+        } catch {}
+      }
+      setIsFallbackFullscreen(false);
+      setIsFullscreen(false);
+      return;
+    }
+
+    const reqFn = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    if (reqFn) {
+      try {
+        const res = reqFn.call(el);
+        if (res && typeof res.catch === 'function') {
+          res.catch(() => {
+            setIsFallbackFullscreen(true);
+            setIsFullscreen(true);
+          });
+        }
+      } catch {
+        setIsFallbackFullscreen(true);
+        setIsFullscreen(true);
+      }
     } else {
-      document.exitFullscreen?.();
+      setIsFallbackFullscreen(true);
+      setIsFullscreen(true);
     }
   };
 
@@ -3692,12 +4927,64 @@ export default function FloorPlan({
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isFull = !!document.fullscreenElement;
-      setIsFullscreen(isFull);
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      const isThisNativeFull = !!fsEl && (fsEl === containerRef.current || fsEl.contains(containerRef.current));
+      if (isThisNativeFull) {
+        setIsFallbackFullscreen(false);
+        setIsFullscreen(true);
+      } else if (!isFallbackFullscreen) {
+        setIsFullscreen(false);
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, [isFallbackFullscreen]);
+
+  // Lock body scroll & allow Escape to exit CSS fallback fullscreen + resize Canvas
+  useEffect(() => {
+    if (isFallbackFullscreen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+          setIsFallbackFullscreen(false);
+          setIsFullscreen(false);
+        }
+      };
+      window.addEventListener('keydown', handleEsc);
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        window.removeEventListener('keydown', handleEsc);
+      };
+    }
+  }, [isFallbackFullscreen]);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isFullscreen]);
+
+  // Shortcut 'F' to toggle fullscreen (only in studio editor or active fullscreen)
+  useEffect(() => {
+    if (isSidebarPreview) return;
+    if (isWidget && !isFullscreen) return;
+    const handleShortcutF = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      if (e.key?.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', handleShortcutF);
+    return () => window.removeEventListener('keydown', handleShortcutF);
+  }, [isSidebarPreview, isWidget, isFullscreen, isFallbackFullscreen]);
 
   // Resolve currently inspected object (wall, group child, or device)
   const inspectedTarget = React.useMemo(() => {
@@ -3939,27 +5226,35 @@ export default function FloorPlan({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[#f3f4f6] text-slate-800 w-full select-none ${
-        hideHeader
-          ? (isFullscreen ? 'p-0 w-screen h-[100dvh]' : 'p-0 h-full')
-          : 'p-0 h-[calc(100dvh-6.5rem)] rounded-2xl border border-slate-200/90 overflow-hidden shadow-xl'
+      className={`flex flex-col select-none transition-colors duration-300 ${
+        isLightMode ? 'bg-[#f3f4f6] text-slate-800' : 'bg-[#0b1120] text-slate-100'
+      } ${
+        isFullscreen
+          ? `${isFallbackFullscreen ? 'fixed inset-0 z-[9999]' : ''} p-0 w-screen h-[100dvh] rounded-none border-0 overflow-hidden`
+          : hideHeader
+            ? 'p-0 w-full h-full'
+            : `p-0 w-full h-[calc(100dvh-6.5rem)] rounded-2xl border overflow-hidden shadow-xl ${
+                isLightMode ? 'border-slate-200/90' : 'border-slate-800/90'
+              }`
       }`}
     >
       {/* Hidden JSON file input */}
       <input type="file" accept=".json" id="import-json" className="hidden" onChange={handleImportJSON} />
 
-      {/* ── MAIN FULL-BLEED 3D ARCHITECTURAL VIEWPORT (HomeByMe Floating Island UI) ── */}
+      {/* ── MAIN FULL-BLEED 3D ARCHITECTURAL VIEWPORT ── */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden">
-        <div className="flex-1 min-w-0 bg-[#f3f4f6] overflow-hidden relative">
+        <div className={`flex-1 min-w-0 overflow-hidden relative transition-colors duration-300 ${isLightMode ? 'bg-[#f3f4f6]' : 'bg-[#0b1120]'}`}>
           {/* Widget Mode Floating Fullscreen Button */}
           {isWidget && !isFullscreen && !isSidebarPreview && (
             <div className="absolute top-3 right-3 z-20 flex gap-1.5">
               <button
+                type="button"
                 onClick={toggleFullscreen}
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/95 text-slate-700 hover:bg-white border border-slate-200/90 shadow-md transition-colors cursor-pointer"
-                title="Layar Penuh 3D"
+                className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-100 border border-slate-700/80 shadow-md text-xs font-semibold transition-colors cursor-pointer backdrop-blur-md"
+                title="Mode Layar Penuh 3D"
               >
-                <Maximize2 size={15} />
+                <Maximize2 size={14} />
+                <span className="hidden sm:inline">Fullscreen</span>
               </button>
             </div>
           )}
@@ -3982,161 +5277,184 @@ export default function FloorPlan({
                   <Home size={18} strokeWidth={2.2} />
                 </button>
 
-                {/* Island 2: Project / Room Selector Pill (☰ Bedroom bis) */}
-                <div className="h-10 px-3.5 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center gap-2.5 text-slate-800">
-                  <Menu size={16} className="text-slate-600 shrink-0" />
+                {/* Island 2: Project / Room Selector Pill */}
+                <div className="h-10 px-3.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center gap-2.5 text-slate-100 transition-colors">
+                  <Menu size={16} className="text-slate-400 shrink-0" />
                   {Array.isArray(roomsList) && roomsList.length > 1 && onSelectRoom ? (
                     <select
                       value={roomId}
                       onChange={(e) => onSelectRoom(e.target.value)}
-                      className="bg-transparent text-slate-800 font-semibold text-[13px] focus:outline-none cursor-pointer pr-1"
+                      className="bg-transparent text-slate-100 font-semibold text-[13px] focus:outline-none cursor-pointer pr-1"
                     >
                       {roomsList.map((r) => (
-                        <option key={r.id} value={r.id} className="bg-white text-slate-800">
+                        <option key={r.id} value={r.id} className="bg-slate-900 text-slate-100">
                           {r.name}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <span className="font-semibold text-[13px] text-slate-800 truncate max-w-[160px]">
+                    <span className="font-semibold text-[13px] text-slate-100 truncate max-w-[160px]">
                       {cleanRoomTitle}
                     </span>
                   )}
                 </div>
 
-                {/* Island 3: Floor / Layers Pill (First floor) */}
-                <button
-                  type="button"
-                  onClick={() => setLayersPanelOpen(!layersPanelOpen)}
-                  className={`h-10 px-3.5 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center gap-2 text-[13px] font-semibold transition-colors cursor-pointer ${
-                    layersPanelOpen
-                      ? 'bg-blue-50 text-blue-600 border-blue-200'
-                      : 'bg-white/95 hover:bg-white text-slate-800 border-slate-200/90'
-                  }`}
-                  title="Buka Daftar Layer & Inspektor Objek"
-                >
-                  <Layers size={16} className={layersPanelOpen ? 'text-blue-600' : 'text-slate-600'} />
-                  <span>First floor</span>
-                </button>
+                {/* Edit-only Controls */}
+                {editMode && (
+                  <>
+                    {/* Island 3: Floor / Layers Pill (First floor) */}
+                    <button
+                      type="button"
+                      onClick={() => setLayersPanelOpen(!layersPanelOpen)}
+                      className={`h-10 px-3.5 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center gap-2 text-[13px] font-semibold transition-colors cursor-pointer backdrop-blur-md ${
+                        layersPanelOpen
+                          ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                          : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border-slate-700/80'
+                      }`}
+                      title="Buka Daftar Layer & Inspektor Objek"
+                    >
+                      <Layers size={16} className={layersPanelOpen ? 'text-blue-500' : 'text-slate-400'} />
+                      <span>First floor</span>
+                    </button>
 
-                {/* Island 4: Save Square Button */}
-                <button
-                  type="button"
-                  onClick={saveLayout}
-                  className="w-10 h-10 rounded-xl bg-white/95 hover:bg-white text-slate-700 hover:text-slate-950 border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center justify-center transition-colors cursor-pointer"
-                  title="Simpan Layout 3D (Ctrl+S)"
-                >
-                  <Save size={17} />
-                </button>
+                    {/* Island 4: Save Square Button */}
+                    <button
+                      type="button"
+                      onClick={saveLayout}
+                      className="w-10 h-10 rounded-xl border bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-slate-100 border-slate-700/80 shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md"
+                      title="Simpan Layout 3D (Ctrl+S)"
+                    >
+                      <Save size={17} />
+                    </button>
 
-                {/* Island 5: Undo / Redo Combined Pill */}
-                <div className="h-10 px-1 rounded-xl bg-white/95 border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    onClick={handleUndo}
-                    disabled={!canUndo}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                      canUndo ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'
-                    }`}
-                    title="Undo (Ctrl+Z)"
-                  >
-                    <Undo2 size={16} />
-                  </button>
-                  <div className="w-px h-4 bg-slate-200" />
-                  <button
-                    type="button"
-                    onClick={handleRedo}
-                    disabled={!canRedo}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                      canRedo ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'
-                    }`}
-                    title="Redo (Ctrl+Y)"
-                  >
-                    <Redo2 size={16} />
-                  </button>
-                </div>
-
-                {/* Island 6: Help & File Actions Square Button (?) */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowHelpPopover(!showHelpPopover)}
-                    className={`w-10 h-10 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center justify-center transition-colors cursor-pointer ${
-                      showHelpPopover
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                        : 'bg-white/95 hover:bg-white text-slate-700 border-slate-200/90'
-                    }`}
-                    title="Bantuan, Import/Export & Reset Template"
-                  >
-                    <HelpCircle size={17} />
-                  </button>
-
-                  {showHelpPopover && (
-                    <div className="absolute top-12 left-0 w-64 p-3 rounded-2xl bg-white/98 backdrop-blur-xl border border-slate-200/90 shadow-2xl text-slate-800 space-y-2 z-40">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                        <span className="text-xs font-bold text-slate-800">Proyek & Bantuan</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowHelpPopover(false)}
-                          className="text-slate-400 hover:text-slate-700 cursor-pointer"
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
+                    {/* Island 5: Undo / Redo Combined Pill */}
+                    <div className="h-10 px-1 rounded-xl border bg-slate-900/90 border-slate-700/80 shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center gap-0.5 backdrop-blur-md">
                       <button
                         type="button"
-                        onClick={() => {
-                          setWallsWithHistory(createHomeByMeDefaultSuite(cleanRoomTitle));
-                          setSelectedObj(null);
-                          setShowHelpPopover(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 text-amber-900 text-xs font-semibold transition-colors cursor-pointer"
+                        onClick={handleUndo}
+                        disabled={!canUndo}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          canUndo ? 'text-slate-200 hover:bg-slate-800 cursor-pointer' : 'text-slate-500/60 cursor-not-allowed'
+                        }`}
+                        title="Undo (Ctrl+Z)"
                       >
-                        <Sparkles size={14} className="text-amber-600 shrink-0" />
-                        <span>Muat Template Suite HomeByMe</span>
+                        <Undo2 size={16} />
                       </button>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            document.getElementById('import-json')?.click();
-                            setShowHelpPopover(false);
-                          }}
-                          className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          <Download size={13} /> Import JSON
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleExportJSON();
-                            setShowHelpPopover(false);
-                          }}
-                          className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          <Upload size={13} /> Export JSON
-                        </button>
-                      </div>
-                      <div className="pt-1.5 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
-                        <div>• Klik panah biru di sekitar avatar untuk jalan</div>
-                        <div>• Drag kanan / kiri mouse untuk putar 3D</div>
-                        <div>• Tekan <strong className="text-slate-700">Delete</strong> untuk hapus objek terpilih</div>
-                      </div>
+                      <div className="w-px h-4 bg-slate-700" />
+                      <button
+                        type="button"
+                        onClick={handleRedo}
+                        disabled={!canRedo}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          canRedo ? 'text-slate-200 hover:bg-slate-800 cursor-pointer' : 'text-slate-500/60 cursor-not-allowed'
+                        }`}
+                        title="Redo (Ctrl+Y)"
+                      >
+                        <Redo2 size={16} />
+                      </button>
                     </div>
-                  )}
-                </div>
+
+                    {/* Island 6: Help & File Actions Square Button (?) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowHelpPopover(!showHelpPopover)}
+                        className={`w-10 h-10 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md ${
+                          showHelpPopover
+                            ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                            : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
+                        }`}
+                        title="Bantuan & Import/Export"
+                      >
+                        <HelpCircle size={17} />
+                      </button>
+
+                      {showHelpPopover && (
+                        <div className="absolute top-12 left-0 w-64 p-3 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 shadow-2xl text-slate-100 space-y-2 z-40">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-700/70">
+                            <span className="text-xs font-bold text-slate-100">Proyek &amp; Bantuan</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowHelpPopover(false)}
+                              className="text-slate-400 hover:text-slate-100 cursor-pointer"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                document.getElementById('import-json')?.click();
+                                setShowHelpPopover(false);
+                              }}
+                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              <Download size={13} /> Import JSON
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleExportJSON();
+                                setShowHelpPopover(false);
+                              }}
+                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              <Upload size={13} /> Export JSON
+                            </button>
+                          </div>
+                          <div className="pt-1.5 border-t border-slate-700/70 text-[11px] text-slate-400 space-y-1">
+                            <div>• Klik panah biru di sekitar avatar untuk jalan</div>
+                            <div>• Drag kanan / kiri mouse untuk putar 3D</div>
+                            <div>• Tekan <strong className="text-slate-200">F</strong> untuk masuk/keluar mode Fullscreen</div>
+                            <div>• Tekan <strong className="text-slate-200">Delete</strong> untuk hapus objek terpilih</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Top-Right Compact Actions: Pin to Dashboard + Fullscreen */}
+              {/* Top-Right Compact Actions: Edit/Preview Toggle + Pin to Dashboard + Fullscreen */}
               <div className="flex items-center gap-2 pointer-events-auto">
+                {!isWidget && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editMode) {
+                        setEditMode(false);
+                        setActiveDrawer(null);
+                        setDrawWallMode(false);
+                        setSelectedObj(null);
+                        setLayersPanelOpen(false);
+                        setShowHelpPopover(false);
+                      } else {
+                        setIsExploreMode(false);
+                        setEditMode(true);
+                        setActiveTab('walls');
+                        setActiveDrawer('build');
+                      }
+                    }}
+                    className={`h-10 px-3.5 rounded-xl text-xs font-bold border shadow-[0_2px_10px_rgba(0,0,0,0.08)] inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      editMode
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600'
+                    }`}
+                    title={editMode ? 'Kembali ke Mode Preview untuk klik sensor' : 'Masuk Mode Edit Denah 3D'}
+                  >
+                    {editMode ? <Check size={15} /> : <Edit3 size={14} />}
+                    <span>{editMode ? 'Selesai Edit' : 'Edit Denah'}</span>
+                  </button>
+                )}
                 {onTogglePin && (
                   <button
                     type="button"
                     onClick={onTogglePin}
-                    className={`h-10 px-3.5 rounded-xl text-xs font-semibold border shadow-[0_2px_10px_rgba(0,0,0,0.06)] inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    className={`h-10 px-3.5 rounded-xl text-xs font-semibold border shadow-[0_2px_10px_rgba(0,0,0,0.08)] inline-flex items-center gap-1.5 transition-colors cursor-pointer backdrop-blur-md ${
                       isPinned
                         ? 'bg-amber-400 text-slate-900 border-amber-400'
-                        : 'bg-white/95 hover:bg-white text-slate-700 border-slate-200/90'
+                        : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border-slate-700/80'
                     }`}
                   >
                     <Pin size={14} className={isPinned ? 'fill-slate-900' : ''} />
@@ -4146,67 +5464,55 @@ export default function FloorPlan({
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className="w-10 h-10 rounded-xl bg-white/95 hover:bg-white text-slate-700 border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.06)] flex items-center justify-center transition-colors cursor-pointer"
-                  title={isFullscreen ? 'Keluar Layar Penuh' : 'Layar Penuh'}
+                  className={`h-10 px-3.5 rounded-xl text-xs font-semibold border shadow-[0_2px_10px_rgba(0,0,0,0.08)] inline-flex items-center gap-1.5 transition-colors cursor-pointer backdrop-blur-md ${
+                    isFullscreen
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500'
+                      : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border-slate-700/80'
+                  }`}
+                  title={isFullscreen ? 'Keluar Layar Penuh (Esc / F)' : 'Mode Layar Penuh (F)'}
                 >
-                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                  <span className="hidden sm:inline">{isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── 2. LEFT FLOATING 4-ISLAND COMPACT DOCK (Matches HomeByMe Left Toolbar) ── */}
+          {/* ── 2. LEFT FLOATING PRO-CAD TOOLBAR DOCK ── */}
           {editMode && !isSidebarPreview && (
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2.5">
-              {/* Island 1: Build / Room Structure [⊞] */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('walls');
-                  setActiveDrawer(activeDrawer === 'build' ? null : 'build');
-                }}
-                className={`w-11 h-11 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.07)] flex items-center justify-center transition-colors cursor-pointer ${
-                  activeDrawer === 'build'
-                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                    : 'bg-white/95 hover:bg-white text-slate-700 border-slate-200/90'
-                }`}
-                title="Bangunan, Dinding & Sekat Ruangan"
-              >
-                <LayoutGrid size={18} />
-              </button>
-
-              {/* Island 2: 3-Button Vertical Pill [🔍 / 🛋️ / ♡] */}
-              <div className="w-11 py-1.5 rounded-xl bg-white/95 border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.07)] flex flex-col items-center gap-1">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2 max-h-[calc(100%-8.5rem)] overflow-y-auto py-0.5 [&::-webkit-scrollbar]:hidden">
+              {/* Group 1: Katalog [Struktur / Perangkat IoT / Material] */}
+              <div className="w-11 py-1.5 rounded-xl border bg-slate-900/95 border-slate-700/80 shadow-[0_4px_14px_rgba(0,0,0,0.14)] flex flex-col items-center gap-1 backdrop-blur-md">
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTab('furniture');
-                    setActiveDrawer(activeDrawer === 'search' ? null : 'search');
+                    setActiveTab('walls');
+                    setActiveDrawer(activeDrawer === 'build' ? null : 'build');
                   }}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                    activeDrawer === 'search'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    activeDrawer === 'build'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
-                  title="Cari Furnitur, Struktur & Perangkat IoT"
+                  title="Katalog Struktur, Pintu, Jendela & Template Denah"
                 >
-                  <Search size={17} />
+                  <LayoutGrid size={17} />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTab('furniture');
-                    setActiveDrawer(activeDrawer === 'furniture' ? null : 'furniture');
+                    setActiveTab('devices');
+                    setActiveDrawer(activeDrawer === 'devices' ? null : 'devices');
                   }}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                    activeDrawer === 'furniture'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    activeDrawer === 'devices'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
-                  title="Katalog Furnitur 3D & Perangkat IoT"
+                  title="Perangkat & Sensor IoT Ruangan"
                 >
-                  <Armchair size={17} />
+                  <Cpu size={17} />
                 </button>
 
                 <button
@@ -4215,40 +5521,130 @@ export default function FloorPlan({
                     setActiveTab('material');
                     setActiveDrawer(activeDrawer === 'material' ? null : 'material');
                   }}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                     activeDrawer === 'material'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
-                  title="Material Dinding & Warna Lantai Kayu"
+                  title="Material Dinding & Lantai"
                 >
-                  <Heart size={17} />
+                  <Palette size={17} />
                 </button>
               </div>
 
-              {/* Island 3: Edit / Transform Object [✎] */}
-              <button
-                type="button"
-                onClick={() => setActiveDrawer(activeDrawer === 'edit' ? null : 'edit')}
-                className={`w-11 h-11 rounded-xl border shadow-[0_2px_10px_rgba(0,0,0,0.07)] flex items-center justify-center transition-colors cursor-pointer ${
-                  activeDrawer === 'edit' || transformMode !== 'select'
-                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                    : 'bg-white/95 hover:bg-white text-slate-700 border-slate-200/90'
-                }`}
-                title="Alat Transformasi Objek (Geser, Putar, Skala, Hapus)"
-              >
-                <Edit3 size={17} />
-              </button>
+              {/* Group 2: Buat Cepat [Gambar Dinding / Label Teks Zona] */}
+              <div className="w-11 py-1.5 rounded-xl border bg-slate-900/95 border-slate-700/80 shadow-[0_4px_14px_rgba(0,0,0,0.14)] flex flex-col items-center gap-1 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setDrawWallMode(!drawWallMode)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    drawWallMode
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title={drawWallMode ? 'Matikan Mode Gambar Dinding' : 'Gambar Dinding Manual di Lantai (Titik A → B)'}
+                >
+                  <Edit3 size={16} />
+                </button>
 
-              {/* Island 4: Camera Snapshot [📷] */}
-              <button
-                type="button"
-                onClick={handleDownloadImage}
-                className="w-11 h-11 rounded-xl bg-white/95 hover:bg-white text-slate-700 hover:text-blue-600 border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.07)] flex items-center justify-center transition-colors cursor-pointer"
-                title="Simpan Tangkapan Layar 3D (PNG)"
-              >
-                <Camera size={17} />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleAddTextLabel}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
+                  title="Tambah Label Nama Zona / Ruangan 3D"
+                >
+                  <Type size={16} />
+                </button>
+              </div>
+
+              {/* Group 3: Transformasi Objek [Geser / Putar / Ukuran] */}
+              <div className="w-11 py-1.5 rounded-xl border bg-slate-900/95 border-slate-700/80 shadow-[0_4px_14px_rgba(0,0,0,0.14)] flex flex-col items-center gap-1 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setTransformMode('translate')}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    transformMode === 'translate'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title="Mode Geser Objek"
+                >
+                  <Move size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTransformMode('rotate')}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    transformMode === 'rotate'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title="Mode Putar Objek"
+                >
+                  <RotateCcw size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTransformMode('scale')}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    transformMode === 'scale'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title="Mode Ubah Ukuran Dinding"
+                >
+                  <Maximize size={16} />
+                </button>
+              </div>
+
+              {/* Group 4: Utilitas [Penggaris / Snap Grid / Screenshot / Bersihkan] */}
+              <div className="w-11 py-1.5 rounded-xl border bg-slate-900/95 border-slate-700/80 shadow-[0_4px_14px_rgba(0,0,0,0.14)] flex flex-col items-center gap-1 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={() => setShowRuler(!showRuler)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    showRuler
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title={showRuler ? 'Sembunyikan Penggaris Dimensi (m)' : 'Tampilkan Penggaris Dimensi (m)'}
+                >
+                  <Ruler size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSnapEnabled(!snapEnabled)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                    snapEnabled
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title={snapEnabled ? 'Snap Grid 0.25m Aktif' : 'Aktifkan Snap Grid 0.25m'}
+                >
+                  <Grid size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadImage}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-200 hover:bg-slate-800 transition-all cursor-pointer"
+                  title="Simpan Tangkapan Layar 3D (PNG)"
+                >
+                  <Camera size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-500/15 transition-all cursor-pointer"
+                  title="Bersihkan Semua Tembok di Kanvas"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -4266,11 +5662,15 @@ export default function FloorPlan({
             </div>
           )}
 
-          {/* ── COMPACT FLOATING TRANSFORM & PROPERTY POPOVER (When Island 3 [✎] is active or an object is selected) ── */}
+          {/* ── COMPACT FLOATING TRANSFORM & PROPERTY POPOVER (Native Surface Tokens: Auto Dark & Light) ── */}
           {editMode && !isSidebarPreview && (activeDrawer === 'edit' || selectedObj) && (
-            <div className="absolute right-4 top-18 z-30 bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-3 flex flex-col gap-2.5 w-60 text-slate-800">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                <span className="text-xs font-bold text-slate-800 truncate">
+            <div
+              onWheel={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute right-4 top-[4.25rem] z-30 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2.5 w-60 max-h-[calc(100%-5.25rem)] overflow-y-auto custom-scrollbar text-slate-100 transition-colors"
+            >
+              <div className="flex items-center justify-between border-b border-slate-700/70 pb-1.5">
+                <span className="text-xs font-bold text-slate-100 truncate">
                   {inspectedTarget?.obj?.name || 'Edit Objek 3D'}
                 </span>
                 <button
@@ -4280,7 +5680,7 @@ export default function FloorPlan({
                     setSelectedObj(null);
                     setTransformMode('select');
                   }}
-                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                  className="text-slate-400 hover:text-slate-100 cursor-pointer"
                 >
                   <X size={14} />
                 </button>
@@ -4303,8 +5703,8 @@ export default function FloorPlan({
                       onClick={() => setTransformMode(tool.mode)}
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
                         isAct
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'bg-blue-500/15 text-blue-500 border border-blue-500/40'
+                          : 'text-slate-200 hover:bg-slate-800 border border-transparent'
                       }`}
                     >
                       <IconComp size={13} />
@@ -4316,7 +5716,7 @@ export default function FloorPlan({
 
               {/* 2. Putar Cepat 1-Klik (-90° / +45° / +90°) */}
               {inspectedTarget && (
-                <div className="space-y-1 pt-1 border-t border-slate-100">
+                <div className="space-y-1 pt-1.5 border-t border-slate-700/70">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Putar Cepat</span>
                   <div className="grid grid-cols-3 gap-1">
                     {[
@@ -4328,7 +5728,7 @@ export default function FloorPlan({
                         key={rot.label}
                         type="button"
                         onClick={() => rotateInspectedByDeg(rot.deg)}
-                        className="py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 text-[11px] font-bold font-mono tabular-nums transition-colors cursor-pointer"
+                        className="py-1 rounded-lg bg-slate-800 hover:bg-blue-500/15 hover:text-blue-500 text-slate-100 border border-slate-700/70 text-[11px] font-bold font-mono tabular-nums transition-colors cursor-pointer"
                       >
                         {rot.label}
                       </button>
@@ -4339,7 +5739,7 @@ export default function FloorPlan({
 
               {/* 3. Ubah Tipe Dinding 1-Klik (Polos / Pintu / Jendela / Kaca) */}
               {inspectedTarget?.obj && !['furniture', 'text_label', 'custom_group', 'room'].includes(inspectedTarget.obj.type) && inspectedTarget.kind !== 'device' && (
-                <div className="space-y-1 pt-1 border-t border-slate-100">
+                <div className="space-y-1 pt-1.5 border-t border-slate-700/70">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipe Dinding</span>
                   <div className="grid grid-cols-2 gap-1">
                     {[
@@ -4354,10 +5754,10 @@ export default function FloorPlan({
                           key={wt.id}
                           type="button"
                           onClick={() => updateInspectedWallType(wt.id)}
-                          className={`py-1 px-2 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          className={`py-1 px-2 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border ${
                             isCur
-                              ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                              : 'bg-slate-100 hover:bg-slate-200/70 text-slate-700'
+                              ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700/70'
                           }`}
                         >
                           {wt.label}
@@ -4370,7 +5770,7 @@ export default function FloorPlan({
 
               {/* 4. Ukuran / Dimensi (Panjang X, Tinggi Y, Lebar Z) */}
               {inspectedTarget?.obj && inspectedTarget.kind !== 'device' && inspectedTarget.obj.type !== 'custom_group' && (
-                <div className="space-y-1 pt-1 border-t border-slate-100">
+                <div className="space-y-1 pt-1.5 border-t border-slate-700/70">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     {inspectedTarget.obj.type === 'furniture' ? 'Skala Ukuran (X / Y / Z)' : 'Dimensi Meter (P / T / L)'}
                   </span>
@@ -4382,7 +5782,7 @@ export default function FloorPlan({
                     ].map((dim) => (
                       <div
                         key={dim.label}
-                        className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-100 border border-slate-200/80 text-[11px]"
+                        className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-800 border border-slate-700/80 text-[11px]"
                       >
                         <span className="text-slate-400 font-bold">{dim.label}</span>
                         <input
@@ -4391,7 +5791,7 @@ export default function FloorPlan({
                           min="0.1"
                           value={Number(dim.val).toFixed(2)}
                           onChange={(e) => updateInspectedScale(dim.idx, e.target.value)}
-                          className="w-full bg-transparent text-slate-800 font-mono tabular-nums text-[11px] outline-none text-right"
+                          className="w-full bg-transparent text-slate-100 font-mono tabular-nums text-[11px] outline-none text-right"
                         />
                       </div>
                     ))}
@@ -4399,9 +5799,9 @@ export default function FloorPlan({
                 </div>
               )}
 
-              {/* 5. Warna & Material Cepat untuk Dinding / Furnitur yang Dipilih */}
+              {/* 5. Warna & Material Cepat untuk Dinding yang Dipilih */}
               {inspectedTarget?.obj && inspectedTarget.kind !== 'device' && (
-                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                <div className="space-y-1.5 pt-1.5 border-t border-slate-700/70">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       Warna / Material
@@ -4426,7 +5826,7 @@ export default function FloorPlan({
                             applyMaterialToSelectionOrAll(mat.id);
                           }
                         }}
-                        className="w-6 h-6 rounded-lg border border-black/15 shadow-2xs transition-transform hover:scale-110 cursor-pointer"
+                        className="w-6 h-6 rounded-lg border border-slate-600/50 shadow-2xs transition-transform hover:scale-110 cursor-pointer"
                         style={{ backgroundColor: mat.swatch }}
                         title={mat.label}
                       />
@@ -4436,28 +5836,28 @@ export default function FloorPlan({
               )}
 
               {selectedObj?.type === 'wall' && (
-                <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-700/70">
                   {inspectedTarget?.obj?.type === 'custom_group' && (
                     <button
                       type="button"
                       onClick={handleUngroup}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-semibold transition-colors cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
                       title="Pisahkan Grup agar Tiap Dinding Bisa Diedit"
                     >
-                      <FolderOpen size={12} /> Pisah Grup
+                      <FolderOpen size={12} /> Pisah
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={handleDuplicateWall}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700/70 text-[11px] font-semibold transition-colors cursor-pointer"
                   >
                     <Copy size={12} /> Duplikat
                   </button>
                   <button
                     type="button"
                     onClick={handleDeleteWall}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-semibold transition-colors cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-500 border border-rose-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
                   >
                     <Trash2 size={12} /> Hapus
                   </button>
@@ -4466,34 +5866,38 @@ export default function FloorPlan({
             </div>
           )}
 
-          {/* ── FLOATING LAYERS & INSPEKTOR CARD (Opens from Top-Left "First floor" Pill) ── */}
+          {/* ── FLOATING LAYERS & INSPEKTOR CARD (Native Surface Tokens: Auto Dark & Light) ── */}
           {editMode && !isSidebarPreview && layersPanelOpen && (
-            <div className="absolute top-16 left-4 z-30 w-72 max-h-[calc(100vh-160px)] bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-800">
-              <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-100">
-                <span className="font-bold text-xs text-slate-800">First floor • Layers</span>
+            <div
+              onWheel={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute top-[4.25rem] left-4 z-30 w-72 max-h-[calc(100%-5.25rem)] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 transition-colors"
+            >
+              <div className="shrink-0 px-3.5 py-2.5 flex items-center justify-between border-b border-slate-700/70">
+                <span className="font-bold text-xs text-slate-100">First floor • Layers</span>
                 <button
                   type="button"
                   onClick={() => setLayersPanelOpen(false)}
-                  className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  className="text-slate-400 hover:text-slate-100 transition-colors cursor-pointer"
                 >
                   <X size={14} />
                 </button>
               </div>
 
-              <div className="px-3 pt-2.5 pb-1.5">
-                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-100/80 border border-slate-200/80">
+              <div className="shrink-0 px-3 pt-2.5 pb-1.5">
+                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
                   <Search size={12} className="text-slate-400 shrink-0" />
                   <input
                     type="text"
                     value={layerFilter}
                     onChange={(e) => setLayerFilter(e.target.value)}
                     placeholder="Cari elemen ruangan..."
-                    className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 outline-none"
+                    className="w-full bg-transparent text-xs text-slate-100 placeholder-slate-400 outline-none"
                   />
                 </div>
               </div>
 
-              <div className="px-3 py-1.5 flex-1 overflow-y-auto custom-scrollbar space-y-1">
+              <div className="min-h-0 px-3 py-1.5 flex-1 overflow-y-auto overscroll-contain custom-scrollbar space-y-1">
                 {walls
                   .filter((w) => {
                     if (!layerFilter.trim()) return true;
@@ -4513,8 +5917,8 @@ export default function FloorPlan({
                           onClick={() => setSelectedObj({ type: 'wall', id: w.id })}
                           className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors ${
                             isSelected
-                              ? 'bg-blue-50 border border-blue-200 text-blue-700'
-                              : 'hover:bg-slate-100/80 border border-transparent text-slate-700'
+                              ? 'bg-blue-500/15 border border-blue-500/40 text-blue-500'
+                              : 'hover:bg-slate-800/80 border border-transparent text-slate-200'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 min-w-0">
@@ -4525,12 +5929,12 @@ export default function FloorPlan({
                                   e.stopPropagation();
                                   setExpandedGroups((p) => ({ ...p, [w.id]: !isExpanded }));
                                 }}
-                                className="text-slate-400 hover:text-slate-700"
+                                className="text-slate-400 hover:text-slate-100"
                               >
                                 {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                               </button>
                             ) : (
-                              <ChevronRight size={12} className="text-slate-300" />
+                              <ChevronRight size={12} className="text-slate-500" />
                             )}
                             <span className="text-xs font-medium truncate">
                               {w.name || (isGroup ? `Grup ${index + 1}` : `Elemen ${index + 1}`)}
@@ -4546,7 +5950,7 @@ export default function FloorPlan({
                                   prev.map((wall) => (wall.id === w.id ? { ...wall, hidden: !wall.hidden } : wall))
                                 );
                               }}
-                              className={w.hidden ? 'text-slate-300' : 'text-slate-500 hover:text-slate-800'}
+                              className={w.hidden ? 'text-slate-500' : 'text-slate-400 hover:text-slate-100'}
                             >
                               {w.hidden ? <EyeOff size={12} /> : <Eye size={12} />}
                             </button>
@@ -4558,7 +5962,7 @@ export default function FloorPlan({
                                   prev.map((wall) => (wall.id === w.id ? { ...wall, locked: !wall.locked } : wall))
                                 );
                               }}
-                              className={w.locked ? 'text-amber-500' : 'text-slate-400 hover:text-slate-700'}
+                              className={w.locked ? 'text-amber-500' : 'text-slate-400 hover:text-slate-100'}
                             >
                               {w.locked ? <Lock size={11} /> : <Unlock size={11} />}
                             </button>
@@ -4566,7 +5970,7 @@ export default function FloorPlan({
                         </div>
 
                         {isGroup && isExpanded && w.children && (
-                          <div className="pl-4 ml-2.5 border-l border-slate-200 space-y-0.5 my-0.5">
+                          <div className="pl-4 ml-2.5 border-l border-slate-700 space-y-0.5 my-0.5">
                             {w.children.map((c, cIdx) => {
                               const isChildSel = selectedObj?.id === c.id || selectedForGroup.includes(c.id);
                               return (
@@ -4575,8 +5979,8 @@ export default function FloorPlan({
                                   onClick={() => setSelectedObj({ type: 'wall', id: c.id })}
                                   className={`flex items-center justify-between px-2 py-1 rounded-lg cursor-pointer transition-colors ${
                                     isChildSel
-                                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                                      : 'hover:bg-slate-100 text-slate-600'
+                                      ? 'bg-blue-500/15 text-blue-500 font-semibold'
+                                      : 'hover:bg-slate-800 text-slate-300'
                                   } ${c.hidden ? 'opacity-45' : ''}`}
                                 >
                                   <span className="text-[11px] truncate">{c.name || `Elemen ${cIdx + 1}`}</span>
@@ -4596,7 +6000,7 @@ export default function FloorPlan({
                                         })
                                       );
                                     }}
-                                    className="text-slate-400 hover:text-slate-700"
+                                    className="text-slate-400 hover:text-slate-100"
                                   >
                                     {c.hidden ? <EyeOff size={11} /> : <Eye size={11} />}
                                   </button>
@@ -4612,16 +6016,16 @@ export default function FloorPlan({
 
               {/* Inspector Coordinates Footer */}
               {inspectedTarget && (
-                <div className="p-3 bg-slate-50 border-t border-slate-200/80 space-y-2">
+                <div className="shrink-0 p-3 bg-slate-950/60 border-t border-slate-700/70 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">
                       {inspectedTarget.obj?.name || 'Objek Terpilih'}
                     </span>
                     {selectedObj?.type === 'wall' && (
                       <button
                         type="button"
                         onClick={handleDeleteWall}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer"
+                        className="text-[11px] text-rose-500 hover:text-rose-400 font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 size={11} /> Hapus
                       </button>
@@ -4635,7 +6039,7 @@ export default function FloorPlan({
                     ].map((coord) => (
                       <div
                         key={coord.label}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px]"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px]"
                       >
                         <span className="text-slate-400 font-bold">{coord.label}</span>
                         <input
@@ -4643,7 +6047,7 @@ export default function FloorPlan({
                           step="0.25"
                           value={Number(coord.val).toFixed(2)}
                           onChange={(e) => updateInspectedCoord(coord.idx, e.target.value)}
-                          className="w-full bg-transparent text-slate-800 font-mono tabular-nums text-[11px] outline-none text-right"
+                          className="w-full bg-transparent text-slate-100 font-mono tabular-nums text-[11px] outline-none text-right"
                         />
                       </div>
                     ))}
@@ -4653,7 +6057,7 @@ export default function FloorPlan({
             </div>
           )}
 
-          {/* ── 3. BOTTOM-CENTER FLOATING WHITE ISLANDS (HomeByMe [Sliders] [2D | 3D | 🚶] [🔍- | 🔍+]) ── */}
+          {/* ── 3. BOTTOM-CENTER FLOATING ISLANDS ([Sliders] [2D | 3D | 🚶] [🔍- | 🔍+] [Fullscreen]) ── */}
           {!isSidebarPreview && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5">
               {/* Island 1: Display Settings Button [SlidersHorizontal] */}
@@ -4661,10 +6065,10 @@ export default function FloorPlan({
                 <button
                   type="button"
                   onClick={() => setShowSettingsPopover(!showSettingsPopover)}
-                  className={`w-11 h-11 rounded-xl border shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`w-11 h-11 rounded-xl border shadow-[0_2px_12px_rgba(0,0,0,0.12)] flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md ${
                     showSettingsPopover
-                      ? 'bg-blue-50 text-blue-600 border-blue-200'
-                      : 'bg-white/95 hover:bg-white text-slate-700 border-slate-200/90'
+                      ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                      : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
                   }`}
                   title="Pengaturan Tampilan 3D"
                 >
@@ -4672,20 +6076,11 @@ export default function FloorPlan({
                 </button>
 
                 {showSettingsPopover && (
-                  <div className="absolute bottom-14 left-0 w-60 p-3 rounded-2xl bg-white/98 backdrop-blur-xl border border-slate-200/90 shadow-2xl text-slate-800 space-y-2 z-40">
-                    <div className="text-xs font-bold text-slate-800 pb-1 border-b border-slate-100">
+                  <div className="absolute bottom-14 left-0 w-60 p-3 rounded-2xl bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 shadow-2xl text-slate-100 space-y-2 z-40">
+                    <div className="text-xs font-bold text-slate-100 pb-1 border-b border-slate-700/70">
                       Pengaturan Tampilan
                     </div>
-                    <label className="flex items-center justify-between text-xs text-slate-700 cursor-pointer py-1">
-                      <span>Tampilkan Avatar 3D</span>
-                      <input
-                        type="checkbox"
-                        checked={showAvatar}
-                        onChange={(e) => setShowAvatar(e.target.checked)}
-                        className="accent-blue-600 rounded cursor-pointer"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between text-xs text-slate-700 cursor-pointer py-1">
+                    <label className="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
                       <span>Penggaris Dimensi (m)</span>
                       <input
                         type="checkbox"
@@ -4694,7 +6089,7 @@ export default function FloorPlan({
                         className="accent-blue-600 rounded cursor-pointer"
                       />
                     </label>
-                    <label className="flex items-center justify-between text-xs text-slate-700 cursor-pointer py-1">
+                    <label className="flex items-center justify-between text-xs text-slate-200 cursor-pointer py-1">
                       <span>Snap Grid 0.25m</span>
                       <input
                         type="checkbox"
@@ -4708,7 +6103,7 @@ export default function FloorPlan({
               </div>
 
               {/* Island 2: 2D | 3D | 🚶 Segmented View Switcher Pill */}
-              <div className="h-11 px-1.5 rounded-xl bg-white/95 border border-slate-200/90 shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex items-center gap-1">
+              <div className="h-11 px-1.5 rounded-xl border bg-slate-900/90 border-slate-700/80 shadow-[0_2px_12px_rgba(0,0,0,0.12)] flex items-center gap-1 backdrop-blur-md">
                 <button
                   type="button"
                   onClick={() => {
@@ -4717,8 +6112,8 @@ export default function FloorPlan({
                   }}
                   className={`h-8 px-3 rounded-lg text-[13px] font-bold transition-colors cursor-pointer ${
                     cameraViewMode === 'top2d' && !isExploreMode
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-500/15 text-blue-500'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
                   title="Tampilan Denah Atas 2D"
                 >
@@ -4733,8 +6128,8 @@ export default function FloorPlan({
                   }}
                   className={`h-8 px-3 rounded-lg text-[13px] font-extrabold transition-colors cursor-pointer ${
                     cameraViewMode === 'orbit' && !isExploreMode
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-500/15 text-blue-500'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
                   title="Tampilan Dollhouse 3D"
                 >
@@ -4750,8 +6145,8 @@ export default function FloorPlan({
                   }}
                   className={`w-9 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                     isExploreMode
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-blue-500/15 text-blue-500'
+                      : 'text-slate-200 hover:bg-slate-800'
                   }`}
                   title="Mode Jalan Avatar (WASD / Klik Panah Lantai)"
                 >
@@ -4760,25 +6155,39 @@ export default function FloorPlan({
               </div>
 
               {/* Island 3: Zoom Out | Zoom In Pill [🔍- | 🔍+] */}
-              <div className="h-11 px-1.5 rounded-xl bg-white/95 border border-slate-200/90 shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex items-center gap-0.5">
+              <div className="h-11 px-1.5 rounded-xl border bg-slate-900/90 border-slate-700/80 shadow-[0_2px_12px_rgba(0,0,0,0.12)] flex items-center gap-0.5 backdrop-blur-md">
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event('zoom-out'))}
-                  className="w-8 h-8 rounded-lg text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-lg text-slate-200 hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
                   title="Perkecil (Zoom Out)"
                 >
                   <ZoomOut size={16} />
                 </button>
-                <div className="w-px h-4 bg-slate-200" />
+                <div className="w-px h-4 bg-slate-700" />
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event('zoom-in'))}
-                  className="w-8 h-8 rounded-lg text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-lg text-slate-200 hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
                   title="Perbesar (Zoom In)"
                 >
                   <ZoomIn size={16} />
                 </button>
               </div>
+
+              {/* Island 4: Quick Fullscreen Toggle Pill */}
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className={`w-11 h-11 rounded-xl border shadow-[0_2px_12px_rgba(0,0,0,0.12)] flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md ${
+                  isFullscreen
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
+                }`}
+                title={isFullscreen ? 'Keluar Layar Penuh (Esc / F)' : 'Mode Layar Penuh (F)'}
+              >
+                {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+              </button>
             </div>
           )}
 
@@ -4797,43 +6206,43 @@ export default function FloorPlan({
               fov: isSidebarPreview ? 38 : 40 
             }}
           >
-            <color attach="background" args={[isCapturing ? '#ffffff' : '#f3f4f6']} />
+            <color attach="background" args={[isCapturing ? '#ffffff' : (isLightMode ? '#f3f4f6' : '#0b1120')]} />
             
-            {/* Bright HomeByMe Architectural Daylight Studio Lighting */}
+            {/* Adaptive Studio Lighting (Light Daylight / Dark Architectural Night) */}
             <ambientLight 
-              intensity={(isCapturing ? 1.8 : 1.55) * lightingIntensityScale} 
-              color={lightingMode === 'warm' ? '#fef3c7' : '#ffffff'} 
+              intensity={(isCapturing ? 1.8 : (isLightMode ? 1.55 : 0.85)) * lightingIntensityScale} 
+              color={lightingMode === 'warm' ? '#fef3c7' : (isLightMode ? '#ffffff' : '#cbd5e1')} 
             />
 
             {/* Key Sun Directional Light with Soft Architectural Shadows */}
             <directionalLight 
               castShadow={!isCapturing && !isSidebarPreview} 
               position={[12, 24, 14]} 
-              intensity={(isCapturing ? 0.8 : 1.45) * lightingIntensityScale} 
+              intensity={(isCapturing ? 0.8 : (isLightMode ? 1.45 : 1.15)) * lightingIntensityScale} 
               shadow-mapSize={isWidget ? [512, 512] : [2048, 2048]} 
               shadow-camera-left={-22}
               shadow-camera-right={22}
               shadow-camera-top={22}
               shadow-camera-bottom={-22}
               shadow-bias={-0.00015}
-              color={lightingMode === 'warm' ? '#fde68a' : '#fffdf9'}
+              color={lightingMode === 'warm' ? '#fde68a' : (isLightMode ? '#fffdf9' : '#e2e8f0')}
             />
 
             {/* Soft Fill Lights */}
             <directionalLight 
               position={[-14, 18, -10]} 
-              intensity={0.75 * lightingIntensityScale} 
-              color="#f1f5f9" 
+              intensity={(isLightMode ? 0.75 : 0.45) * lightingIntensityScale} 
+              color={isLightMode ? '#f1f5f9' : '#94a3b8'} 
             />
             <directionalLight 
               position={[-8, 12, 16]} 
-              intensity={0.55 * lightingIntensityScale} 
-              color="#ffffff" 
+              intensity={(isLightMode ? 0.55 : 0.35) * lightingIntensityScale} 
+              color={isLightMode ? '#ffffff' : '#64748b'} 
             />
             <hemisphereLight 
-              skyColor="#ffffff" 
-              groundColor="#e2e8f0" 
-              intensity={0.85} 
+              skyColor={isLightMode ? '#ffffff' : '#94a3b8'} 
+              groundColor={isLightMode ? '#e2e8f0' : '#0f172a'} 
+              intensity={isLightMode ? 0.85 : 0.65} 
             />
             
             <Suspense fallback={null}>
@@ -4861,39 +6270,43 @@ export default function FloorPlan({
                 cameraViewMode={cameraViewMode}
               />
               {!isCapturing && !isSidebarPreview && (
-                <ContactShadows position={[0, -0.98, 0]} opacity={0.35} scale={30} blur={2.2} far={4.5} color="#334155" />
+                <ContactShadows position={[0, -0.98, 0]} opacity={isLightMode ? 0.35 : 0.55} scale={30} blur={2.2} far={4.5} color={isLightMode ? '#334155' : '#020617'} />
               )}
             </Suspense>
           </Canvas>
         </div>
 
-        {/* ── 4. FLOATING WHITE CATALOG DRAWER (Opens from Left 4-Island Dock: Build / Search / Furniture & IoT / Material) ── */}
+        {/* ── 4. FLOATING CATALOG DRAWER (Native Surface Tokens: Auto Dark & Light) ── */}
         {editMode && !isSidebarPreview && activeDrawer && activeDrawer !== 'edit' && (
-          <div className="absolute left-18 top-18 bottom-18 z-30 w-80 max-w-[calc(100vw-5.5rem)] bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-800">
+          <div
+            onWheel={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute left-[4.5rem] top-[4.25rem] bottom-4 max-h-[calc(100%-5.25rem)] z-30 w-80 max-w-[calc(100vw-5.5rem)] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 transition-colors"
+          >
             {/* Drawer Header + Close Button */}
-            <div className="px-3.5 pt-3 pb-2 flex items-center justify-between border-b border-slate-100">
-              <span className="font-bold text-xs text-slate-800">
+            <div className="shrink-0 px-3.5 pt-3 pb-2 flex items-center justify-between border-b border-slate-700/70">
+              <span className="font-bold text-xs text-slate-100">
                 {activeTab === 'walls'
                   ? 'Bangunan & Struktur'
-                  : activeTab === 'furniture'
-                    ? 'Furnitur 3D & Perangkat IoT'
+                  : activeTab === 'devices'
+                    ? 'Perangkat IoT'
                     : 'Material Dinding & Lantai'}
               </span>
               <button
                 type="button"
                 onClick={() => setActiveDrawer(null)}
-                className="w-6 h-6 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-6 h-6 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 title="Tutup Katalog"
               >
                 <X size={14} />
               </button>
             </div>
 
-            {/* Pill Tabs: Struktur | Furnitur & IoT | Material */}
-            <div className="grid grid-cols-3 gap-1 p-2 bg-slate-50/80 border-b border-slate-100">
+            {/* Pill Tabs: Struktur | Perangkat IoT | Material */}
+            <div className="shrink-0 grid grid-cols-3 gap-1 p-2 bg-slate-950/60 border-b border-slate-700/70">
               {[
                 { id: 'walls', label: 'Struktur' },
-                { id: 'furniture', label: 'Furnitur & IoT' },
+                { id: 'devices', label: 'Perangkat IoT' },
                 { id: 'material', label: 'Material' },
               ].map((tab) => {
                 const isAct = activeTab === tab.id;
@@ -4904,8 +6317,8 @@ export default function FloorPlan({
                     onClick={() => setActiveTab(tab.id)}
                     className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-colors cursor-pointer ${
                       isAct
-                        ? 'bg-blue-50 text-blue-600 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+                        ? 'bg-blue-500/15 text-blue-500 border border-blue-500/35'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent'
                     }`}
                   >
                     {tab.label}
@@ -4915,54 +6328,52 @@ export default function FloorPlan({
             </div>
 
             {/* Search Input */}
-            <div className="p-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/80 border border-slate-200/80 focus-within:border-blue-400 focus-within:bg-white">
+            <div className="shrink-0 p-2.5 border-b border-slate-700/70">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 focus-within:border-blue-500 transition-colors">
                 <Search size={13} className="text-slate-400 shrink-0" />
                 <input
                   type="text"
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
-                  placeholder="Cari furnitur, dinding, sensor..."
-                  className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 outline-none"
+                  placeholder="Cari dinding, sekat, atau sensor IoT..."
+                  className="w-full bg-transparent text-xs text-slate-100 placeholder-slate-400 outline-none"
                 />
               </div>
             </div>
 
-            {/* TAB 1: BANGUNAN & STRUKTUR */}
+            {/* TAB 1: BANGUNAN & STRUKTUR (Architectural 2D Symbol Grid) */}
             {activeTab === 'walls' && (
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-4">
-                {/* 1. Mulai dari Polosan & Gambar Dinding Manual */}
-                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">Buat Ruangan dari Polosan</span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-600/10 text-blue-700 text-[10px] font-bold">
-                      Custom Builder
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDrawWallMode(!drawWallMode)}
-                    className={`w-full py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-                      drawWallMode
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-white hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-300'
-                    }`}
-                  >
-                    <Edit3 size={14} />
-                    <span>{drawWallMode ? 'Sedang Menggambar Dinding (Aktif)' : '✏️ Gambar Dinding di Lantai (Titik A → B)'}</span>
-                  </button>
-                  <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-3.5 pb-6 space-y-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500 [&::-webkit-scrollbar-track]:bg-transparent">
+                {/* 1. Gambar Dinding & Ruangan */}
+                <div>
+                  <h4 className="font-bold text-[12px] text-slate-100 mb-2.5">Gambar Dinding</h4>
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setDrawWallMode(false);
-                        setWallsWithHistory(createBlankRoomDefault());
-                        setSelectedObj(null);
-                      }}
-                      className="py-1.5 px-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/90 font-semibold text-[11px] transition-colors cursor-pointer"
+                      onClick={() => setDrawWallMode(!drawWallMode)}
+                      className={`group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                        drawWallMode
+                          ? 'bg-blue-500/15 border-blue-500/50 text-blue-500 shadow-sm'
+                          : 'bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 hover:border-blue-500/40 text-slate-200 hover:text-slate-100'
+                      }`}
+                      title="Gambar Dinding Manual di Lantai (Titik A → B)"
                     >
-                      Ruangan Polosan (4 Sisi)
+                      <ArchSymbol type="draw_wall" active={drawWallMode} dark={!isLightMode} />
+                      <span className="text-[11px] font-medium leading-tight text-center">
+                        {drawWallMode ? 'Aktif' : 'Gambar'}
+                      </span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddTemplate('blank_room', 'Ruang 4 Sisi')}
+                      className="group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 hover:border-blue-500/40 text-slate-200 hover:text-slate-100 transition-all cursor-pointer"
+                      title="Tambah Ruangan Polosan (4 Sisi)"
+                    >
+                      <ArchSymbol type="draw_room" dark={!isLightMode} />
+                      <span className="text-[11px] font-medium leading-tight text-center">Ruang 4 Sisi</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -4970,190 +6381,135 @@ export default function FloorPlan({
                         setWallsWithHistory([]);
                         setSelectedObj(null);
                       }}
-                      className="py-1.5 px-2.5 rounded-xl bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200/90 font-semibold text-[11px] transition-colors cursor-pointer"
+                      className="group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border bg-slate-800/75 hover:bg-rose-500/15 border-slate-700/70 hover:border-rose-500/40 text-slate-200 hover:text-rose-500 transition-all cursor-pointer"
+                      title="Kosongkan Kanvas (0 Sisi)"
                     >
-                      Kanvas Kosong (0 Sisi)
+                      <ArchSymbol type="empty_canvas" dark={!isLightMode} />
+                      <span className="text-[11px] font-medium leading-tight text-center">Kosongkan</span>
                     </button>
                   </div>
                 </div>
 
-                {/* 2. Elemen Dinding & Sekat Satuan */}
+                {/* 1B. Template Denah Ruangan (Siap Pakai & Bisa Digabung) */}
                 <div>
-                  <h4 className="font-bold text-slate-800 text-xs mb-2">Tambah Dinding & Sekat Satuan</h4>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="font-bold text-[12px] text-slate-100">Template Denah</h4>
+                    <span className="text-[10px] font-medium text-slate-400">Klik untuk tambah</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
                     {[
-                      { title: 'Dinding Putih', props: { scale: [4, 4, 0.35], materialPreset: 'matte_slate', name: 'Dinding Putih' } },
-                      { title: 'Dinding Espresso', props: { scale: [4, 4, 0.35], materialPreset: 'accent_espresso', name: 'Dinding Aksen Espresso' } },
-                      { title: 'Partisi Kaca', props: { type: 'glass_wall', materialPreset: 'glass_frosted', scale: [4.5, 4, 0.22], name: 'Partisi Kaca' } },
-                      { title: 'Jendela Panorama', props: { type: 'window_wall', scale: [6, 4, 0.35], name: 'Jendela Panorama' } },
+                      { id: 'tpl_studio', label: 'Ruang Kotak', title: 'Tambah Template Ruang Kotak 10×8m' },
+                      { id: 'tpl_l_room', label: 'Bentuk L', title: 'Tambah Template Ruangan Bentuk L' },
+                      { id: 'tpl_two_zone', label: '2 Zona', title: 'Tambah Template 2 Ruang dengan Sekat & Pintu' },
+                      { id: 'tpl_office_4', label: 'Kantor 4R', title: 'Tambah Template Kantor 4 Ruang & Partisi Kaca' },
+                      { id: 'tpl_house_3br', label: 'Rumah 3K', title: 'Tambah Template Rumah 3 Kamar & Ruang Tengah' },
+                      { id: 'tpl_iot_lab', label: 'Lab / Server', title: 'Tambah Template Lab IoT / Ruang Server' },
+                      { id: 'tpl_warehouse', label: 'Gudang IoT', title: 'Tambah Template Gudang Industri & Ruang Kontrol' },
+                      { id: 'tpl_greenhouse', label: 'Greenhouse', title: 'Tambah Template Smart Greenhouse / Hidroponik' },
+                      { id: 'tpl_cafe_shop', label: 'Kafe / Toko', title: 'Tambah Template Kafe / Toko Retail' },
+                      { id: 'tpl_apartment', label: 'Apartemen', title: 'Tambah Template Apartemen Studio' },
                     ]
-                      .filter((item) => matchesSearch(item.title))
-                      .map((item) => (
+                      .filter((tpl) => matchesSearch(tpl.label) || matchesSearch(tpl.title))
+                      .map((tpl) => (
                         <button
-                          key={item.title}
+                          key={tpl.id}
                           type="button"
-                          onClick={() => handleAddWall(item.props)}
-                          className="flex flex-col items-start gap-1 p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300 transition-colors cursor-pointer text-left"
+                          onClick={() => handleAddTemplate(tpl.id, tpl.label)}
+                          className="group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 hover:border-blue-500/40 text-slate-200 hover:text-blue-500 transition-all cursor-pointer"
+                          title={tpl.title}
                         >
-                          <span className="text-xs font-bold text-slate-800">{item.title}</span>
-                          <span className="text-[10px] text-slate-500">+ Tambah ke kanvas</span>
+                          <ArchSymbol type={tpl.id} dark={!isLightMode} />
+                          <span className="text-[11px] font-medium leading-tight text-center">{tpl.label}</span>
                         </button>
                       ))}
                   </div>
                 </div>
 
-                {/* 3. Pintu & Bukaan */}
+                {/* 2. Pintu & Jendela */}
                 <div>
-                  <h4 className="font-bold text-slate-800 text-xs mb-2">Pintu & Bukaan</h4>
-                  <div className="space-y-1.5">
+                  <h4 className="font-bold text-[12px] text-slate-100 mb-2.5">Pintu &amp; Jendela</h4>
+                  <div className="grid grid-cols-3 gap-2">
                     {[
-                      { type: 'door_wall', title: 'Dinding + Pintu Tengah', scale: [8, 4, 0.35] },
-                      { type: 'door_wall_left', title: 'Dinding + Pintu Kiri', scale: [8, 4, 0.35] },
-                      { type: 'door_wall_right', title: 'Dinding + Pintu Kanan', scale: [8, 4, 0.35] },
-                      { type: 'door_wall_double', title: 'Dinding + Pintu Ganda', scale: [10, 4, 0.35] },
+                      { type: 'door_wall', symbol: 'door_wall', label: 'Pintu Tengah', title: 'Dinding + Pintu Tengah', scale: [8, 4, 0.35] },
+                      { type: 'door_wall_double', symbol: 'door_wall_double', label: 'Pintu Ganda', title: 'Dinding + Pintu Ganda', scale: [10, 4, 0.35] },
+                      { type: 'sliding_door', symbol: 'sliding_door', label: 'Pintu Geser', title: 'Pintu Geser Kaca', scale: [7, 4, 0.35] },
+                      { type: 'door_wall_left', symbol: 'door_wall_left', label: 'Pintu Kiri', title: 'Dinding + Pintu Kiri', scale: [8, 4, 0.35] },
+                      { type: 'door_wall_right', symbol: 'door_wall_right', label: 'Pintu Kanan', title: 'Dinding + Pintu Kanan', scale: [8, 4, 0.35] },
+                      { type: 'window_wall', symbol: 'window_wall', label: 'Jendela', title: 'Jendela Panorama', scale: [6, 4, 0.35] },
+                      { type: 'french_window', symbol: 'french_window', label: 'Jendela Penuh', title: 'Jendela Kaca Penuh (French Window)', scale: [6.5, 4, 0.35] },
+                      { type: 'bay_window', symbol: 'bay_window', label: 'Jendela Teluk', title: 'Jendela Teluk (Bay Window)', scale: [6, 4, 0.35] },
+                      { type: 'corner_window', symbol: 'corner_window', label: 'Jendela Sudut', title: 'Jendela Sudut 90°', scale: [4.2, 4, 4.2] },
+                      { type: 'glass_wall', symbol: 'glass_wall', label: 'Partisi Kaca', title: 'Partisi Kaca', scale: [4.5, 4, 0.22], materialPreset: 'glass_frosted' },
                     ]
-                      .filter((item) => matchesSearch(item.title))
+                      .filter((item) => matchesSearch(item.label) || matchesSearch(item.title))
                       .map((item) => (
                         <button
                           key={item.type}
                           type="button"
-                          onClick={() => handleAddWall({ type: item.type, scale: item.scale, name: item.title })}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300 transition-colors cursor-pointer text-left"
+                          onClick={() =>
+                            handleAddWall({
+                              type: item.type,
+                              scale: item.scale,
+                              name: item.title,
+                              ...(item.materialPreset ? { materialPreset: item.materialPreset } : {}),
+                            })
+                          }
+                          className="group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 hover:border-blue-500/40 text-slate-200 hover:text-blue-500 transition-all cursor-pointer"
+                          title={item.title}
                         >
-                          <span className="text-xs font-semibold text-slate-700">{item.title}</span>
-                          <PlusSquare size={14} className="text-slate-400" />
+                          <ArchSymbol type={item.symbol} dark={!isLightMode} />
+                          <span className="text-[11px] font-medium leading-tight text-center">{item.label}</span>
                         </button>
                       ))}
                   </div>
                 </div>
 
-                {/* 4. Contoh Template Suite HomeByMe (Opsional) */}
-                <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-950">Contoh Suite Kamar HomeByMe</span>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-900 text-[10px] font-bold">
-                      Template
-                    </span>
+                {/* 3. Struktur & Dinding */}
+                <div>
+                  <h4 className="font-bold text-[12px] text-slate-100 mb-2.5">Struktur &amp; Dinding</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: 'wall_white', symbol: 'wall_white', label: 'Dinding Putih', props: { scale: [4, 4, 0.35], materialPreset: 'matte_slate', name: 'Dinding Putih' } },
+                      { key: 'wall_espresso', symbol: 'wall_espresso', label: 'Dinding Gelap', props: { scale: [4, 4, 0.35], materialPreset: 'accent_espresso', name: 'Dinding Aksen Espresso' } },
+                      { key: 'wall_wood', symbol: 'wall_wood', label: 'Panel Kayu', props: { scale: [4, 4, 0.35], materialPreset: 'warm_wood', name: 'Dinding Panel Kayu' } },
+                      { key: 'wall_half', symbol: 'wall_half', label: 'Sekat Rendah', props: { scale: [4, 1.5, 0.28], materialPreset: 'matte_slate', name: 'Dinding Sekat Rendah' } },
+                      { key: 'wall_l_shape', symbol: 'wall_l_shape', label: 'Sudut L', props: { type: 'wall_l_shape', scale: [4.2, 4, 4.2], materialPreset: 'matte_slate', name: 'Dinding Sudut L' } },
+                      { key: 'wall_u_shape', symbol: 'wall_u_shape', label: 'Bentuk U', props: { type: 'wall_u_shape', scale: [4.5, 4, 3.2], materialPreset: 'matte_slate', name: 'Dinding Bentuk U' } },
+                      { key: 'square_opening', symbol: 'square_opening', label: 'Bukaan Kotak', props: { type: 'square_opening', scale: [6, 4, 0.35], materialPreset: 'matte_slate', name: 'Bukaan Dinding Kotak' } },
+                      { key: 'arch_opening', symbol: 'arch_opening', label: 'Bukaan Lengkung', props: { type: 'arch_opening', scale: [6, 4, 0.35], materialPreset: 'matte_slate', name: 'Bukaan Lengkung (Arch)' } },
+                      { key: 'stair_block', symbol: 'stair_block', label: 'Tangga', props: { type: 'stair_block', scale: [2.4, 2.6, 3.8], materialPreset: 'warm_wood', name: 'Tangga 3D' } },
+                    ]
+                      .filter((item) => matchesSearch(item.label) || matchesSearch(item.props.name))
+                      .map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => handleAddWall(item.props)}
+                          className="group flex flex-col items-center justify-start gap-1.5 p-2 rounded-xl border bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 hover:border-blue-500/40 text-slate-200 hover:text-blue-500 transition-all cursor-pointer"
+                          title={item.props.name}
+                        >
+                          <ArchSymbol type={item.symbol} dark={!isLightMode} />
+                          <span className="text-[11px] font-medium leading-tight text-center">{item.label}</span>
+                        </button>
+                      ))}
                   </div>
-                  <p className="text-[11px] text-amber-900/80 leading-relaxed">
-                    Ingin melihat contoh kamar yang sudah jadi? Klik di bawah untuk memuat suite lengkap (semua item tetap bisa diedit/dihapus).
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDrawWallMode(false);
-                      setWallsWithHistory(createHomeByMeDefaultSuite(cleanRoomTitle));
-                      setSelectedObj(null);
-                    }}
-                    className="w-full py-1.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    Muat Contoh Suite HomeByMe
-                  </button>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: FURNITUR 3D & PERANGKAT IOT */}
-            {activeTab === 'furniture' && (() => {
+            {/* TAB 2: PERANGKAT IOT */}
+            {activeTab === 'devices' && (() => {
               const unassignedDevices = roomId !== 'default' ? devices.filter((d) => !d.room_id) : [];
-              const singleFurnitureCatalog = [
-                { furnitureType: 'queen_bed', title: 'Kasur Queen & Headboard', desc: 'Tempat tidur utama + bantal (satuan)', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'foot_bench', title: 'Bench Kaki Kasur', desc: 'Sofa bench panjang ujung tempat tidur', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'nightstand', title: 'Meja Nakas Samping', desc: 'Meja samping tempat tidur satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'pendant_lamp', title: 'Lampu Gantung Plafon', desc: 'Lampu gantung hangat satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'wall_art', title: 'Lukisan Dinding Frame', desc: 'Bingkai lukisan lanskap dinding', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'wardrobe', title: 'Lemari Pakaian Built-in', desc: 'Kabinet lemari tinggi kayu taupe', pos: [0, 0, 0], scale: [2.8, 3.6, 1.05] },
-                { furnitureType: 'vanity_table', title: 'Meja Rias / Kerja Konsol', desc: 'Meja konsol kayu gantung satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'wall_mirror', title: 'Cermin Dinding Berlampu', desc: 'Cermin besar dengan lampu LED rias', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'accent_chair', title: 'Kursi Rias / Kursi Kerja', desc: 'Kursi kayu & bantalan satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'area_rug', title: 'Karpet Area Lantai', desc: 'Karpet lantai tekstil lembut', pos: [0, 0.02, 0], scale: [4.8, 1, 3.8] },
-                { furnitureType: 'curtain_drape', title: 'Tirai Jendela Tinggi', desc: 'Tirai lipit lantai-ke-plafon', pos: [0, 2.0, 0], scale: [5.0, 3.8, 0.22] },
-                { furnitureType: 'sofa_only', title: 'Sofa Lounge 3-Dudukan', desc: 'Sofa ruang tamu satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'coffee_table', title: 'Meja Kopi Kayu Oak', desc: 'Meja tamu kayu rendah satuan', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'tv_console', title: 'Meja Konsol & Smart TV', desc: 'Kabinet media kayu + layar TV', pos: [0, 0, 0], scale: [1, 1, 1] },
-                { furnitureType: 'indoor_plant', title: 'Tanaman Hias Monstera', desc: 'Pot keramik putih + tanaman hijau', pos: [0, 0, 0], scale: [1, 1, 1] },
-              ];
-
-              const bundleFurnitureCatalog = [
-                { furnitureType: 'bed_suite', title: 'Paket Tempat Tidur Lengkap', desc: 'Kasur + bench + 2 nakas + 2 lampu + lukisan', pos: [0, 0, -1.5], scale: [1, 1, 1] },
-                { furnitureType: 'vanity_desk', title: 'Paket Meja Rias Lengkap', desc: 'Meja konsol + kursi + cermin lampu', pos: [3.5, 0, 1.0], scale: [2.2, 1, 0.85] },
-                { furnitureType: 'sofa_suite', title: 'Paket Sofa & Meja Kopi', desc: 'Sofa 3-dudukan + coffee table kayu', pos: [0, 0, 0.5], scale: [1, 1, 1] },
-              ];
-
-              const spawnFurnitureItem = (item) => {
-                const spawn = getSpawnPosition();
-                const newFurn = {
-                  id: 'furn_' + Date.now(),
-                  type: 'furniture',
-                  furnitureType: item.furnitureType,
-                  name: item.title,
-                  position: [spawn[0], item.pos[1], spawn[2]],
-                  rotation: [0, 0, 0],
-                  scale: item.scale,
-                };
-                setWallsWithHistory((prev) => [...prev, newFurn]);
-                setSelectedObj({ type: 'wall', id: newFurn.id });
-                if (transformMode === 'select') setTransformMode('translate');
-              };
 
               return (
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-4">
-                  {/* 1. Furnitur 3D Satuan (Rakit Sendiri dari Polosan) */}
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs mb-1">Furnitur Satuan (Rakit Sendiri)</h4>
-                    <p className="text-[10.5px] text-slate-500 mb-2">
-                      Klik item untuk menaruh di ruangan, lalu geser, putar, atau ubah warnanya.
-                    </p>
-                    <div className="space-y-1.5">
-                      {singleFurnitureCatalog
-                        .filter((f) => matchesSearch(f.title) || matchesSearch(f.desc))
-                        .map((item) => (
-                          <button
-                            key={item.furnitureType}
-                            type="button"
-                            onClick={() => spawnFurnitureItem(item)}
-                            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-300 transition-colors cursor-pointer text-left"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="text-xs font-bold text-slate-800 truncate">{item.title}</div>
-                              <div className="text-[10.5px] text-slate-500 truncate">{item.desc}</div>
-                            </div>
-                            <PlusSquare size={15} className="text-blue-600 shrink-0" />
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-
-                  {/* 2. Paket Furnitur Cepat (Bundle) */}
-                  <div className="pt-2 border-t border-slate-200/80">
-                    <h4 className="font-bold text-slate-800 text-xs mb-2">Paket Furnitur Cepat (Bundle)</h4>
-                    <div className="space-y-1.5">
-                      {bundleFurnitureCatalog
-                        .filter((f) => matchesSearch(f.title) || matchesSearch(f.desc))
-                        .map((item) => (
-                          <button
-                            key={item.furnitureType}
-                            type="button"
-                            onClick={() => spawnFurnitureItem(item)}
-                            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200/80 transition-colors cursor-pointer text-left"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="text-xs font-bold text-amber-950 truncate">{item.title}</div>
-                              <div className="text-[10.5px] text-amber-800/80 truncate">{item.desc}</div>
-                            </div>
-                            <PlusSquare size={15} className="text-amber-700 shrink-0" />
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-3.5 pb-6 space-y-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500 [&::-webkit-scrollbar-track]:bg-transparent">
                   {/* Perangkat Smart IoT di Ruangan Ini */}
-                  <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                    <h4 className="font-bold text-slate-800 text-xs">
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-xs text-slate-100">
                       Perangkat IoT ({currentRoomDevices.length})
                     </h4>
                     {currentRoomDevices.length === 0 ? (
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-slate-400">
                         Belum ada sensor/perangkat IoT yang ditautkan ke ruangan ini.
                       </p>
                     ) : (
@@ -5168,19 +6524,19 @@ export default function FloorPlan({
                               onClick={() => setSelectedObj({ type: isPlaced ? 'device' : 'device_spawn', id: dev.id })}
                               className={`p-2.5 rounded-xl border transition-colors cursor-pointer flex items-center justify-between ${
                                 isSelected
-                                  ? 'bg-blue-50 border-blue-300'
-                                  : 'bg-slate-50 border-slate-200/80 hover:border-slate-300'
+                                  ? 'bg-blue-500/15 border-blue-500/40'
+                                  : 'bg-slate-800/75 border-slate-700/70 hover:border-slate-600'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                                  isPlaced ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'
+                                  isPlaced ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-700/70 text-slate-400'
                                 }`}>
                                   <Cpu size={14} />
                                 </div>
                                 <div className="min-w-0">
-                                  <div className="text-xs font-bold text-slate-800 truncate">{dev.name}</div>
-                                  <div className="text-[10px] text-slate-500">
+                                  <div className="text-xs font-bold text-slate-100 truncate">{dev.name}</div>
+                                  <div className="text-[10px] text-slate-400">
                                     {isPlaced ? 'Terpasang di 3D' : 'Klik untuk pasang di lantai'}
                                   </div>
                                 </div>
@@ -5192,7 +6548,7 @@ export default function FloorPlan({
                                     e.stopPropagation();
                                     handleRemoveDevicePosition(dev.id);
                                   }}
-                                  className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                                  className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
                                   title="Lepas dari posisi 3D"
                                 >
                                   <X size={13} />
@@ -5213,10 +6569,10 @@ export default function FloorPlan({
                             key={dev.id}
                             type="button"
                             onClick={() => handlePlaceDevice(dev.id, getSpawnPosition())}
-                            className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 text-left transition-colors cursor-pointer"
+                            className="w-full flex items-center justify-between p-2 rounded-xl border bg-slate-800/75 hover:bg-slate-800 border-slate-700/70 text-slate-100 text-left transition-colors cursor-pointer"
                           >
-                            <span className="text-xs font-semibold text-slate-700 truncate">{dev.name}</span>
-                            <PlusSquare size={14} className="text-blue-600 shrink-0" />
+                            <span className="text-xs font-semibold truncate">{dev.name}</span>
+                            <PlusSquare size={14} className="text-blue-500 shrink-0" />
                           </button>
                         ))}
                       </div>
@@ -5228,10 +6584,10 @@ export default function FloorPlan({
 
             {/* TAB 3: MATERIAL DINDING & LANTAI KAYU */}
             {activeTab === 'material' && (
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-3.5 space-y-4">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-3.5 pb-6 space-y-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-500 [&::-webkit-scrollbar-track]:bg-transparent">
                 {/* Pilihan Lantai Interior (Parket Kayu / Keramik) */}
                 <div>
-                  <h4 className="font-bold text-slate-800 text-xs mb-2">Material Lantai Ruangan</h4>
+                  <h4 className="font-bold text-xs text-slate-100 mb-2">Material Lantai Ruangan</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.values(FLOOR_MATERIALS).map((fl) => {
                       const isSel = floorPreset === fl.id;
@@ -5242,12 +6598,12 @@ export default function FloorPlan({
                           onClick={() => setFloorPreset(fl.id)}
                           className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-colors cursor-pointer text-left ${
                             isSel
-                              ? 'bg-blue-50 border-blue-300 text-blue-900'
-                              : 'bg-slate-50 border-slate-200/80 hover:border-slate-300 text-slate-700'
+                              ? 'bg-blue-500/15 border-blue-500/40 text-blue-500'
+                              : 'bg-slate-800/75 border-slate-700/70 hover:border-slate-600 text-slate-200'
                           }`}
                         >
                           <span
-                            className="w-5 h-5 rounded-md border border-black/10 shrink-0"
+                            className="w-5 h-5 rounded-md border border-slate-600/40 shrink-0"
                             style={{ backgroundColor: fl.color }}
                           />
                           <span className="text-[11px] font-bold leading-tight">{fl.label}</span>
@@ -5258,9 +6614,9 @@ export default function FloorPlan({
                 </div>
 
                 {/* Pilihan Cat & Material Dinding */}
-                <div className="pt-2 border-t border-slate-200/80">
-                  <h4 className="font-bold text-slate-800 text-xs mb-1">Cat & Material Dinding</h4>
-                  <p className="text-[11px] text-slate-500 mb-2.5">
+                <div className="pt-2 border-t border-slate-700/70">
+                  <h4 className="font-bold text-xs text-slate-100 mb-1">Cat &amp; Material Dinding</h4>
+                  <p className="text-[11px] text-slate-400 mb-2.5">
                     Pilih dinding terlebih dahulu untuk mengecat 1 sisi, atau klik langsung untuk menerapkan.
                   </p>
                   <div className="space-y-1.5">
@@ -5274,18 +6630,18 @@ export default function FloorPlan({
                           onClick={() => applyMaterialToSelectionOrAll(mat.id)}
                           className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-colors cursor-pointer ${
                             isSelectedMat
-                              ? 'bg-blue-50 border-blue-300 text-blue-900'
-                              : 'bg-slate-50 border-slate-200/80 hover:border-slate-300 text-slate-700'
+                              ? 'bg-blue-500/15 border-blue-500/40 text-blue-500'
+                              : 'bg-slate-800/75 border-slate-700/70 hover:border-slate-600 text-slate-200'
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
                             <span
-                              className="w-6 h-6 rounded-lg border border-black/15 shadow-2xs"
+                              className="w-6 h-6 rounded-lg border border-slate-600/40 shadow-2xs"
                               style={{ backgroundColor: mat.swatch, opacity: mat.opacity }}
                             />
                             <span className="text-xs font-bold">{mat.label}</span>
                           </div>
-                          {isSelectedMat && <Check size={14} className="text-blue-600" />}
+                          {isSelectedMat && <Check size={14} className="text-blue-500" />}
                         </button>
                       );
                     })}

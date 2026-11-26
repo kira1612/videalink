@@ -667,6 +667,11 @@
   animation: scrollPulseDown 1.8s ease-in-out infinite;
 }
 
+/* Prevent Tailwind space-y-* / space-x-* from shifting fixed full-screen modal backdrops off viewport edges */
+.fixed.inset-0 {
+  margin: 0 !important;
+}
+
 /* Photosensitive Epilepsy (PSE) & Reduced Motion Protection (WCAG 2.3.1 / 2.3.3) */
 @media (prefers-reduced-motion: reduce) {
   *,
