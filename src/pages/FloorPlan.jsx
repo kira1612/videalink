@@ -838,7 +838,7 @@ function SmartDeviceNode({ device, position, isEditMode, isSelected, onClick, on
 /* ─────────────────────────────────────────────────────────────────────────
    Wall Block Component (Supports Standard Wall, Glass Partition & HomeByMe Automatic Front-Wall Cutaway)
 ───────────────────────────────────────────────────────────────────────── */
-const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
+const WallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing = false }, ref) => {
   const groupRef = useRef();
   const matRef = useRef();
   const capMatRef = useRef();
@@ -846,7 +846,9 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
   const isLightMode = useIsLightMode();
   useCursor(hovered);
 
-  const matProps = getWallMatProps(wall, isSelected, hovered, isLightMode);
+  const matProps = isCapturing
+    ? { color: isSelected ? '#3b82f6' : '#4b5563', roughness: 0.92, metalness: 0.05, transparent: false, opacity: 1, depthWrite: true }
+    : getWallMatProps(wall, isSelected, hovered, isLightMode);
   const isGlass = wall?.type === 'glass_wall' || wall?.materialPreset === 'glass_frosted';
 
   const setCombinedRef = (node) => {
@@ -868,13 +870,13 @@ const WallBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
       <RoundedBox 
         args={[1, 1, 1]} 
         radius={0.02} 
-        receiveShadow 
-        castShadow={!isGlass}
+        receiveShadow={!isCapturing}
+        castShadow={!isGlass && !isCapturing}
       >
         <meshStandardMaterial ref={matRef} {...matProps} />
       </RoundedBox>
       {/* Crisp architectural wall-top cap trim */}
-      {!isGlass && (
+      {!isGlass && !isCapturing && (
         <mesh position={[0, 0.502, 0]}>
           <boxGeometry args={[1.004, 0.018, 1.02]} />
           <meshStandardMaterial ref={capMatRef} color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} />
@@ -1240,6 +1242,11 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
   const calculatedFontSize = wall.fontSize || Math.min(1.15, Math.max(0.68, 9.5 / (labelText.length || 7)));
 
   const isAlreadyFlat = Math.abs((wall.rotation?.[0] || 0) + Math.PI / 2) < 0.2;
+  const resolvedColor =
+    wall.customColor ||
+    wall.color ||
+    WALL_MATERIALS[wall.materialPreset]?.swatch ||
+    (isLightMode ? '#1e293b' : '#cbd5e1');
 
   return (
     <group 
@@ -1252,19 +1259,21 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
       onPointerOut={() => setHovered(false)}
     >
       <Text
-        position={[0, 0.04, 0]}
+        position={[0, isCapturing ? 0.25 : 0.04, 0]}
         rotation={isAlreadyFlat ? [0, 0, 0] : [-Math.PI / 2, 0, 0]}
         font={wall.fontFamily || undefined}
         fontSize={calculatedFontSize}
         maxWidth={5.2}
         lineHeight={1.15}
         textAlign="center"
-        color={isCapturing ? '#000000' : (isSelected ? '#38bdf8' : (hovered ? '#60a5fa' : (wall.color || (isLightMode ? '#1e293b' : '#cbd5e1'))))}
+        color={isCapturing ? '#000000' : resolvedColor}
+        outlineWidth={isCapturing ? 0 : (isSelected ? 0.035 : (hovered ? 0.02 : 0))}
+        outlineColor={isSelected ? '#38bdf8' : '#60a5fa'}
         anchorX="center"
         anchorY="middle"
         fontStyle={wall.italic ? 'italic' : 'normal'}
         fontWeight={wall.bold || isCapturing ? 'bold' : '800'}
-        fillOpacity={isSelected || hovered ? 0.95 : (wall.opacity !== undefined ? wall.opacity : (isLightMode ? 0.82 : 0.78))}
+        fillOpacity={isCapturing ? 1 : (isSelected || hovered ? 0.95 : (wall.opacity !== undefined ? wall.opacity : (isLightMode ? 0.82 : 0.78)))}
       >
         {labelText}
       </Text>
@@ -1275,12 +1284,14 @@ const TextLabelBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturin
 /* ─────────────────────────────────────────────────────────────────────────
    Room Group Block (4 Walls as 1 Object)
 ───────────────────────────────────────────────────────────────────────── */
-const RoomGroupBlock = React.forwardRef(({ wall, isSelected, onClick }, ref) => {
+const RoomGroupBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing = false }, ref) => {
   const [hovered, setHovered] = useState(false);
   const isLightMode = useIsLightMode();
   useCursor(hovered);
 
-  const matProps = getWallMatProps(wall, isSelected, hovered, isLightMode);
+  const matProps = isCapturing
+    ? { color: isSelected ? '#3b82f6' : '#4b5563', roughness: 0.92, metalness: 0.05, transparent: false, opacity: 1, depthWrite: true }
+    : getWallMatProps(wall, isSelected, hovered, isLightMode);
 
   return (
     <group 
@@ -1370,7 +1381,7 @@ const CustomGroupBlock = React.forwardRef(({ wall, isSelected, onClick, selected
         if (isArchSpecialType(child.type)) {
           return <DoorWallBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} isCapturing={isCapturing} />;
         }
-        return <WallBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} />;
+        return <WallBlock key={child.id || idx} wall={childWithInheritedMaterial} isSelected={groupHighlight} onClick={(e) => handleChildClick(e, child)} isCapturing={isCapturing} />;
       })}
     </group>
   );
@@ -1478,6 +1489,318 @@ function WallResizeHandles({ object, orbitRef, onCommit }) {
           </div>
         </Html>
       </group>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Window Position Drag Handle
+   Lets the user drag a window opening directly along its host wall.
+───────────────────────────────────────────────────────────────────────── */
+const WINDOW_DRAG_TYPES = new Set(['window_wall', 'french_window', 'bay_window']);
+
+function getWindowLocalWidth(wall, count) {
+  const safeCount = Math.max(1, Math.min(4, Math.round(count) || 1));
+  const wallW = wall?.scale?.[0] || 1;
+  const edgeMargin = 0.02;
+  const maxPerWin = Math.max(0.08, (1 - 2 * edgeMargin) / safeCount);
+  if (typeof wall?.windowWidth === 'number' && Number.isFinite(wall.windowWidth) && wall.windowWidth > 0) {
+    return Math.max(0.08, Math.min(wall.windowWidth / wallW, maxPerWin));
+  }
+  if (safeCount === 1) {
+    if (wall?.type === 'french_window') return Math.min(4.8 / wallW, 0.8);
+    if (wall?.type === 'bay_window') return 0.62;
+    return Math.min(4.2 / wallW, 0.72);
+  }
+  const baseWorldW = wall?.type === 'french_window' ? 3.4 : wall?.type === 'bay_window' ? wallW * 0.38 : 3.0;
+  const targetWorldW = safeCount >= 3 ? Math.min(baseWorldW, 2.3) : baseWorldW;
+  return Math.max(0.08, Math.min(targetWorldW / wallW, maxPerWin));
+}
+
+function buildEvenWindowOffsets(wall, count) {
+  const safeCount = Math.max(1, Math.min(4, Math.round(count) || 1));
+  if (safeCount === 1) return [0];
+  const winLocalW = getWindowLocalWidth(wall, safeCount);
+  const gap = Math.max(0, (1 - safeCount * winLocalW) / (safeCount + 1));
+  return Array.from({ length: safeCount }, (_, i) => -0.5 + gap * (i + 1) + winLocalW * (i + 0.5));
+}
+
+function buildMergedWindowOffsets(wall, count) {
+  const safeCount = Math.max(1, Math.min(4, Math.round(count) || 1));
+  if (safeCount === 1) return [0];
+  const winLocalW = getWindowLocalWidth(wall, safeCount);
+  const totalSpan = safeCount * winLocalW;
+  const start = -totalSpan / 2;
+  return Array.from({ length: safeCount }, (_, i) => start + winLocalW * (i + 0.5));
+}
+
+function getWallWindowsLayout(wall) {
+  const edgeMargin = 0.02;
+  const minGap = 0; // Allow adjacent windows to touch & merge seamlessly with zero pillar
+
+  const rawOffsets =
+    Array.isArray(wall?.windowOffsets) && wall.windowOffsets.length > 0
+      ? wall.windowOffsets.slice(0, 4).map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0))
+      : [typeof wall?.windowOffset === 'number' && Number.isFinite(wall.windowOffset) ? wall.windowOffset : 0];
+
+  const count = rawOffsets.length;
+  const winLocalW = getWindowLocalWidth(wall, count);
+
+  const minBound = -0.5 + edgeMargin + winLocalW / 2;
+  const maxBound = 0.5 - edgeMargin - winLocalW / 2;
+
+  const positions = rawOffsets.map((o) => Math.max(minBound, Math.min(maxBound, o)));
+  for (let i = 1; i < count; i++) {
+    positions[i] = Math.max(positions[i], positions[i - 1] + winLocalW + minGap);
+  }
+  for (let i = count - 2; i >= 0; i--) {
+    positions[i] = Math.min(positions[i], positions[i + 1] - winLocalW - minGap);
+  }
+  for (let i = 0; i < count; i++) {
+    positions[i] = Math.max(minBound, Math.min(maxBound, positions[i]));
+  }
+
+  const windows = positions.map((centerX, idx) => {
+    const leftEdge = centerX - winLocalW / 2;
+    const rightEdge = centerX + winLocalW / 2;
+    const minOffset = idx === 0 ? minBound : positions[idx - 1] + winLocalW + minGap;
+    const maxOffset = idx === count - 1 ? maxBound : positions[idx + 1] - winLocalW - minGap;
+    return {
+      index: idx,
+      centerX,
+      winW: winLocalW,
+      leftEdge,
+      rightEdge,
+      minOffset: Math.min(centerX, minOffset),
+      maxOffset: Math.max(centerX, maxOffset),
+      leftW: Math.max(0, 0.5 + leftEdge),
+      rightW: Math.max(0, 0.5 - rightEdge),
+    };
+  });
+
+  const solidSegments = [];
+  let cursor = -0.5;
+  for (const win of windows) {
+    const segW = win.leftEdge - cursor;
+    if (segW > 0.012) {
+      solidSegments.push({ start: cursor, end: win.leftEdge, width: segW, center: (cursor + win.leftEdge) / 2 });
+    }
+    cursor = Math.max(cursor, win.rightEdge);
+  }
+  const tailW = 0.5 - cursor;
+  if (tailW > 0.012) {
+    solidSegments.push({ start: cursor, end: 0.5, width: tailW, center: (cursor + 0.5) / 2 });
+  }
+
+  return { count, winLocalW, windows, solidSegments };
+}
+
+function getWindowLayout(wall) {
+  const { winLocalW, windows } = getWallWindowsLayout(wall);
+  const first = windows[0] || { centerX: 0, maxOffset: 0, leftW: 0, rightW: 0 };
+  return {
+    winLocalW,
+    maxOffset: Math.max(0, first.maxOffset),
+    centerX: first.centerX,
+    leftW: first.leftW,
+    rightW: first.rightW,
+  };
+}
+
+function WindowPositionHandle({ object, wall, windowIndex = 0, totalWindows = 1, orbitRef, onPreview, onCommit }) {
+  const { camera, gl } = useThree();
+  const handleRef = useRef();
+  const cleanupRef = useRef(null);
+  const [active, setActive] = useState(false);
+  const [hover, setHover] = useState(false);
+  useCursor(hover || active, active ? 'grabbing' : 'grab');
+
+  const axis = useRef(new THREE.Vector3());
+
+  const fullLayout = getWallWindowsLayout(wall);
+  const winInfo = fullLayout.windows[windowIndex];
+  const wallW = object?.scale?.x || wall?.scale?.[0] || 1;
+  const leftMeters = Math.max(0, (winInfo?.leftW || 0) * wallW);
+  const rightMeters = Math.max(0, (winInfo?.rightW || 0) * wallW);
+
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+    };
+  }, []);
+
+  useFrame(() => {
+    if (!object || !handleRef.current) return;
+    const currentWin = getWallWindowsLayout(wall).windows[windowIndex];
+    if (!currentWin) return;
+    axis.current.set(1, 0, 0).applyQuaternion(object.quaternion).normalize();
+    handleRef.current.position
+      .copy(object.position)
+      .addScaledVector(axis.current, currentWin.centerX * object.scale.x);
+    handleRef.current.position.y = object.position.y + object.scale.y / 2 + 0.32;
+    handleRef.current.quaternion.copy(object.quaternion);
+  });
+
+  const startDrag = (clientX, clientY) => {
+    if (!object) return;
+    const currentLayout = getWallWindowsLayout(wall);
+    const currentWin = currentLayout.windows[windowIndex];
+    if (!currentWin) return;
+    cleanupRef.current?.();
+    if (orbitRef?.current) orbitRef.current.enabled = false;
+
+    const wallWorldPos = new THREE.Vector3();
+    const wallWorldQuat = new THREE.Quaternion();
+    object.getWorldPosition(wallWorldPos);
+    object.getWorldQuaternion(wallWorldQuat);
+    const uWorld = new THREE.Vector3(1, 0, 0).applyQuaternion(wallWorldQuat).normalize();
+
+    const rect = gl.domElement.getBoundingClientRect();
+    const p0 = wallWorldPos.clone().project(camera);
+    const p1 = wallWorldPos.clone().add(uWorld).project(camera);
+    const sx = (p1.x - p0.x) * (rect.width / 2);
+    const sy = -(p1.y - p0.y) * (rect.height / 2);
+    const lenSq = sx * sx + sy * sy;
+
+    const wallScaleX = object.scale.x || wall?.scale?.[0] || 1;
+    const startOffsets = currentLayout.windows.map((w) => w.centerX);
+    const startOffset = currentWin.centerX;
+    let lastOffsets = [...startOffsets];
+
+    setActive(true);
+
+    const onWindowMove = (ev) => {
+      if (lenSq < 1) return;
+      const dx = ev.clientX - clientX;
+      const dy = ev.clientY - clientY;
+      const deltaMeters = (dx * sx + dy * sy) / lenSq;
+      const startWorldOffset = startOffset * wallScaleX;
+      const snappedWorldOffset = Math.round((startWorldOffset + deltaMeters) * 20) / 20; // snap 5 cm
+      let nextOffset = Math.max(currentWin.minOffset, Math.min(currentWin.maxOffset, snappedWorldOffset / wallScaleX));
+      // Magnetic snap to adjacent window so they merge seamlessly (gap = 0)
+      const mergeSnapThreshold = Math.min(0.025, 0.15 / wallScaleX);
+      if (windowIndex > 0 && nextOffset - currentWin.minOffset < mergeSnapThreshold) {
+        nextOffset = currentWin.minOffset;
+      } else if (windowIndex < totalWindows - 1 && currentWin.maxOffset - nextOffset < mergeSnapThreshold) {
+        nextOffset = currentWin.maxOffset;
+      }
+      lastOffsets = startOffsets.map((o, idx) => (idx === windowIndex ? nextOffset : o));
+      onPreview?.(lastOffsets);
+    };
+
+    const stopListeners = () => {
+      window.removeEventListener('pointermove', onWindowMove);
+      window.removeEventListener('pointerup', onWindowUp);
+      window.removeEventListener('pointercancel', onWindowCancel);
+      cleanupRef.current = null;
+      setActive(false);
+      if (orbitRef?.current) orbitRef.current.enabled = true;
+    };
+
+    const onWindowUp = () => {
+      stopListeners();
+      onCommit?.(lastOffsets);
+    };
+
+    const onWindowCancel = () => {
+      stopListeners();
+      onPreview?.(null);
+    };
+
+    cleanupRef.current = () => {
+      window.removeEventListener('pointermove', onWindowMove);
+      window.removeEventListener('pointerup', onWindowUp);
+      window.removeEventListener('pointercancel', onWindowCancel);
+      if (orbitRef?.current) orbitRef.current.enabled = true;
+    };
+
+    window.addEventListener('pointermove', onWindowMove);
+    window.addEventListener('pointerup', onWindowUp);
+    window.addEventListener('pointercancel', onWindowCancel);
+  };
+
+  if (!winInfo || (winInfo.maxOffset - winInfo.minOffset) < 0.01) return null;
+
+  return (
+    <group ref={handleRef}>
+      <mesh
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          startDrag(e.clientX, e.clientY);
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          onCommit?.(buildEvenWindowOffsets(wall, totalWindows));
+        }}
+        onPointerOver={(e) => { e.stopPropagation(); setHover(true); }}
+        onPointerOut={() => setHover(false)}
+        renderOrder={1000}
+      >
+        <boxGeometry args={[active || hover ? 0.56 : 0.44, active || hover ? 0.26 : 0.2, active || hover ? 0.26 : 0.2]} />
+        <meshBasicMaterial
+          color={active ? '#f59e0b' : (hover ? '#7dd3fc' : '#0ea5e9')}
+          depthTest={false}
+          transparent
+          opacity={0.95}
+        />
+      </mesh>
+      <Html center position={[0, 0.34, 0]} zIndexRange={[25, 0]}>
+        <div
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            startDrag(e.clientX, e.clientY);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onCommit?.(buildEvenWindowOffsets(wall, totalWindows));
+          }}
+          onPointerEnter={() => setHover(true)}
+          onPointerLeave={() => setHover(false)}
+          style={{
+            padding: '5px 11px',
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 600,
+            color: '#f8fafc',
+            background: active ? 'rgba(245,158,11,0.95)' : (hover ? 'rgba(14,165,233,0.95)' : 'rgba(15,23,42,0.9)'),
+            border: active ? '1px solid rgba(253,224,71,0.9)' : '1px solid rgba(56,189,248,0.75)',
+            backdropFilter: 'blur(6px)',
+            whiteSpace: 'nowrap',
+            fontFamily: 'Inter, sans-serif',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.38)',
+            cursor: active ? 'grabbing' : 'grab',
+            userSelect: 'none',
+            touchAction: 'none',
+          }}
+          title="Drag kiri/kanan untuk geser jendela (double-click untuk ratakan)"
+        >
+          {active
+            ? `Kiri ${leftMeters.toFixed(2)}m • Kanan ${rightMeters.toFixed(2)}m`
+            : (totalWindows > 1 ? `↔ Jendela ${windowIndex + 1}` : '↔ Geser Jendela')}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+function WindowPositionHandles({ object, wall, orbitRef, onPreview, onCommit }) {
+  const { count } = getWallWindowsLayout(wall);
+  return (
+    <>
+      {Array.from({ length: count }, (_, idx) => (
+        <WindowPositionHandle
+          key={`win-handle-${idx}`}
+          object={object}
+          wall={wall}
+          windowIndex={idx}
+          totalWindows={count}
+          orbitRef={orbitRef}
+          onPreview={onPreview}
+          onCommit={onCommit}
+        />
+      ))}
     </>
   );
 }
@@ -1626,7 +1949,31 @@ function ChildInGroupTransform({ child, parentGroup, transformMode, setWalls, or
     }
   }, [child.position, child.rotation, child.scale, parentGroup.position]);
 
-  const wallData = { ...child, position: worldPos };
+  const [liveWindowOffsets, setLiveWindowOffsets] = useState(null);
+  const wallData = {
+    ...child,
+    position: worldPos,
+    ...(liveWindowOffsets !== null ? { windowOffsets: liveWindowOffsets, windowOffset: liveWindowOffsets[0] || 0 } : {}),
+  };
+
+  const commitWindowOffsets = (nextOffsets) => {
+    setLiveWindowOffsets(null);
+    setWalls((prev) =>
+      prev.map((w) => {
+        if (w.id === parentGroup.id && w.children) {
+          return {
+            ...w,
+            children: w.children.map((c) =>
+              c.id === child.id
+                ? { ...c, windowOffsets: nextOffsets, windowOffset: nextOffsets?.[0] || 0 }
+                : c
+            ),
+          };
+        }
+        return w;
+      })
+    );
+  };
 
   const isSelectedGroup = selectedForGroup.includes(child.id);
   
@@ -1643,6 +1990,15 @@ function ChildInGroupTransform({ child, parentGroup, transformMode, setWalls, or
         <DoorWallBlock ref={wallRef} wall={wallData} isSelected={true} onClick={() => {}} />
       ) : (
         <WallBlock ref={wallRef} wall={wallData} isSelected={true} onClick={() => {}} />
+      )}
+      {!child.locked && showGizmo && wallRef.current && WINDOW_DRAG_TYPES.has(child.type) && (
+        <WindowPositionHandles
+          object={wallRef.current}
+          wall={wallData}
+          orbitRef={orbitRef}
+          onPreview={setLiveWindowOffsets}
+          onCommit={commitWindowOffsets}
+        />
       )}
       {showGizmo && transformMode !== 'select' && transformMode !== 'camera' && wallRef.current && (
         <DragTransformControls
@@ -1705,6 +2061,41 @@ const ARCH_SPECIAL_TYPES = new Set([
 
 const isArchSpecialType = (type) => Boolean(type && (type.startsWith('door_wall') || ARCH_SPECIAL_TYPES.has(type)));
 
+function buildDoorArcPoints(hingeX, hingeZ, rx, rz, startAngle, endAngle, y = 0.48, segments = 24) {
+  const pts = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = startAngle + (endAngle - startAngle) * (i / segments);
+    pts.push([hingeX + rx * Math.cos(t), y, hingeZ + rz * Math.sin(t)]);
+  }
+  return pts;
+}
+
+function BlueprintWindowSymbol({ centerX, winW }) {
+  return (
+    <group position={[centerX, 0.46, 0]}>
+      {/* White glass cavity */}
+      <mesh>
+        <boxGeometry args={[winW, 0.06, 0.96]} />
+        <meshBasicMaterial color="#ffffff" />
+      </mesh>
+      {/* Crisp dark charcoal architectural window frame edges */}
+      <mesh position={[0, 0.036, 0.46]}>
+        <boxGeometry args={[winW, 0.02, 0.14]} />
+        <meshBasicMaterial color="#1e293b" />
+      </mesh>
+      <mesh position={[0, 0.036, -0.46]}>
+        <boxGeometry args={[winW, 0.02, 0.14]} />
+        <meshBasicMaterial color="#1e293b" />
+      </mesh>
+      {/* Center glass sash line */}
+      <mesh position={[0, 0.036, 0]}>
+        <boxGeometry args={[winW, 0.02, 0.1]} />
+        <meshBasicMaterial color="#64748b" />
+      </mesh>
+    </group>
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Door, Window & Architectural Structure 3D Block
 ───────────────────────────────────────────────────────────────────────── */
@@ -1714,7 +2105,9 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
   const localGroupRef = useRef();
   useCursor(hovered);
 
-  const rawMatProps = getWallMatProps(wall, isSelected, hovered, isLightMode);
+  const rawMatProps = isCapturing
+    ? { color: isSelected ? '#3b82f6' : '#4b5563', roughness: 0.92, metalness: 0.05, opacity: 1, transparent: false }
+    : getWallMatProps(wall, isSelected, hovered, isLightMode);
   const finalOpacity = rawMatProps.opacity ?? 1;
   const isTransparent = rawMatProps.transparent || finalOpacity < 0.99;
   const matProps = {
@@ -1737,8 +2130,7 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
   const wallH = wall.scale?.[1] || 1;
 
   if (wall.type === 'window_wall') {
-    const winLocalW = Math.min(4.2 / wallW, 0.72);
-    const sideW = (1 - winLocalW) / 2;
+    const { windows, solidSegments } = getWallWindowsLayout(wall);
     const sillH = 0.28;
     const lintelH = 0.22;
     const glassH = 1 - sillH - lintelH;
@@ -1753,36 +2145,41 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
         onPointerOut={() => setHovered(false)}
       >
-        {sideW > 0.01 && (
-          <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+        {solidSegments.map((seg, i) => (
+          <RoundedBox key={`solid-${i}`} position={[seg.center, 0, 0]} args={[seg.width, 1, 1]} radius={0.01} receiveShadow castShadow>
             <meshStandardMaterial {...matProps} />
           </RoundedBox>
-        )}
-        {sideW > 0.01 && (
-          <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
-            <meshStandardMaterial {...matProps} />
-          </RoundedBox>
-        )}
-        {/* Bottom sill */}
-        <RoundedBox position={[0, -0.5 + sillH / 2, 0]} args={[winLocalW, sillH, 1]} radius={0.01} receiveShadow castShadow>
-          <meshStandardMaterial {...matProps} />
-        </RoundedBox>
-        {/* Top lintel */}
-        {!isCapturing && (
-          <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[winLocalW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
-            <meshStandardMaterial {...matProps} />
-          </RoundedBox>
-        )}
+        ))}
+        {windows.map((win) => (
+          <React.Fragment key={`win-${win.index}`}>
+            {/* Bottom sill */}
+            {!isCapturing && (
+              <RoundedBox position={[win.centerX, -0.5 + sillH / 2, 0]} args={[win.winW, sillH, 1]} radius={0.01} receiveShadow castShadow>
+                <meshStandardMaterial {...matProps} />
+              </RoundedBox>
+            )}
+            {/* Top lintel */}
+            {!isCapturing && (
+              <RoundedBox position={[win.centerX, 0.5 - lintelH / 2, 0]} args={[win.winW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+                <meshStandardMaterial {...matProps} />
+              </RoundedBox>
+            )}
+            {/* Translucent glass pane (3D) or 2D Architectural Blueprint Window (Export) */}
+            {isCapturing ? (
+              <BlueprintWindowSymbol centerX={win.centerX} winW={win.winW} />
+            ) : (
+              <RoundedBox position={[win.centerX, (sillH - lintelH) / 2, 0]} args={[win.winW, glassH, 0.22]} radius={0.005}>
+                <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.15} />
+              </RoundedBox>
+            )}
+          </React.Fragment>
+        ))}
         {/* Crisp White Architectural Top Trim */}
-        <mesh position={[0, 0.502, 0]} receiveShadow>
-          <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
-        </mesh>
-        {/* Translucent glass pane */}
         {!isCapturing && (
-          <RoundedBox position={[0, (sillH - lintelH) / 2, 0]} args={[winLocalW, glassH, 0.22]} radius={0.005}>
-            <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.15} />
-          </RoundedBox>
+          <mesh position={[0, 0.502, 0]} receiveShadow>
+            <boxGeometry args={[1.002, 0.025, 1.02]} />
+            <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          </mesh>
         )}
       </group>
     );
@@ -1821,40 +2218,39 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
             <meshStandardMaterial {...matProps} />
           </RoundedBox>
         )}
-        <mesh position={[0, 0.502, 0]}>
-          <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
-        </mesh>
         {!isCapturing && (
-          <>
-            {/* Left sliding glass leaf */}
-            <mesh position={[-openW * 0.22, -lintelH / 2, 0.16]}>
-              <boxGeometry args={[panelW, panelH, 0.14]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
-            </mesh>
-            <mesh position={[-openW * 0.22, -lintelH / 2, 0.16]}>
-              <boxGeometry args={[panelW + 0.012, 0.025, 0.18]} />
-              <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
-            </mesh>
-            {/* Right sliding glass leaf (slightly offset in Z) */}
-            <mesh position={[openW * 0.22, -lintelH / 2, -0.16]}>
-              <boxGeometry args={[panelW, panelH, 0.14]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
-            </mesh>
-            <mesh position={[openW * 0.22, -lintelH / 2, -0.16]}>
-              <boxGeometry args={[panelW + 0.012, 0.025, 0.18]} />
-              <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
-            </mesh>
-          </>
+          <mesh position={[0, 0.502, 0]}>
+            <boxGeometry args={[1.002, 0.025, 1.02]} />
+            <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          </mesh>
         )}
+        <>
+          {/* Left sliding glass leaf */}
+          <mesh position={[-openW * 0.22, -lintelH / 2, 0.16]}>
+            <boxGeometry args={[panelW, panelH, 0.14]} />
+            <meshStandardMaterial color={isCapturing ? '#0284c7' : '#bae6fd'} transparent={!isCapturing} opacity={isCapturing ? 1 : 0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
+          </mesh>
+          <mesh position={[-openW * 0.22, isCapturing ? 0.45 : -lintelH / 2, 0.16]}>
+            <boxGeometry args={[panelW + 0.012, isCapturing ? 0.08 : 0.025, 0.22]} />
+            <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* Right sliding glass leaf (slightly offset in Z) */}
+          <mesh position={[openW * 0.22, -lintelH / 2, -0.16]}>
+            <boxGeometry args={[panelW, panelH, 0.14]} />
+            <meshStandardMaterial color={isCapturing ? '#0284c7' : '#bae6fd'} transparent={!isCapturing} opacity={isCapturing ? 1 : 0.32 * finalOpacity} roughness={0.12} metalness={0.2} />
+          </mesh>
+          <mesh position={[openW * 0.22, isCapturing ? 0.45 : -lintelH / 2, -0.16]}>
+            <boxGeometry args={[panelW + 0.012, isCapturing ? 0.08 : 0.025, 0.22]} />
+            <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.5} />
+          </mesh>
+        </>
       </group>
     );
   }
 
   // French Window (Floor-to-ceiling tall panoramic glass with vertical mullions)
   if (wall.type === 'french_window') {
-    const winW = Math.min(4.8 / wallW, 0.8);
-    const sideW = (1 - winW) / 2;
+    const { windows, solidSegments } = getWallWindowsLayout(wall);
     const sillH = 0.05;
     const lintelH = 0.12;
     const glassH = 1 - sillH - lintelH;
@@ -1869,41 +2265,46 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
         onPointerOut={() => setHovered(false)}
       >
-        {sideW > 0.01 && (
-          <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
+        {solidSegments.map((seg, i) => (
+          <RoundedBox key={`solid-${i}`} position={[seg.center, 0, 0]} args={[seg.width, 1, 1]} radius={0.01} receiveShadow castShadow>
             <meshStandardMaterial {...matProps} />
           </RoundedBox>
-        )}
-        {sideW > 0.01 && (
-          <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
-            <meshStandardMaterial {...matProps} />
-          </RoundedBox>
-        )}
-        <RoundedBox position={[0, -0.5 + sillH / 2, 0]} args={[winW, sillH, 1]} radius={0.005} receiveShadow castShadow>
-          <meshStandardMaterial {...matProps} />
-        </RoundedBox>
+        ))}
+        {windows.map((win) => (
+          <React.Fragment key={`fw-${win.index}`}>
+            {!isCapturing && (
+              <RoundedBox position={[win.centerX, -0.5 + sillH / 2, 0]} args={[win.winW, sillH, 1]} radius={0.005} receiveShadow castShadow>
+                <meshStandardMaterial {...matProps} />
+              </RoundedBox>
+            )}
+            {!isCapturing && (
+              <RoundedBox position={[win.centerX, 0.5 - lintelH / 2, 0]} args={[win.winW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
+                <meshStandardMaterial {...matProps} />
+              </RoundedBox>
+            )}
+            {isCapturing ? (
+              <BlueprintWindowSymbol centerX={win.centerX} winW={win.winW} />
+            ) : (
+              <>
+                <mesh position={[win.centerX, (sillH - lintelH) / 2, 0]}>
+                  <boxGeometry args={[win.winW, glassH, 0.18]} />
+                  <meshStandardMaterial color="#bae6fd" transparent opacity={0.26 * finalOpacity} roughness={0.1} metalness={0.18} />
+                </mesh>
+                {[-win.winW / 6, win.winW / 6].map((mx, idx) => (
+                  <mesh key={idx} position={[win.centerX + mx, (sillH - lintelH) / 2, 0]}>
+                    <boxGeometry args={[0.016, glassH, 0.28]} />
+                    <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.4} />
+                  </mesh>
+                ))}
+              </>
+            )}
+          </React.Fragment>
+        ))}
         {!isCapturing && (
-          <RoundedBox position={[0, 0.5 - lintelH / 2, 0]} args={[winW, lintelH, 1]} radius={0.01} receiveShadow castShadow>
-            <meshStandardMaterial {...matProps} />
-          </RoundedBox>
-        )}
-        <mesh position={[0, 0.502, 0]}>
-          <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
-        </mesh>
-        {!isCapturing && (
-          <>
-            <mesh position={[0, (sillH - lintelH) / 2, 0]}>
-              <boxGeometry args={[winW, glassH, 0.18]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.26 * finalOpacity} roughness={0.1} metalness={0.18} />
-            </mesh>
-            {[-winW / 6, winW / 6].map((mx, idx) => (
-              <mesh key={idx} position={[mx, (sillH - lintelH) / 2, 0]}>
-                <boxGeometry args={[0.016, glassH, 0.28]} />
-                <meshStandardMaterial color="#334155" roughness={0.4} metalness={0.4} />
-              </mesh>
-            ))}
-          </>
+          <mesh position={[0, 0.502, 0]}>
+            <boxGeometry args={[1.002, 0.025, 1.02]} />
+            <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          </mesh>
         )}
       </group>
     );
@@ -1911,8 +2312,7 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
 
   // Bay Window (Protruding 3-sided window alcove)
   if (wall.type === 'bay_window') {
-    const bayW = 0.62;
-    const sideW = (1 - bayW) / 2;
+    const { windows, solidSegments } = getWallWindowsLayout(wall);
     const sillH = 0.28;
     const lintelH = 0.2;
     const glassH = 1 - sillH - lintelH;
@@ -1928,39 +2328,42 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
         onPointerOut={() => setHovered(false)}
       >
-        <RoundedBox position={[-0.5 + sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
-          <meshStandardMaterial {...matProps} />
-        </RoundedBox>
-        <RoundedBox position={[0.5 - sideW / 2, 0, 0]} args={[sideW, 1, 1]} radius={0.01} receiveShadow castShadow>
-          <meshStandardMaterial {...matProps} />
-        </RoundedBox>
-        {/* Protruding bottom bay seat / sill */}
-        <RoundedBox position={[0, -0.5 + sillH / 2, depth / 2]} args={[bayW, sillH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
-          <meshStandardMaterial {...matProps} />
-        </RoundedBox>
-        {/* Protruding top bay soffit */}
-        {!isCapturing && (
-          <RoundedBox position={[0, 0.5 - lintelH / 2, depth / 2]} args={[bayW + 0.04, lintelH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
+        {solidSegments.map((seg, i) => (
+          <RoundedBox key={`solid-${i}`} position={[seg.center, 0, 0]} args={[seg.width, 1, 1]} radius={0.01} receiveShadow castShadow>
             <meshStandardMaterial {...matProps} />
           </RoundedBox>
-        )}
-        {/* Front + left + right glass panes */}
-        {!isCapturing && (
-          <>
-            <mesh position={[0, (sillH - lintelH) / 2, depth]}>
-              <boxGeometry args={[bayW, glassH, 0.22]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
-            </mesh>
-            <mesh position={[-bayW / 2, (sillH - lintelH) / 2, depth / 2]}>
-              <boxGeometry args={[0.025, glassH, depth]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
-            </mesh>
-            <mesh position={[bayW / 2, (sillH - lintelH) / 2, depth / 2]}>
-              <boxGeometry args={[0.025, glassH, depth]} />
-              <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
-            </mesh>
-          </>
-        )}
+        ))}
+        {windows.map((win) => (
+          <React.Fragment key={`bay-${win.index}`}>
+            {/* Protruding bottom bay seat / sill */}
+            <RoundedBox position={[win.centerX, -0.5 + sillH / 2, depth / 2]} args={[win.winW, sillH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
+              <meshStandardMaterial {...matProps} />
+            </RoundedBox>
+            {/* Protruding top bay soffit */}
+            {!isCapturing && (
+              <RoundedBox position={[win.centerX, 0.5 - lintelH / 2, depth / 2]} args={[win.winW + 0.04, lintelH, depth + 0.6]} radius={0.01} receiveShadow castShadow>
+                <meshStandardMaterial {...matProps} />
+              </RoundedBox>
+            )}
+            {/* Front + left + right glass panes */}
+            {!isCapturing && (
+              <>
+                <mesh position={[win.centerX, (sillH - lintelH) / 2, depth]}>
+                  <boxGeometry args={[win.winW, glassH, 0.22]} />
+                  <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+                </mesh>
+                <mesh position={[win.centerX - win.winW / 2, (sillH - lintelH) / 2, depth / 2]}>
+                  <boxGeometry args={[0.025, glassH, depth]} />
+                  <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+                </mesh>
+                <mesh position={[win.centerX + win.winW / 2, (sillH - lintelH) / 2, depth / 2]}>
+                  <boxGeometry args={[0.025, glassH, depth]} />
+                  <meshStandardMaterial color="#bae6fd" transparent opacity={0.28 * finalOpacity} roughness={0.12} metalness={0.18} />
+                </mesh>
+              </>
+            )}
+          </React.Fragment>
+        ))}
       </group>
     );
   }
@@ -2288,11 +2691,41 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
             <meshStandardMaterial {...matProps} />
           </RoundedBox>
         )}
-        {/* Crisp White Architectural Top Trim */}
-        <mesh position={[0, 0.502, 0]} receiveShadow>
-          <boxGeometry args={[1.002, 0.025, 1.02]} />
-          <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
-        </mesh>
+        {/* Crisp White Architectural Top Trim (hidden during 2D capture so doorway stays open) */}
+        {!isCapturing && (
+          <mesh position={[0, 0.502, 0]} receiveShadow>
+            <boxGeometry args={[1.002, 0.025, 1.02]} />
+            <meshStandardMaterial color={isLightMode ? '#ffffff' : '#64748b'} roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+          </mesh>
+        )}
+        {/* 2D Blueprint Double-Door Leaves + 90° Swing Arcs (HomeByMe Architectural Style) */}
+        {isCapturing && (() => {
+          const wallD = Math.max(0.1, wall.scale?.[2] || 0.35);
+          const halfW = doubleDoorLocalW / 2;
+          const leafLocalX = Math.max(0.008, 0.08 / wallW);
+          const leafLocalZ = (halfW * wallW) / wallD;
+          const leftArc = buildDoorArcPoints(-halfW, 0.5, halfW, leafLocalZ, 0, Math.PI / 2, 0.49, 22);
+          const rightArc = buildDoorArcPoints(halfW, 0.5, halfW, leafLocalZ, Math.PI / 2, Math.PI, 0.49, 22);
+          return (
+            <>
+              {/* Warm wooden threshold sill */}
+              <mesh position={[0, 0.44, 0]}>
+                <boxGeometry args={[doubleDoorLocalW, 0.04, 0.96]} />
+                <meshBasicMaterial color="#e5d4b7" />
+              </mesh>
+              <mesh position={[-halfW + leafLocalX / 2, 0.49, 0.5 + leafLocalZ / 2]}>
+                <boxGeometry args={[leafLocalX, 0.05, leafLocalZ]} />
+                <meshBasicMaterial color="#1e293b" />
+              </mesh>
+              <mesh position={[halfW - leafLocalX / 2, 0.49, 0.5 + leafLocalZ / 2]}>
+                <boxGeometry args={[leafLocalX, 0.05, leafLocalZ]} />
+                <meshBasicMaterial color="#1e293b" />
+              </mesh>
+              <Line points={leftArc} color="#334155" lineWidth={1.6} />
+              <Line points={rightArc} color="#334155" lineWidth={1.6} />
+            </>
+          );
+        })()}
       </group>
     );
   }
@@ -2331,11 +2764,35 @@ const DoorWallBlock = React.forwardRef(({ wall, isSelected, onClick, isCapturing
           <meshStandardMaterial {...matProps} />
         </RoundedBox>
       )}
-      {/* Crisp White Architectural Top Trim */}
-      <mesh position={[0, 0.502, 0]} receiveShadow>
-        <boxGeometry args={[1.002, 0.025, 1.02]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
-      </mesh>
+      {/* Crisp White Architectural Top Trim (hidden during 2D capture so doorway stays open) */}
+      {!isCapturing && (
+        <mesh position={[0, 0.502, 0]} receiveShadow>
+          <boxGeometry args={[1.002, 0.025, 1.02]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.35} transparent={isTransparent} opacity={Math.min(1, finalOpacity + 0.15)} />
+        </mesh>
+      )}
+      {/* 2D Blueprint Single-Door Leaf + 90° Swing Arc (HomeByMe Architectural Style) */}
+      {isCapturing && (() => {
+        const wallD = Math.max(0.1, wall.scale?.[2] || 0.35);
+        const hingeX = doorCenterX - doorLocalW / 2;
+        const leafLocalX = Math.max(0.008, 0.08 / wallW);
+        const leafLocalZ = (doorLocalW * wallW) / wallD;
+        const arcPts = buildDoorArcPoints(hingeX, 0.5, doorLocalW, leafLocalZ, 0, Math.PI / 2, 0.49, 24);
+        return (
+          <>
+            {/* Warm wooden threshold sill */}
+            <mesh position={[doorCenterX, 0.44, 0]}>
+              <boxGeometry args={[doorLocalW, 0.04, 0.96]} />
+              <meshBasicMaterial color="#e5d4b7" />
+            </mesh>
+            <mesh position={[hingeX + leafLocalX / 2, 0.49, 0.5 + leafLocalZ / 2]}>
+              <boxGeometry args={[leafLocalX, 0.05, leafLocalZ]} />
+              <meshBasicMaterial color="#1e293b" />
+            </mesh>
+            <Line points={arcPts} color="#334155" lineWidth={1.6} />
+          </>
+        );
+      })()}
     </group>
   );
 });
@@ -2474,6 +2931,23 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
   if (!primaryId && selectedForGroup.length === 1) primaryId = selectedForGroup[0];
   const showGizmo = isSelected && selectedForGroup.length <= 1 && primaryId === wall.id;
 
+  const [liveWindowOffsets, setLiveWindowOffsets] = useState(null);
+  const effectiveWall =
+    liveWindowOffsets !== null
+      ? { ...wall, windowOffsets: liveWindowOffsets, windowOffset: liveWindowOffsets[0] || 0 }
+      : wall;
+
+  const commitWindowOffsets = (nextOffsets) => {
+    setLiveWindowOffsets(null);
+    setWalls((prev) =>
+      prev.map((w) =>
+        w.id === wall.id
+          ? { ...w, windowOffsets: nextOffsets, windowOffset: nextOffsets?.[0] || 0 }
+          : w
+      )
+    );
+  };
+
   return (
     <>
       {wall.type === 'room' ? (
@@ -2482,6 +2956,7 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
           wall={wall}
           isSelected={isSelected}
           onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
+          isCapturing={isCapturing}
         />
       ) : wall.type === 'custom_group' ? (
         <>
@@ -2518,7 +2993,7 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
       ) : isArchSpecialType(wall.type) ? (
         <DoorWallBlock 
           ref={wallRef}
-          wall={wall}
+          wall={effectiveWall}
           isSelected={isSelected}
           onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
           isCapturing={isCapturing}
@@ -2544,6 +3019,16 @@ function WallBlockWithTransform({ wall, isSelected, selectedObj, selectedForGrou
           wall={wall}
           isSelected={isSelected}
           onClick={() => { if(editMode) setSelectedObj({ type: 'wall', id: wall.id }) }}
+          isCapturing={isCapturing}
+        />
+      )}
+      {!wall.locked && showGizmo && wallRef.current && WINDOW_DRAG_TYPES.has(wall.type) && (
+        <WindowPositionHandles
+          object={wallRef.current}
+          wall={effectiveWall}
+          orbitRef={orbitRef}
+          onPreview={setLiveWindowOffsets}
+          onCommit={commitWindowOffsets}
         />
       )}
       {!wall.locked && showGizmo && transformMode === 'scale' && wallRef.current && !['room', 'custom_group', 'text_label', 'furniture'].includes(wall.type) && (
@@ -2899,7 +3384,7 @@ function TopDownCameraController({ isSidebarPreview, walls, orbitRef }) {
    Computes the outer bounding box of all visible walls and draws cyan
    dimension lines with perpendicular end-ticks & meter labels (e.g. 10.0 m, 8.5 m)
 ───────────────────────────────────────────────────────────────────────── */
-function RoomDimensionRuler({ walls, visible }) {
+function RoomDimensionRuler({ walls, visible, isBlueprint = false }) {
   const bounds = React.useMemo(() => {
     if (!visible || !Array.isArray(walls) || walls.length === 0) return null;
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -2958,37 +3443,40 @@ function RoomDimensionRuler({ walls, visible }) {
   // Front horizontal dimension line (along X axis at Z = maxZ + offset)
   const frontZ = maxZ + offset;
 
+  const lineColor = isBlueprint ? '#1e293b' : '#38bdf8';
+  const textColor = isBlueprint ? '#0f172a' : '#7dd3fc';
+
   return (
     <group>
       {/* Left Z-Depth Dimension Line */}
       <Line
         points={[[leftX, y, minZ], [leftX, y, maxZ]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       {/* End Ticks for Left Line */}
       <Line
         points={[[leftX - tick, y, minZ], [leftX + tick * 1.4, y, minZ]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       <Line
         points={[[leftX - tick, y, maxZ], [leftX + tick * 1.4, y, maxZ]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       {/* Depth Label (e.g. 10.0 m) */}
       <Text
-        position={[leftX - 0.85, y + 0.02, (minZ + maxZ) / 2]}
-        rotation={[-Math.PI / 2, 0, -Math.PI / 6]}
+        position={[leftX - 0.85, y + 0.04, (minZ + maxZ) / 2]}
+        rotation={[-Math.PI / 2, 0, isBlueprint ? Math.PI / 2 : -Math.PI / 6]}
         fontSize={0.58}
-        color="#7dd3fc"
+        color={textColor}
         anchorX="center"
         anchorY="middle"
         fontWeight="bold"
@@ -2999,32 +3487,32 @@ function RoomDimensionRuler({ walls, visible }) {
       {/* Front X-Width Dimension Line */}
       <Line
         points={[[minX, y, frontZ], [maxX, y, frontZ]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       {/* End Ticks for Front Line */}
       <Line
         points={[[minX, y, frontZ - tick * 1.4], [minX, y, frontZ + tick]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       <Line
         points={[[maxX, y, frontZ - tick * 1.4], [maxX, y, frontZ + tick]]}
-        color="#38bdf8"
-        lineWidth={1.6}
+        color={lineColor}
+        lineWidth={1.5}
         transparent
-        opacity={0.85}
+        opacity={isBlueprint ? 0.9 : 0.85}
       />
       {/* Width Label (e.g. 8.5 m / 10.0 m) */}
       <Text
-        position={[(minX + maxX) / 2, y + 0.02, frontZ + 0.72]}
+        position={[(minX + maxX) / 2, y + 0.04, frontZ + 0.72]}
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={0.58}
-        color="#7dd3fc"
+        color={textColor}
         anchorX="center"
         anchorY="middle"
         fontWeight="bold"
@@ -3225,8 +3713,32 @@ function RoomLayout({
     const handleReset = () => {
       if (orbitRef.current) {
         const cam = orbitRef.current.object;
-        cam.position.set(0, 30, 0.1); 
-        orbitRef.current.target.set(0, 0, 0);
+        let minX = -8, maxX = 8, minZ = -8, maxZ = 8;
+        let found = false;
+        const addPt = (x, z, sx, sz) => {
+          if (!found) {
+            minX = x - sx; maxX = x + sx; minZ = z - sz; maxZ = z + sz; found = true;
+          } else {
+            minX = Math.min(minX, x - sx); maxX = Math.max(maxX, x + sx);
+            minZ = Math.min(minZ, z - sz); maxZ = Math.max(maxZ, z + sz);
+          }
+        };
+        (walls || []).forEach((w) => {
+          if (w.hidden || !w.position) return;
+          const r = Math.max(w.scale?.[0] || 1, w.scale?.[2] || 1) / 2;
+          addPt(w.position[0] || 0, w.position[2] || 0, r, r);
+        });
+        const cx = (minX + maxX) / 2;
+        const cz = (minZ + maxZ) / 2;
+        const span = Math.max(14, maxX - minX + 8, maxZ - minZ + 8);
+        const targetFov = 5; // Near-orthographic flat 2D view (zero 3D wall parallax)
+        const dist = (span / 2) / Math.tan((targetFov / 2) * (Math.PI / 180));
+        cam.fov = targetFov;
+        cam.far = Math.max(3000, dist + 1500);
+        cam.position.set(cx, dist, cz + 0.001);
+        cam.updateProjectionMatrix();
+        orbitRef.current.maxDistance = Math.max(1200, dist * 2.5);
+        orbitRef.current.target.set(cx, 0, cz);
         orbitRef.current.update();
       }
     };
@@ -3234,7 +3746,11 @@ function RoomLayout({
     const handleOrbitView = () => {
       if (orbitRef.current) {
         const cam = orbitRef.current.object;
+        cam.fov = 40;
+        cam.far = 1000;
         cam.position.set(14, 19, 15);
+        cam.updateProjectionMatrix();
+        orbitRef.current.maxDistance = 200;
         orbitRef.current.target.set(0, 0, 0);
         orbitRef.current.update();
       }
@@ -3397,6 +3913,8 @@ function RoomLayout({
     return { midX, midZ, len, angle, x1, z1, x2, z2 };
   }, [drawWallMode, drawStartPoint, drawHoverPoint]);
 
+  const isBlueprint = isCapturing || (cameraViewMode === 'top2d' && !isExploreMode);
+
   return (
     <>
       <TopDownCameraController 
@@ -3410,14 +3928,14 @@ function RoomLayout({
         makeDefault 
         enabled={!isSidebarPreview}
         minPolarAngle={cameraViewMode === 'top2d' ? 0 : Math.PI / 8} 
-        maxPolarAngle={cameraViewMode === 'top2d' ? 0.05 : Math.PI / 2.1} 
+        maxPolarAngle={cameraViewMode === 'top2d' ? 0.01 : Math.PI / 2.1} 
         minDistance={2} 
-        maxDistance={200} 
+        maxDistance={cameraViewMode === 'top2d' ? 2000 : 200} 
         enablePan={!isSidebarPreview}
         enableZoom={!isSidebarPreview}
         enableRotate={!isSidebarPreview && cameraViewMode !== 'top2d'}
         keyPanSpeed={20}
-        screenSpacePanning={false}
+        screenSpacePanning={cameraViewMode === 'top2d'}
       />
       
       <group position={[0, -1, 0]}>
@@ -3433,7 +3951,7 @@ function RoomLayout({
             radius={0.05} 
             smoothness={4} 
             position={[0, -0.1, 0]} 
-            receiveShadow
+            receiveShadow={!isBlueprint}
             onClick={handleFloorClick}
             onPointerMove={handleFloorPointerMove}
             onContextMenu={(e) => {
@@ -3451,9 +3969,9 @@ function RoomLayout({
             onPointerOut={() => { document.body.style.cursor = 'auto'; }}
           >
             <meshStandardMaterial 
-              color={isLightMode ? '#f3f4f6' : '#0f172a'} 
-              roughness={isLightMode ? 0.75 : 0.85} 
-              metalness={0.04} 
+              color={isBlueprint ? (isLightMode ? '#ffffff' : '#0f172a') : (isLightMode ? '#f3f4f6' : '#0f172a')} 
+              roughness={isBlueprint ? 1 : (isLightMode ? 0.75 : 0.85)} 
+              metalness={isBlueprint ? 0 : 0.04} 
             />
           </RoundedBox>
         )}
@@ -3472,7 +3990,7 @@ function RoomLayout({
           </React.Fragment>
         )}
 
-        {/* Warm Oak Hardwood Interior Floor inside Room Footprint */}
+        {/* Warm Oak Hardwood Interior Floor inside Room Footprint (HomeByMe Colored 2D & 3D look) */}
         <RoomInteriorFloor walls={walls} floorPreset={floorPreset} onClick={handleFloorClick} />
 
         {/* Live Point-to-Point Wall Drawing Preview (Gambar Dinding Manual) */}
@@ -3501,9 +4019,9 @@ function RoomLayout({
           </group>
         )}
 
-        {/* 3D Architectural Dimension Ruler Lines (Optional toggle) */}
-        {!isCapturing && !isSidebarPreview && (
-          <RoomDimensionRuler walls={walls} visible={showRuler} />
+        {/* 3D Architectural Dimension Ruler Lines (Auto-shown in 2D blueprint view & export) */}
+        {!isSidebarPreview && (
+          <RoomDimensionRuler walls={walls} visible={isBlueprint || showRuler} isBlueprint={isBlueprint} />
         )}
 
         {/* Tembok (Walls) */}
@@ -3526,7 +4044,7 @@ function RoomLayout({
               transformMode={transformMode}
               setWalls={setWalls}
               orbitRef={orbitRef}
-              isCapturing={isCapturing}
+              isCapturing={isBlueprint}
             />
           );
         })}
@@ -4160,7 +4678,13 @@ export default function FloorPlan({
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showRuler, setShowRuler] = useState(false);
   const [showAvatar, setShowAvatar] = useState(true);
-  const [floorPreset, setFloorPreset] = useState('warm_oak');
+  const [floorPreset, setFloorPreset] = useState(() => {
+    try {
+      return localStorage.getItem(getUserScopedKey(`iot_layout_floor_${roomId}`)) || 'warm_oak';
+    } catch {
+      return 'warm_oak';
+    }
+  });
   const [lightingMode, setLightingMode] = useState('studio'); // 'studio' | 'bright' | 'warm'
   const [showWasdPip, setShowWasdPip] = useState(true);
   const [layerFilter, setLayerFilter] = useState('');
@@ -4201,6 +4725,7 @@ export default function FloorPlan({
   const [selectedObj, setSelectedObj] = useState(null);
   const [selectedForGroup, setSelectedForGroup] = useState([]);
   const [isExploreMode, setIsExploreMode] = useState(false);
+  const effectiveEditMode = editMode && !isExploreMode;
   const [isCapturing, setIsCapturing] = useState(false);
   const [hiddenDevices, setHiddenDevices] = useState([]);
   const [transformMode, setTransformMode] = useState('translate');
@@ -4318,18 +4843,73 @@ export default function FloorPlan({
     return () => clearInterval(iv);
   }, [isWidget, isSidebarPreview, initialDevices]);
 
-  const saveLayout = () => {
-    localStorage.setItem(getUserScopedKey(`iot_layout_walls_${roomId}`), JSON.stringify(walls));
+  const wallsRef = useRef(walls);
+  const floorPresetRef = useRef(floorPreset);
+  const hasMountedRef = useRef(false);
+  wallsRef.current = walls;
+  floorPresetRef.current = floorPreset;
+
+  const persistLayoutToStorage = (targetWalls = wallsRef.current, targetFloor = floorPresetRef.current) => {
+    try {
+      localStorage.setItem(getUserScopedKey(`iot_layout_walls_${roomId}`), JSON.stringify(targetWalls));
+      localStorage.setItem(getUserScopedKey(`iot_layout_floor_${roomId}`), String(targetFloor || 'warm_oak'));
+      window.dispatchEvent(new CustomEvent('floorplan-layout-saved', { detail: { roomId: String(roomId) } }));
+      return true;
+    } catch (err) {
+      console.error('Gagal menyimpan layout 3D ke localStorage:', err);
+      return false;
+    }
+  };
+
+  // Auto-save layout 3D setiap ada perubahan dinding atau lantai (debounced 300ms)
+  useEffect(() => {
+    if (!isStudioEditor) return;
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      persistLayoutToStorage(walls, floorPreset);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [walls, floorPreset, roomId, isStudioEditor]);
+
+  // Sinkronisasi otomatis widget/preview saat layout ruangan yang sama disimpan
+  useEffect(() => {
+    if (isStudioEditor) return;
+    const onSaved = (e) => {
+      if (e?.detail?.roomId && String(e.detail.roomId) !== String(roomId)) return;
+      try {
+        const saved =
+          localStorage.getItem(getUserScopedKey(`iot_layout_walls_${roomId}`)) ||
+          (roomId !== 'default' ? localStorage.getItem(`iot_layout_walls_${roomId}`) : null);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setWalls(parsed);
+        }
+        const savedFloor = localStorage.getItem(getUserScopedKey(`iot_layout_floor_${roomId}`));
+        if (savedFloor) setFloorPreset(savedFloor);
+      } catch {}
+    };
+    window.addEventListener('floorplan-layout-saved', onSaved);
+    return () => window.removeEventListener('floorplan-layout-saved', onSaved);
+  }, [roomId, isStudioEditor]);
+
+  const saveLayout = (showToast = true) => {
+    const ok = persistLayoutToStorage(wallsRef.current, floorPresetRef.current);
+    if (!showToast) return ok;
     Swal.fire({
+      target: containerRef.current || document.body,
       toast: true,
       position: 'top-end',
       timer: 2200,
       showConfirmButton: false,
       background: '#0f172a',
       color: '#f1f5f9',
-      icon: 'success',
-      title: 'Layout 3D berhasil disimpan!',
+      icon: ok ? 'success' : 'error',
+      title: ok ? 'Layout 3D berhasil disimpan!' : 'Gagal menyimpan layout (memori browser penuh)',
     });
+    return ok;
   };
 
   const getSpawnPosition = () => {
@@ -4635,6 +5215,7 @@ export default function FloorPlan({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!effectiveEditMode) return;
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       
       if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedObj?.type === 'wall' || selectedForGroup.length > 0)) {
@@ -4648,14 +5229,14 @@ export default function FloorPlan({
         e.preventDefault();
         handleRedo();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        if (editMode) saveLayout();
+        saveLayout(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObj, selectedForGroup, editMode, handleUndo, wallsHistory, historyIndex]);
+  }, [selectedObj, selectedForGroup, effectiveEditMode, handleUndo, wallsHistory, historyIndex, walls, floorPreset, roomId]);
 
   const handleClearAll = () => {
     Swal.fire({
@@ -4746,32 +5327,75 @@ export default function FloorPlan({
     oc.update();
 
     Swal.fire({
+      target: containerRef.current || document.body,
       title: 'Menyimpan Denah...',
       text: 'Mohon tunggu sebentar',
-      timer: 800,
+      timer: 700,
       timerProgressBar: true,
+      showConfirmButton: false,
+      allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      }
+      },
     }).then(() => {
-      if (canvas) {
-        const image = canvas.toDataURL('image/png');
+      const restoreCamera = () => {
+        oc.maxDistance = oldMaxDist;
+        oc.minPolarAngle = oldMinPolar;
+        oc.maxPolarAngle = oldMaxPolar;
+        cam.fov = currentFov;
+        cam.far = oldFar;
+        cam.position.copy(currentPos);
+        cam.updateProjectionMatrix();
+        oc.target.copy(currentTarget);
+        oc.update();
+        setIsCapturing(false);
+      };
+
+      const triggerDownload = (href, revokeAfter = false) => {
         const link = document.createElement('a');
         link.download = `denah_${roomId || 'ruangan'}.png`;
-        link.href = image;
+        link.href = href;
+        link.style.display = 'none';
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        if (revokeAfter) {
+          setTimeout(() => URL.revokeObjectURL(href), 1500);
+        }
+      };
+
+      if (!canvas) {
+        restoreCamera();
+        return;
       }
-      
-      oc.maxDistance = oldMaxDist;
-      oc.minPolarAngle = oldMinPolar;
-      oc.maxPolarAngle = oldMaxPolar;
-      cam.fov = currentFov;
-      cam.far = oldFar;
-      cam.position.copy(currentPos);
-      cam.updateProjectionMatrix();
-      oc.target.copy(currentTarget);
-      oc.update();
-      setIsCapturing(false);
+
+      requestAnimationFrame(() => {
+        try {
+          if (typeof canvas.toBlob === 'function') {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const url = URL.createObjectURL(blob);
+                triggerDownload(url, true);
+              } else {
+                triggerDownload(canvas.toDataURL('image/png'), false);
+              }
+              restoreCamera();
+            }, 'image/png');
+          } else {
+            triggerDownload(canvas.toDataURL('image/png'), false);
+            restoreCamera();
+          }
+        } catch (err) {
+          console.error('Gagal export gambar denah:', err);
+          restoreCamera();
+          Swal.fire({
+            target: containerRef.current || document.body,
+            icon: 'error',
+            title: 'Gagal Export Gambar',
+            text: 'Terjadi kendala saat mengambil tangkapan layar kanvas 3D.',
+          });
+        }
+      });
     });
   };
 
@@ -4967,6 +5591,25 @@ export default function FloorPlan({
     const raf = requestAnimationFrame(() => {
       window.dispatchEvent(new Event('resize'));
     });
+    if (!isWidget && !isSidebarPreview) {
+      if (isFullscreen) {
+        setIsExploreMode(false);
+        setEditMode(true);
+        setActiveTab('walls');
+        setActiveDrawer('build');
+      } else {
+        if (editMode) {
+          saveLayout(false);
+        }
+        setEditMode(false);
+        setActiveDrawer(null);
+        setDrawWallMode(false);
+        setSelectedObj(null);
+        setLayersPanelOpen(false);
+        setShowHelpPopover(false);
+        setShowSettingsPopover(false);
+      }
+    }
     return () => cancelAnimationFrame(raf);
   }, [isFullscreen]);
 
@@ -5135,18 +5778,95 @@ export default function FloorPlan({
     );
   };
 
-  const updateInspectedCustomColor = (hexColor) => {
-    if (!inspectedTarget?.obj) return;
-    setWallsWithHistory((prev) =>
+  const updateInspectedWindowOffsets = (nextOffsets, recordHistory = true) => {
+    if (!inspectedTarget?.obj || !Array.isArray(nextOffsets) || nextOffsets.length === 0) return;
+    const setter = recordHistory ? setWallsWithHistory : setWalls;
+    const firstOffset = nextOffsets[0] || 0;
+    setter((prev) =>
       prev.map((w) => {
         if (w.id === inspectedTarget.obj.id) {
-          return { ...w, customColor: hexColor };
+          return { ...w, windowOffsets: nextOffsets, windowOffset: firstOffset };
         }
         if (inspectedTarget.parentGroup && w.id === inspectedTarget.parentGroup.id && w.children) {
           return {
             ...w,
             children: w.children.map((c) =>
-              c.id === inspectedTarget.obj.id ? { ...c, customColor: hexColor } : c
+              c.id === inspectedTarget.obj.id
+                ? { ...c, windowOffsets: nextOffsets, windowOffset: firstOffset }
+                : c
+            ),
+          };
+        }
+        return w;
+      })
+    );
+  };
+
+  const updateInspectedWindowCount = (nextCount) => {
+    if (!inspectedTarget?.obj) return;
+    const offsets = buildEvenWindowOffsets(inspectedTarget.obj, nextCount);
+    updateInspectedWindowOffsets(offsets, true);
+  };
+
+  const mergeInspectedWindows = () => {
+    if (!inspectedTarget?.obj) return;
+    const { count } = getWallWindowsLayout(inspectedTarget.obj);
+    const offsets = buildMergedWindowOffsets(inspectedTarget.obj, count);
+    updateInspectedWindowOffsets(offsets, true);
+  };
+
+  const updateInspectedWindowWidth = (nextWidthMeters) => {
+    if (!inspectedTarget?.obj) return;
+    const wallW = inspectedTarget.obj.scale?.[0] || 1;
+    const { count } = getWallWindowsLayout(inspectedTarget.obj);
+    const maxWidth = Math.max(0.5, ((1 - 0.04) * wallW) / count);
+    const parsed = parseFloat(nextWidthMeters);
+    if (Number.isNaN(parsed)) return;
+    const clampedW = Math.max(0.5, Math.min(maxWidth, Math.round(parsed * 20) / 20));
+    setWallsWithHistory((prev) =>
+      prev.map((w) => {
+        if (w.id === inspectedTarget.obj.id) {
+          return { ...w, windowWidth: clampedW };
+        }
+        if (inspectedTarget.parentGroup && w.id === inspectedTarget.parentGroup.id && w.children) {
+          return {
+            ...w,
+            children: w.children.map((c) =>
+              c.id === inspectedTarget.obj.id ? { ...c, windowWidth: clampedW } : c
+            ),
+          };
+        }
+        return w;
+      })
+    );
+  };
+
+  const updateInspectedWindowOffsetAt = (winIdx, nextOffset, recordHistory = true) => {
+    if (!inspectedTarget?.obj) return;
+    const layout = getWallWindowsLayout(inspectedTarget.obj);
+    const targetWin = layout.windows[winIdx];
+    if (!targetWin) return;
+    const clamped = Math.max(targetWin.minOffset, Math.min(targetWin.maxOffset, Number(nextOffset) || 0));
+    const nextOffsets = layout.windows.map((w, i) => (i === winIdx ? clamped : w.centerX));
+    updateInspectedWindowOffsets(nextOffsets, recordHistory);
+  };
+
+  const updateInspectedCustomColor = (hexColor) => {
+    if (!inspectedTarget?.obj) return;
+    setWallsWithHistory((prev) =>
+      prev.map((w) => {
+        if (w.id === inspectedTarget.obj.id) {
+          return w.type === 'text_label'
+            ? { ...w, customColor: hexColor, color: hexColor }
+            : { ...w, customColor: hexColor };
+        }
+        if (inspectedTarget.parentGroup && w.id === inspectedTarget.parentGroup.id && w.children) {
+          return {
+            ...w,
+            children: w.children.map((c) =>
+              c.id === inspectedTarget.obj.id
+                ? (c.type === 'text_label' ? { ...c, customColor: hexColor, color: hexColor } : { ...c, customColor: hexColor })
+                : c
             ),
           };
         }
@@ -5300,7 +6020,7 @@ export default function FloorPlan({
                 </div>
 
                 {/* Edit-only Controls */}
-                {editMode && (
+                {effectiveEditMode && (
                   <>
                     {/* Island 3: Floor / Layers Pill (First floor) */}
                     <button
@@ -5320,7 +6040,7 @@ export default function FloorPlan({
                     {/* Island 4: Save Square Button */}
                     <button
                       type="button"
-                      onClick={saveLayout}
+                      onClick={() => saveLayout(true)}
                       className="w-10 h-10 rounded-xl border bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-slate-100 border-slate-700/80 shadow-[0_2px_10px_rgba(0,0,0,0.08)] flex items-center justify-center transition-colors cursor-pointer backdrop-blur-md"
                       title="Simpan Layout 3D (Ctrl+S)"
                     >
@@ -5416,51 +6136,8 @@ export default function FloorPlan({
                 )}
               </div>
 
-              {/* Top-Right Compact Actions: Edit/Preview Toggle + Pin to Dashboard + Fullscreen */}
+              {/* Top-Right Compact Action: Fullscreen (automatically enters Edit Mode) */}
               <div className="flex items-center gap-2 pointer-events-auto">
-                {!isWidget && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editMode) {
-                        setEditMode(false);
-                        setActiveDrawer(null);
-                        setDrawWallMode(false);
-                        setSelectedObj(null);
-                        setLayersPanelOpen(false);
-                        setShowHelpPopover(false);
-                      } else {
-                        setIsExploreMode(false);
-                        setEditMode(true);
-                        setActiveTab('walls');
-                        setActiveDrawer('build');
-                      }
-                    }}
-                    className={`h-10 px-3.5 rounded-xl text-xs font-bold border shadow-[0_2px_10px_rgba(0,0,0,0.08)] inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      editMode
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600'
-                    }`}
-                    title={editMode ? 'Kembali ke Mode Preview untuk klik sensor' : 'Masuk Mode Edit Denah 3D'}
-                  >
-                    {editMode ? <Check size={15} /> : <Edit3 size={14} />}
-                    <span>{editMode ? 'Selesai Edit' : 'Edit Denah'}</span>
-                  </button>
-                )}
-                {onTogglePin && (
-                  <button
-                    type="button"
-                    onClick={onTogglePin}
-                    className={`h-10 px-3.5 rounded-xl text-xs font-semibold border shadow-[0_2px_10px_rgba(0,0,0,0.08)] inline-flex items-center gap-1.5 transition-colors cursor-pointer backdrop-blur-md ${
-                      isPinned
-                        ? 'bg-amber-400 text-slate-900 border-amber-400'
-                        : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border-slate-700/80'
-                    }`}
-                  >
-                    <Pin size={14} className={isPinned ? 'fill-slate-900' : ''} />
-                    <span className="hidden sm:inline">{isPinned ? 'Pinned' : 'Pin Dashboard'}</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
@@ -5469,7 +6146,7 @@ export default function FloorPlan({
                       ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500'
                       : 'bg-slate-900/90 hover:bg-slate-800 text-slate-100 border-slate-700/80'
                   }`}
-                  title={isFullscreen ? 'Keluar Layar Penuh (Esc / F)' : 'Mode Layar Penuh (F)'}
+                  title={isFullscreen ? 'Keluar Layar Penuh & Simpan (Esc / F)' : 'Masuk Mode Edit Fullscreen (F)'}
                 >
                   {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                   <span className="hidden sm:inline">{isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}</span>
@@ -5479,7 +6156,7 @@ export default function FloorPlan({
           )}
 
           {/* ── 2. LEFT FLOATING PRO-CAD TOOLBAR DOCK ── */}
-          {editMode && !isSidebarPreview && (
+          {effectiveEditMode && !isSidebarPreview && (
             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2 max-h-[calc(100%-8.5rem)] overflow-y-auto py-0.5 [&::-webkit-scrollbar]:hidden">
               {/* Group 1: Katalog [Struktur / Perangkat IoT / Material] */}
               <div className="w-11 py-1.5 rounded-xl border bg-slate-900/95 border-slate-700/80 shadow-[0_4px_14px_rgba(0,0,0,0.14)] flex flex-col items-center gap-1 backdrop-blur-md">
@@ -5663,7 +6340,7 @@ export default function FloorPlan({
           )}
 
           {/* ── COMPACT FLOATING TRANSFORM & PROPERTY POPOVER (Native Surface Tokens: Auto Dark & Light) ── */}
-          {editMode && !isSidebarPreview && (activeDrawer === 'edit' || selectedObj) && (
+          {effectiveEditMode && !isSidebarPreview && (activeDrawer === 'edit' || selectedObj) && (
             <div
               onWheel={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -5768,6 +6445,133 @@ export default function FloorPlan({
                 </div>
               )}
 
+              {/* 3b. Pengaturan Jendela (Jumlah 1–4, Gabung Memanjang, Lebar Jendela, Posisi Cepat) */}
+              {inspectedTarget?.obj && inspectedTarget.kind !== 'device' && WINDOW_DRAG_TYPES.has(inspectedTarget.obj.type) && (() => {
+                const layout = getWallWindowsLayout(inspectedTarget.obj);
+                const wallW = inspectedTarget.obj.scale?.[0] || 1;
+                const currentWinMeters = layout.winLocalW * wallW;
+                const maxWinMeters = Math.max(0.5, ((1 - 0.04) * wallW) / layout.count);
+                const singleWin = layout.windows[0];
+                const isSingleLeft = layout.count === 1 && singleWin && Math.abs(singleWin.centerX - singleWin.minOffset) < 0.015;
+                const isSingleCenter = layout.count === 1 && singleWin && Math.abs(singleWin.centerX) < 0.015;
+                const isSingleRight = layout.count === 1 && singleWin && Math.abs(singleWin.centerX - singleWin.maxOffset) < 0.015;
+                return (
+                  <div className="space-y-2 pt-1.5 border-t border-slate-700/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Jendela ({layout.count})
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Drag di 3D untuk geser
+                      </span>
+                    </div>
+
+                    {/* Pilih Jumlah Jendela (1 - 4) */}
+                    <div className="grid grid-cols-4 gap-1">
+                      {[1, 2, 3, 4].map((cnt) => {
+                        const isAct = layout.count === cnt;
+                        return (
+                          <button
+                            key={cnt}
+                            type="button"
+                            onClick={() => updateInspectedWindowCount(cnt)}
+                            className={`py-1 rounded-lg text-[11px] font-bold font-mono transition-colors cursor-pointer border ${
+                              isAct
+                                ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700/70'
+                            }`}
+                            title={`Pasang ${cnt} jendela di dinding ini`}
+                          >
+                            {cnt}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Aksi Cepat Susunan (Gabung Memanjang / Pisahkan Rata) saat > 1 jendela */}
+                    {layout.count > 1 && (
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={mergeInspectedWindows}
+                          className="py-1 px-2 rounded-lg text-[11px] font-semibold bg-blue-500/15 hover:bg-blue-500/25 text-blue-500 border border-blue-500/35 transition-colors cursor-pointer"
+                          title="Rapatkan semua jendela tanpa sekat agar menyatu memanjang"
+                        >
+                          Gabung Panjang
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateInspectedWindowCount(layout.count)}
+                          className="py-1 px-2 rounded-lg text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700/70 transition-colors cursor-pointer"
+                          title="Pisahkan dan ratakan jarak antar jendela"
+                        >
+                          Ratakan Jarak
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Lebar per Jendela (Meter) */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold text-slate-400">Lebar Jendela</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => updateInspectedWindowWidth(currentWinMeters - 0.5)}
+                          disabled={currentWinMeters <= 0.55}
+                          className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800 hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40 text-slate-200 border border-slate-700/70 text-xs font-bold cursor-pointer"
+                          title="Perkecil lebar jendela (-0.5m)"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          step="0.25"
+                          min="0.5"
+                          max={Number(maxWinMeters.toFixed(2))}
+                          value={Number(currentWinMeters.toFixed(2))}
+                          onChange={(e) => updateInspectedWindowWidth(e.target.value)}
+                          className="w-14 px-1.5 py-0.5 rounded-md bg-slate-800 border border-slate-700/80 text-slate-100 font-mono tabular-nums text-[11px] text-center outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateInspectedWindowWidth(currentWinMeters + 0.5)}
+                          disabled={currentWinMeters >= maxWinMeters - 0.05}
+                          className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800 hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40 text-slate-200 border border-slate-700/70 text-xs font-bold cursor-pointer"
+                          title="Perlebar jendela (+0.5m)"
+                        >
+                          +
+                        </button>
+                        <span className="text-[10px] text-slate-400 font-mono">m</span>
+                      </div>
+                    </div>
+
+                    {/* Preset Cepat Kiri / Tengah / Kanan untuk 1 Jendela */}
+                    {layout.count === 1 && singleWin && (singleWin.maxOffset - singleWin.minOffset) >= 0.01 && (
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { label: 'Kiri', val: singleWin.minOffset, active: isSingleLeft },
+                          { label: 'Tengah', val: 0, active: isSingleCenter },
+                          { label: 'Kanan', val: singleWin.maxOffset, active: isSingleRight },
+                        ].map((pos) => (
+                          <button
+                            key={pos.label}
+                            type="button"
+                            onClick={() => updateInspectedWindowOffsetAt(0, pos.val, true)}
+                            className={`py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border ${
+                              pos.active
+                                ? 'bg-blue-500/15 text-blue-500 border-blue-500/40'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700/70'
+                            }`}
+                          >
+                            {pos.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* 4. Ukuran / Dimensi (Panjang X, Tinggi Y, Lebar Z) */}
               {inspectedTarget?.obj && inspectedTarget.kind !== 'device' && inspectedTarget.obj.type !== 'custom_group' && (
                 <div className="space-y-1 pt-1.5 border-t border-slate-700/70">
@@ -5808,7 +6612,7 @@ export default function FloorPlan({
                     </span>
                     <input
                       type="color"
-                      value={inspectedTarget.obj.customColor || WALL_MATERIALS[inspectedTarget.obj.materialPreset]?.swatch || '#e6e4e0'}
+                      value={inspectedTarget.obj.customColor || inspectedTarget.obj.color || WALL_MATERIALS[inspectedTarget.obj.materialPreset]?.swatch || '#e6e4e0'}
                       onChange={(e) => updateInspectedCustomColor(e.target.value)}
                       className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
                       title="Pilih Warna Bebas"
@@ -5820,7 +6624,7 @@ export default function FloorPlan({
                         key={mat.id}
                         type="button"
                         onClick={() => {
-                          if (inspectedTarget.obj.type === 'furniture') {
+                          if (inspectedTarget.obj.type === 'furniture' || inspectedTarget.obj.type === 'text_label') {
                             updateInspectedCustomColor(mat.swatch);
                           } else {
                             applyMaterialToSelectionOrAll(mat.id);
@@ -5867,7 +6671,7 @@ export default function FloorPlan({
           )}
 
           {/* ── FLOATING LAYERS & INSPEKTOR CARD (Native Surface Tokens: Auto Dark & Light) ── */}
-          {editMode && !isSidebarPreview && layersPanelOpen && (
+          {effectiveEditMode && !isSidebarPreview && layersPanelOpen && (
             <div
               onWheel={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
@@ -6141,7 +6945,16 @@ export default function FloorPlan({
                   onClick={() => {
                     const nextWalk = !isExploreMode;
                     setIsExploreMode(nextWalk);
-                    if (nextWalk) setCameraViewMode('orbit');
+                    if (nextWalk) {
+                      setCameraViewMode('orbit');
+                      setSelectedObj(null);
+                      setSelectedForGroup([]);
+                      setDrawWallMode(false);
+                      setActiveDrawer(null);
+                      setLayersPanelOpen(false);
+                      setShowHelpPopover(false);
+                      setShowSettingsPopover(false);
+                    }
                   }}
                   className={`w-9 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                     isExploreMode
@@ -6196,7 +7009,7 @@ export default function FloorPlan({
             shadows={!isSidebarPreview}
             frameloop={isSidebarPreview ? "demand" : "always"}
             gl={{ 
-              preserveDrawingBuffer: isCapturing, 
+              preserveDrawingBuffer: !isSidebarPreview, 
               antialias: !isSidebarPreview,
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.08 * lightingIntensityScale,
@@ -6216,7 +7029,7 @@ export default function FloorPlan({
 
             {/* Key Sun Directional Light with Soft Architectural Shadows */}
             <directionalLight 
-              castShadow={!isCapturing && !isSidebarPreview} 
+              castShadow={!isCapturing && !isSidebarPreview && cameraViewMode !== 'top2d'} 
               position={[12, 24, 14]} 
               intensity={(isCapturing ? 0.8 : (isLightMode ? 1.45 : 1.15)) * lightingIntensityScale} 
               shadow-mapSize={isWidget ? [512, 512] : [2048, 2048]} 
@@ -6248,7 +7061,7 @@ export default function FloorPlan({
             <Suspense fallback={null}>
               <RoomLayout 
                 devices={currentRoomDevices} 
-                editMode={editMode} 
+                editMode={effectiveEditMode} 
                 activeTab={activeTab === 'devices' ? 'devices' : 'walls'}
                 walls={walls} setWalls={setWallsWithHistory}
                 selectedObj={selectedObj} setSelectedObj={setSelectedObj}
@@ -6277,7 +7090,7 @@ export default function FloorPlan({
         </div>
 
         {/* ── 4. FLOATING CATALOG DRAWER (Native Surface Tokens: Auto Dark & Light) ── */}
-        {editMode && !isSidebarPreview && activeDrawer && activeDrawer !== 'edit' && (
+        {effectiveEditMode && !isSidebarPreview && activeDrawer && activeDrawer !== 'edit' && (
           <div
             onWheel={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
